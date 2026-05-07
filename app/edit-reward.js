@@ -1,15 +1,17 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
-    Alert,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
+import { BrandHeader } from "../components/BrandMark";
 import { api } from "../lib/api";
+import { colors, radii, shadows, spacing } from "../lib/theme";
 
 export default function EditRewardScreen() {
   const params = useLocalSearchParams();
@@ -57,20 +59,18 @@ export default function EditRewardScreen() {
       contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled"
     >
-      <View style={styles.header}>
-        <Text style={styles.eyebrow}>Edit reward</Text>
-        <Text style={styles.title}>Update Reward</Text>
-        <Text style={styles.subtitle}>
-          Adjust the reward name, notes, or coin cost.
-        </Text>
-      </View>
+      <BrandHeader eyebrow="Edit Reward" title="Update Reward" />
+
+      <Text style={styles.subtitle}>
+        Adjust the reward name, notes, or coin cost.
+      </Text>
 
       <View style={styles.card}>
         <Text style={styles.label}>Reward name</Text>
         <TextInput
           style={styles.input}
           placeholder="Reward name"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={colors.textMuted}
           value={name}
           onChangeText={setName}
         />
@@ -79,7 +79,7 @@ export default function EditRewardScreen() {
         <TextInput
           style={[styles.input, styles.textarea]}
           placeholder="Optional notes"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={colors.textMuted}
           value={description}
           onChangeText={setDescription}
           multiline
@@ -89,11 +89,26 @@ export default function EditRewardScreen() {
         <TextInput
           style={styles.input}
           placeholder="Coin cost"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={colors.textMuted}
           value={cost}
           onChangeText={setCost}
           keyboardType="numeric"
         />
+
+        <View style={styles.previewBox}>
+          <View style={styles.iconCircle}>
+            <Text style={styles.iconText}>🎁</Text>
+          </View>
+
+          <View style={styles.previewText}>
+            <Text style={styles.previewTitle}>
+              {name.trim() || "Your reward"}
+            </Text>
+            <Text style={styles.previewSubtitle}>
+              {cost ? `${cost} coins` : "Set a coin cost"}
+            </Text>
+          </View>
+        </View>
       </View>
 
       <Pressable
@@ -119,83 +134,108 @@ export default function EditRewardScreen() {
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    backgroundColor: "#F6F7FB",
+    backgroundColor: colors.background,
   },
   container: {
-    padding: 20,
-    paddingTop: 34,
-    paddingBottom: 40,
-  },
-  header: {
-    marginBottom: 18,
-  },
-  eyebrow: {
-    fontSize: 13,
-    color: "#6B7280",
-    fontWeight: "800",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-  },
-  title: {
-    fontSize: 36,
-    fontWeight: "900",
-    color: "#111827",
-    marginTop: 2,
+    padding: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
   },
   subtitle: {
-    color: "#6B7280",
-    marginTop: 8,
-    lineHeight: 21,
+    color: colors.textMuted,
+    marginTop: spacing.sm,
+    marginBottom: spacing.lg,
+    lineHeight: 20,
     fontWeight: "600",
   },
   card: {
-    backgroundColor: "white",
-    borderRadius: 22,
-    padding: 18,
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    padding: spacing.lg,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
-    marginBottom: 16,
+    borderColor: colors.border,
+    marginBottom: spacing.md,
+    ...shadows.card,
   },
   label: {
-    color: "#374151",
+    color: colors.text,
     fontWeight: "900",
     marginBottom: 8,
     marginTop: 4,
   },
   input: {
-    backgroundColor: "#F9FAFB",
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
     padding: 14,
-    borderRadius: 14,
-    marginBottom: 14,
-    color: "#111827",
-    fontWeight: "600",
+    borderRadius: radii.md,
+    marginBottom: spacing.md,
+    color: colors.text,
+    fontWeight: "700",
   },
   textarea: {
     height: 96,
     textAlignVertical: "top",
   },
-  button: {
-    backgroundColor: "#2563EB",
-    padding: 16,
-    borderRadius: 16,
+  previewBox: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    flexDirection: "row",
     alignItems: "center",
+    gap: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  iconCircle: {
+    width: 46,
+    height: 46,
+    borderRadius: radii.pill,
+    backgroundColor: "rgba(34, 197, 94, 0.18)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  iconText: {
+    fontSize: 22,
+  },
+  previewText: {
+    flex: 1,
+  },
+  previewTitle: {
+    fontSize: 17,
+    fontWeight: "900",
+    color: colors.text,
+  },
+  previewSubtitle: {
+    marginTop: 3,
+    color: colors.textMuted,
+    fontWeight: "700",
+  },
+  button: {
+    backgroundColor: colors.accent,
+    padding: 16,
+    borderRadius: radii.lg,
+    alignItems: "center",
+    marginTop: spacing.sm,
+    ...shadows.glow,
   },
   buttonDisabled: {
     opacity: 0.65,
   },
   buttonText: {
-    color: "white",
+    color: colors.textDark,
     fontWeight: "900",
     fontSize: 16,
   },
   cancelButton: {
-    padding: 16,
+    padding: spacing.md,
     alignItems: "center",
   },
   cancelText: {
-    color: "#6B7280",
+    color: colors.textMuted,
     fontWeight: "800",
   },
 });

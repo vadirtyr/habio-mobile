@@ -1,21 +1,33 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSequence,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
+import { BrandHeader } from "../../components/BrandMark";
 import { api } from "../../lib/api";
+import { colors, radii, shadows, spacing } from "../../lib/theme";
 
 export default function RewardsScreen() {
   const [rewards, setRewards] = useState([]);
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState(null);
+  const [redeemedReward, setRedeemedReward] = useState(null);
 
   async function fetchRewards() {
     try {
@@ -41,40 +53,37 @@ export default function RewardsScreen() {
       const data = await api.post(`/rewards/${reward.id}/redeem`);
 
       setBalance(data.new_balance);
+      setRedeemedReward(reward);
       setMessage(`Redeemed: ${reward.name}`);
+
       fetchRewards();
 
-      setTimeout(() => setMessage(null), 2200);
+      setTimeout(() => setMessage(null), 2000);
+      setTimeout(() => setRedeemedReward(null), 1800);
     } catch (error) {
       Alert.alert("Error", error.message);
     }
   }
 
   function confirmDeleteReward(reward) {
-    Alert.alert(
-      "Delete reward?",
-      `Delete “${reward.name}”?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => deleteReward(reward),
-        },
-      ]
-    );
+    Alert.alert("Delete reward?", `Delete “${reward.name}”?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => deleteReward(reward),
+      },
+    ]);
   }
 
   async function deleteReward(reward) {
     const previous = rewards;
-
     setRewards((current) => current.filter((r) => r.id !== reward.id));
 
     try {
       await api.delete(`/rewards/${reward.id}`);
-
       setMessage("Reward deleted");
-      setTimeout(() => setMessage(null), 1800);
+      setTimeout(() => setMessage(null), 1600);
     } catch (error) {
       setRewards(previous);
       Alert.alert("Error", error.message);
@@ -94,7 +103,7 @@ export default function RewardsScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator color={colors.accent} />
         <Text style={styles.loadingText}>Loading rewards...</Text>
       </View>
     );
@@ -102,6 +111,8 @@ export default function RewardsScreen() {
 
   return (
     <View style={styles.container}>
+      <RedeemCelebration reward={redeemedReward} />
+
       <FlatList
         data={rewards}
         keyExtractor={(item) => item.id}
@@ -109,13 +120,13 @@ export default function RewardsScreen() {
         onRefresh={fetchRewards}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
-          <View style={styles.header}>
-            <Text style={styles.eyebrow}>Spend</Text>
-            <Text style={styles.title}>Rewards</Text>
+          <View>
+            <BrandHeader eyebrow="Spend" title="Rewards" />
 
             <View style={styles.balanceCard}>
-              <Text style={styles.balanceLabel}>Coin balance</Text>
+              <Text style={styles.balanceLabel}>Available Coins</Text>
               <Text style={styles.balanceValue}>{balance}</Text>
+              <Text style={styles.balanceSub}>Earn it. Spend it well.</Text>
             </View>
 
             <Pressable
@@ -125,13 +136,15 @@ export default function RewardsScreen() {
               <Text style={styles.addButtonText}>+ Add Reward</Text>
             </Pressable>
 
-            {message && <Text style={styles.message}>{message}</Text>}
+            <RewardToast message={message} />
           </View>
         }
         ListEmptyComponent={
           <View style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>No rewards yet</Text>
-            <Text style={styles.emptyText}>Add something worth earning.</Text>
+            <Text style={styles.emptyText}>
+              Add something worth working toward.
+            </Text>
             <Pressable
               style={styles.emptyButton}
               onPress={() => router.push("/create-reward")}
@@ -140,186 +153,284 @@ export default function RewardsScreen() {
             </Pressable>
           </View>
         }
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <View style={styles.cardTop}>
-              <View style={styles.iconCircle}>
-                <Text style={styles.iconText}>🎁</Text>
+        renderItem={({ item, index }) => {
+          const canRedeem = balance >= item.cost;
+
+          return (
+            <AnimatedCard index={index}>
+              <View style={[styles.card, !canRedeem && styles.lockedCard]}>
+                <View style={styles.cardTop}>
+                  <View style={[styles.iconCircle, canRedeem && styles.iconReady]}>
+                    <Text style={styles.iconText}>🎁</Text>
+                  </View>
+
+                  <View style={styles.cardText}>
+                    <Text style={styles.name}>{item.name}</Text>
+                    {!!item.description && (
+                      <Text style={styles.description}>{item.description}</Text>
+                    )}
+                  </View>
+                </View>
+
+                <View style={styles.metaRow}>
+                  <Text style={styles.metaPill}>🪙 {item.cost}</Text>
+                  <Text style={styles.metaPill}>
+                    {item.times_redeemed || 0} redeemed
+                  </Text>
+                </View>
+
+                <Pressable
+                  style={[
+                    styles.redeemButton,
+                    !canRedeem && styles.redeemButtonDisabled,
+                  ]}
+                  disabled={!canRedeem}
+                  onPress={() => redeemReward(item)}
+                >
+                  <Text
+                    style={[
+                      styles.redeemButtonText,
+                      !canRedeem && styles.redeemButtonTextDisabled,
+                    ]}
+                  >
+                    {canRedeem ? "Redeem Reward" : `${item.cost - balance} coins short`}
+                  </Text>
+                </Pressable>
+
+                <View style={styles.secondaryRow}>
+                  <Pressable
+                    style={styles.secondaryButton}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/edit-reward",
+                        params: {
+                          id: item.id,
+                          name: item.name,
+                          description: item.description || "",
+                          cost: String(item.cost),
+                          icon: item.icon || "gift",
+                        },
+                      })
+                    }
+                  >
+                    <Text style={styles.secondaryText}>Edit</Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={styles.deleteButton}
+                    onPress={() => confirmDeleteReward(item)}
+                  >
+                    <Text style={styles.deleteText}>Delete</Text>
+                  </Pressable>
+                </View>
               </View>
-
-              <View style={styles.cardText}>
-                <Text style={styles.name}>{item.name}</Text>
-                {!!item.description && (
-                  <Text style={styles.description}>{item.description}</Text>
-                )}
-              </View>
-            </View>
-
-            <View style={styles.metaRow}>
-              <Text style={styles.metaPill}>🪙 {item.cost} coins</Text>
-              <Text style={styles.metaPill}>
-                Redeemed {item.times_redeemed || 0}x
-              </Text>
-            </View>
-
-            <Pressable
-              style={[
-                styles.redeemButton,
-                balance < item.cost && styles.redeemButtonDisabled,
-              ]}
-              disabled={balance < item.cost}
-              onPress={() => redeemReward(item)}
-            >
-              <Text style={styles.redeemButtonText}>
-                {balance >= item.cost ? "Redeem" : "Not enough coins"}
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={styles.editButton}
-              onPress={() =>
-                router.push({
-                  pathname: "/edit-reward",
-                  params: {
-                    id: item.id,
-                    name: item.name,
-                    description: item.description || "",
-                    cost: String(item.cost),
-                    icon: item.icon || "gift",
-                  },
-                })
-              }
-            >
-              <Text style={styles.editButtonText}>Edit</Text>
-            </Pressable>
-
-            <Pressable
-              style={styles.deleteButton}
-              onPress={() => confirmDeleteReward(item)}
-            >
-              <Text style={styles.deleteButtonText}>Delete</Text>
-            </Pressable>
-          </View>
-        )}
+            </AnimatedCard>
+          );
+        }}
       />
     </View>
+  );
+}
+
+function AnimatedCard({ children, index = 0 }) {
+  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(18);
+
+  useEffect(() => {
+    opacity.value = withDelay(index * 55, withTiming(1, { duration: 260 }));
+    translateY.value = withDelay(index * 55, withTiming(0, { duration: 260 }));
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  return <Animated.View style={animatedStyle}>{children}</Animated.View>;
+}
+
+function RewardToast({ message }) {
+  const scale = useSharedValue(0.9);
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (message) {
+      opacity.value = withTiming(1, { duration: 180 });
+      scale.value = withSequence(withSpring(1.08), withSpring(1));
+    } else {
+      opacity.value = withTiming(0, { duration: 150 });
+      scale.value = withTiming(0.9, { duration: 150 });
+    }
+  }, [message]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: scale.value }],
+  }));
+
+  if (!message) return null;
+
+  return (
+    <Animated.View style={[styles.toast, animatedStyle]}>
+      <Text style={styles.toastText}>{message}</Text>
+    </Animated.View>
+  );
+}
+
+function RedeemCelebration({ reward }) {
+  const scale = useSharedValue(0.55);
+  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(30);
+
+  useEffect(() => {
+    if (reward) {
+      opacity.value = withTiming(1, { duration: 160 });
+      translateY.value = withSpring(0);
+      scale.value = withSequence(withSpring(1.15), withSpring(1));
+    } else {
+      opacity.value = withTiming(0, { duration: 180 });
+      translateY.value = withTiming(30, { duration: 180 });
+      scale.value = withTiming(0.55, { duration: 180 });
+    }
+  }, [reward]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }, { scale: scale.value }],
+  }));
+
+  if (!reward) return null;
+
+  return (
+    <Modal visible transparent animationType="none">
+      <View style={styles.celebrationOverlay}>
+        <Animated.View style={[styles.celebrationCard, animatedStyle]}>
+          <Text style={styles.celebrationIcon}>🎉</Text>
+          <Text style={styles.celebrationTitle}>Reward Redeemed</Text>
+          <Text style={styles.celebrationName}>{reward.name}</Text>
+          <Text style={styles.celebrationText}>Nice work. You earned this.</Text>
+        </Animated.View>
+      </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 22,
-    paddingHorizontal: 20,
-    backgroundColor: "#F6F7FB",
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
   },
   listContent: {
-    paddingBottom: 110,
+    paddingBottom: 120,
   },
   center: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    gap: 10,
-    backgroundColor: "#F6F7FB",
+    backgroundColor: colors.background,
   },
   loadingText: {
-    color: "#6B7280",
-    fontWeight: "600",
-  },
-  header: {
-    marginBottom: 6,
-  },
-  eyebrow: {
-    fontSize: 13,
-    color: "#6B7280",
+    color: colors.textMuted,
+    marginTop: 10,
     fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
   },
-  title: {
-    fontSize: 36,
-    fontWeight: "900",
-    color: "#111827",
-    marginTop: 2,
-  },
+
   balanceCard: {
-    marginTop: 18,
-    backgroundColor: "#111827",
-    borderRadius: 22,
-    padding: 18,
+    marginTop: spacing.md,
+    backgroundColor: colors.primaryBright,
+    borderRadius: radii.xl,
+    padding: spacing.lg,
+    ...shadows.glow,
   },
   balanceLabel: {
-    color: "#D1D5DB",
-    fontSize: 13,
-    fontWeight: "700",
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 12,
+    fontWeight: "900",
     textTransform: "uppercase",
-    letterSpacing: 0.7,
   },
   balanceValue: {
     color: "white",
-    fontSize: 34,
+    fontSize: 42,
     fontWeight: "900",
     marginTop: 4,
   },
+  balanceSub: {
+    color: "rgba(255,255,255,0.78)",
+    marginTop: 4,
+    fontWeight: "700",
+  },
+
   addButton: {
-    marginTop: 14,
-    backgroundColor: "#2563EB",
+    marginTop: spacing.md,
+    backgroundColor: colors.accent,
     padding: 15,
-    borderRadius: 16,
+    borderRadius: radii.lg,
     alignItems: "center",
   },
   addButtonText: {
-    color: "white",
+    color: colors.textDark,
     fontWeight: "900",
     fontSize: 16,
   },
-  message: {
+
+  toast: {
     marginTop: 12,
-    backgroundColor: "#DCFCE7",
-    color: "#166534",
+    backgroundColor: "rgba(34, 197, 94, 0.18)",
+    borderColor: colors.accent,
+    borderWidth: 1,
     padding: 12,
-    borderRadius: 14,
-    textAlign: "center",
+    borderRadius: radii.lg,
+    alignItems: "center",
+  },
+  toastText: {
+    color: colors.accent,
     fontWeight: "900",
   },
+
   emptyCard: {
-    marginTop: 16,
-    backgroundColor: "white",
-    padding: 22,
-    borderRadius: 22,
+    marginTop: spacing.lg,
+    backgroundColor: colors.surface,
+    padding: spacing.lg,
+    borderRadius: radii.xl,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
   },
   emptyTitle: {
     fontSize: 20,
     fontWeight: "900",
-    color: "#111827",
+    color: colors.text,
   },
   emptyText: {
-    color: "#6B7280",
+    color: colors.textMuted,
     textAlign: "center",
     marginTop: 6,
     marginBottom: 16,
   },
   emptyButton: {
-    backgroundColor: "#111827",
+    backgroundColor: colors.accent,
     paddingVertical: 12,
     paddingHorizontal: 18,
-    borderRadius: 14,
+    borderRadius: radii.md,
   },
   emptyButtonText: {
-    color: "white",
+    color: colors.textDark,
     fontWeight: "900",
   },
+
   card: {
-    backgroundColor: "white",
-    padding: 16,
-    borderRadius: 22,
+    backgroundColor: colors.surface,
+    padding: spacing.md,
+    borderRadius: radii.xl,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
+    ...shadows.card,
+  },
+  lockedCard: {
+    opacity: 0.72,
   },
   cardTop: {
     flexDirection: "row",
@@ -327,15 +438,21 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 999,
-    backgroundColor: "#FCE7F3",
+    width: 48,
+    height: 48,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surfaceElevated,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  iconReady: {
+    backgroundColor: "rgba(34, 197, 94, 0.18)",
+    borderColor: colors.accent,
   },
   iconText: {
-    fontSize: 22,
+    fontSize: 23,
   },
   cardText: {
     flex: 1,
@@ -343,13 +460,15 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 18,
     fontWeight: "900",
-    color: "#111827",
+    color: colors.text,
   },
   description: {
-    color: "#6B7280",
+    color: colors.textMuted,
     marginTop: 4,
     lineHeight: 20,
+    fontWeight: "600",
   },
+
   metaRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -357,48 +476,103 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   metaPill: {
-    backgroundColor: "#F3F4F6",
-    color: "#374151",
+    backgroundColor: colors.surfaceElevated,
+    color: colors.textMuted,
     paddingVertical: 7,
     paddingHorizontal: 10,
-    borderRadius: 999,
-    fontWeight: "800",
+    borderRadius: radii.pill,
+    fontWeight: "900",
     fontSize: 12,
   },
+
   redeemButton: {
     marginTop: 14,
-    backgroundColor: "#111827",
-    padding: 13,
-    borderRadius: 14,
+    backgroundColor: colors.accent,
+    padding: 14,
+    borderRadius: radii.lg,
     alignItems: "center",
   },
   redeemButtonDisabled: {
-    backgroundColor: "#9CA3AF",
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   redeemButtonText: {
-    color: "white",
+    color: colors.textDark,
     fontWeight: "900",
+    fontSize: 15,
   },
-  editButton: {
-    marginTop: 12,
-    backgroundColor: "#F3F4F6",
+  redeemButtonTextDisabled: {
+    color: colors.textMuted,
+  },
+
+  secondaryRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 10,
+  },
+  secondaryButton: {
+    flex: 1,
+    backgroundColor: colors.surfaceElevated,
     padding: 12,
-    borderRadius: 14,
+    borderRadius: radii.md,
     alignItems: "center",
   },
-  editButtonText: {
-    color: "#111827",
+  secondaryText: {
+    color: colors.text,
     fontWeight: "900",
   },
   deleteButton: {
-    marginTop: 10,
-    backgroundColor: "#FEE2E2",
+    flex: 1,
+    backgroundColor: "rgba(239, 68, 68, 0.14)",
     padding: 12,
-    borderRadius: 14,
+    borderRadius: radii.md,
     alignItems: "center",
   },
-  deleteButtonText: {
-    color: "#B91C1C",
+  deleteText: {
+    color: colors.danger || "#EF4444",
     fontWeight: "900",
+  },
+
+  celebrationOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.78)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: spacing.lg,
+  },
+  celebrationCard: {
+    width: "100%",
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    padding: spacing.xl,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    alignItems: "center",
+    ...shadows.glow,
+  },
+  celebrationIcon: {
+    fontSize: 54,
+    marginBottom: spacing.sm,
+  },
+  celebrationTitle: {
+    color: colors.accent,
+    fontSize: 14,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  celebrationName: {
+    color: colors.text,
+    fontSize: 28,
+    fontWeight: "900",
+    marginTop: spacing.sm,
+    textAlign: "center",
+  },
+  celebrationText: {
+    color: colors.textMuted,
+    fontWeight: "700",
+    marginTop: spacing.sm,
+    textAlign: "center",
   },
 });

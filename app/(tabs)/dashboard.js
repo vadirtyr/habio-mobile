@@ -1,15 +1,16 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { api } from "../../lib/api";
+import { colors, radii, shadows, spacing } from "../../lib/theme";
 
 export default function DashboardScreen() {
   const [stats, setStats] = useState(null);
@@ -43,8 +44,8 @@ export default function DashboardScreen() {
   if (loading || !stats) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" />
-        <Text style={styles.loadingText}>Loading dashboard...</Text>
+        <ActivityIndicator color={colors.accent} />
+        <Text style={styles.loadingText}>Loading your progress...</Text>
       </View>
     );
   }
@@ -54,50 +55,39 @@ export default function DashboardScreen() {
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.container}>
       <Text style={styles.eyebrow}>Overview</Text>
-      <Text style={styles.title}>Dashboard</Text>
+      <Text style={styles.title}>Your Progress</Text>
 
+      {/* HERO */}
       <View style={styles.heroCard}>
-        <Text style={styles.heroLabel}>Coin balance</Text>
+        <Text style={styles.heroLabel}>Coin Balance</Text>
         <Text style={styles.heroValue}>{stats.coin_balance}</Text>
+        <Text style={styles.heroSub}>Keep earning rewards 🔥</Text>
       </View>
 
+      {/* STATS GRID */}
       <View style={styles.grid}>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{stats.habits_count}</Text>
-          <Text style={styles.statLabel}>Habits</Text>
-        </View>
-
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{stats.tasks_pending}</Text>
-          <Text style={styles.statLabel}>Pending tasks</Text>
-        </View>
-
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{stats.current_max_streak}</Text>
-          <Text style={styles.statLabel}>Current streak</Text>
-        </View>
-
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{claimableQuests}</Text>
-          <Text style={styles.statLabel}>Claimable quests</Text>
-        </View>
+        <StatCard label="Habits" value={stats.habits_count} />
+        <StatCard label="Pending Tasks" value={stats.tasks_pending} />
+        <StatCard label="Current Streak" value={stats.current_max_streak} />
+        <StatCard label="Claimable Quests" value={claimableQuests} highlight />
       </View>
 
+      {/* ACTIONS */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Quick actions</Text>
 
         <Pressable
-          style={styles.actionButton}
+          style={styles.primaryButton}
           onPress={() => router.push("/create-habit")}
         >
-          <Text style={styles.actionText}>+ Add Habit</Text>
+          <Text style={styles.primaryText}>+ Add Habit</Text>
         </Pressable>
 
         <Pressable
-          style={styles.actionButton}
+          style={styles.primaryButton}
           onPress={() => router.push("/create-task")}
         >
-          <Text style={styles.actionText}>+ Add Task</Text>
+          <Text style={styles.primaryText}>+ Add Task</Text>
         </Pressable>
 
         <Pressable
@@ -111,114 +101,141 @@ export default function DashboardScreen() {
   );
 }
 
+function StatCard({ label, value, highlight }) {
+  return (
+    <View style={[styles.statCard, highlight && styles.statHighlight]}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    backgroundColor: "#F6F7FB",
+    backgroundColor: colors.background,
   },
   container: {
-    padding: 20,
-    paddingTop: 34,
+    padding: spacing.lg,
+    paddingTop: spacing.xl,
     paddingBottom: 120,
   },
   center: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    gap: 10,
-    backgroundColor: "#F6F7FB",
+    backgroundColor: colors.background,
   },
   loadingText: {
-    color: "#6B7280",
+    color: colors.textMuted,
+    marginTop: 10,
     fontWeight: "600",
   },
   eyebrow: {
-    fontSize: 13,
-    color: "#6B7280",
-    fontWeight: "800",
+    fontSize: 12,
+    color: colors.accent,
+    fontWeight: "900",
     textTransform: "uppercase",
-    letterSpacing: 0.8,
+    letterSpacing: 1,
   },
   title: {
-    fontSize: 36,
+    fontSize: 34,
     fontWeight: "900",
-    color: "#111827",
-    marginTop: 2,
+    color: colors.text,
+    marginTop: 4,
   },
+
   heroCard: {
-    marginTop: 18,
-    backgroundColor: "#111827",
-    borderRadius: 24,
-    padding: 22,
+    marginTop: spacing.lg,
+    backgroundColor: colors.primaryBright,
+    borderRadius: radii.xl,
+    padding: spacing.lg,
+    ...shadows.glow,
   },
   heroLabel: {
-    color: "#D1D5DB",
+    color: "rgba(255,255,255,0.8)",
     fontSize: 13,
     fontWeight: "800",
     textTransform: "uppercase",
-    letterSpacing: 0.7,
   },
   heroValue: {
     color: "white",
-    fontSize: 46,
+    fontSize: 48,
     fontWeight: "900",
     marginTop: 6,
   },
+  heroSub: {
+    color: "rgba(255,255,255,0.8)",
+    marginTop: 6,
+    fontWeight: "600",
+  },
+
   grid: {
-    marginTop: 16,
+    marginTop: spacing.lg,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
   },
   statCard: {
     width: "48%",
-    backgroundColor: "white",
-    borderRadius: 22,
-    padding: 16,
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    padding: spacing.md,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
+  },
+  statHighlight: {
+    borderColor: colors.accent,
+    backgroundColor: colors.surfaceElevated,
   },
   statValue: {
     fontSize: 28,
     fontWeight: "900",
-    color: "#111827",
+    color: colors.text,
   },
   statLabel: {
     marginTop: 4,
-    color: "#6B7280",
+    color: colors.textMuted,
     fontWeight: "700",
   },
+
   section: {
-    marginTop: 22,
+    marginTop: spacing.xl,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: "900",
-    color: "#111827",
-    marginBottom: 12,
+    color: colors.text,
+    marginBottom: spacing.md,
   },
-  actionButton: {
-    backgroundColor: "#2563EB",
+
+  primaryButton: {
+    backgroundColor: colors.accent,
     padding: 16,
-    borderRadius: 16,
+    borderRadius: radii.lg,
     alignItems: "center",
     marginBottom: 10,
+    shadowColor: colors.accent,
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 6,
   },
-  actionText: {
-    color: "white",
+  primaryText: {
+    color: colors.textDark,
     fontWeight: "900",
     fontSize: 16,
   },
+
   secondaryButton: {
-    backgroundColor: "white",
+    backgroundColor: colors.surface,
     padding: 16,
-    borderRadius: 16,
+    borderRadius: radii.lg,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
   },
   secondaryText: {
-    color: "#111827",
+    color: colors.text,
     fontWeight: "900",
     fontSize: 16,
   },

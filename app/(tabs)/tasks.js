@@ -10,7 +10,17 @@ import {
   View,
 } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSequence,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
+import { BrandHeader } from "../../components/BrandMark";
 import { api } from "../../lib/api";
+import { colors, radii, shadows, spacing } from "../../lib/theme";
 
 export default function TasksScreen() {
   const [tasks, setTasks] = useState([]);
@@ -36,30 +46,19 @@ export default function TasksScreen() {
     const task = tasks.find((t) => t.id === taskId);
     if (!task || task.completed) return;
 
-    // optimistic update
     setTasks((current) =>
-      current.map((t) =>
-        t.id === taskId ? { ...t, completed: true } : t
-      )
+      current.map((t) => (t.id === taskId ? { ...t, completed: true } : t))
     );
 
     setBalance((b) => b + (task.coins_reward || 0));
 
     try {
       const data = await api.post(`/tasks/${taskId}/complete`);
-
-      setMessage(`+${data.coins_earned} coins earned`);
+      setMessage(`+${data.coins_earned} coins`);
       setBalance(data.new_balance);
-      setTimeout(() => setMessage(null), 2200);
+      setTimeout(() => setMessage(null), 1800);
     } catch (error) {
-      // rollback
-      setTasks((current) =>
-        current.map((t) =>
-          t.id === taskId ? { ...t, completed: false } : t
-        )
-      );
-
-      setBalance((b) => Math.max(0, b - (task.coins_reward || 0)));
+      fetchTasks();
       Alert.alert("Error", error.message);
     }
   }
@@ -68,33 +67,25 @@ export default function TasksScreen() {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
 
-    Alert.alert(
-      "Delete task?",
-      `Delete “${task.name}”?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => deleteTask(task),
-        },
-      ]
-    );
+    Alert.alert("Delete task?", `Delete “${task.name}”?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => deleteTask(task),
+      },
+    ]);
   }
 
   async function deleteTask(task) {
     const previous = tasks;
-
-    // optimistic remove
     setTasks((current) => current.filter((t) => t.id !== task.id));
 
     try {
       await api.delete(`/tasks/${task.id}`);
-
       setMessage("Task deleted");
-      setTimeout(() => setMessage(null), 1800);
+      setTimeout(() => setMessage(null), 1600);
     } catch (error) {
-      // rollback
       setTasks(previous);
       Alert.alert("Error", error.message);
     }
@@ -113,7 +104,7 @@ export default function TasksScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator color={colors.accent} />
         <Text style={styles.loadingText}>Loading tasks...</Text>
       </View>
     );
@@ -128,12 +119,11 @@ export default function TasksScreen() {
         onRefresh={fetchTasks}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
-          <View style={styles.header}>
-            <Text style={styles.eyebrow}>Plan</Text>
-            <Text style={styles.title}>Tasks</Text>
+          <View>
+            <BrandHeader eyebrow="Plan" title="Your Tasks" />
 
             <View style={styles.balanceCard}>
-              <Text style={styles.balanceLabel}>Coin balance</Text>
+              <Text style={styles.balanceLabel}>Coins</Text>
               <Text style={styles.balanceValue}>{balance}</Text>
             </View>
 
@@ -144,143 +134,318 @@ export default function TasksScreen() {
               <Text style={styles.addButtonText}>+ Add Task</Text>
             </Pressable>
 
-            {message && <Text style={styles.message}>{message}</Text>}
+            <RewardToast message={message} />
           </View>
         }
         ListEmptyComponent={
           <View style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>No tasks yet</Text>
-            <Text style={styles.emptyText}>
-              Add your first task.
-            </Text>
+            <Text style={styles.emptyText}>Start planning your day.</Text>
+            <Pressable
+              style={styles.emptyButton}
+              onPress={() => router.push("/create-task")}
+            >
+              <Text style={styles.emptyButtonText}>Create Task</Text>
+            </Pressable>
           </View>
         }
-        renderItem={({ item }) => (
-          <Swipeable
-            leftThreshold={80}
-            rightThreshold={80}
-            renderLeftActions={() => (
-              <View style={styles.completeAction}>
-                <Text style={styles.swipeText}>Complete</Text>
-              </View>
-            )}
-            renderRightActions={() => (
-              <View style={styles.deleteAction}>
-                <Text style={styles.swipeText}>Delete</Text>
-              </View>
-            )}
-            onSwipeableOpen={(direction) => {
-              if (direction === "left") completeTask(item.id);
-              if (direction === "right") confirmDeleteTask(item.id);
-            }}
-          >
-            <View style={styles.card}>
-              <Text style={styles.name}>{item.name}</Text>
+        renderItem={({ item, index }) => {
+          const isUrgent =
+            item.due_date &&
+            !item.completed &&
+            new Date(item.due_date) < new Date();
 
-              {!!item.description && (
-                <Text style={styles.description}>
-                  {item.description}
-                </Text>
+          return (
+            <Swipeable
+              renderLeftActions={() =>
+                item.completed ? null : (
+                  <View style={styles.completeAction}>
+                    <Text style={styles.swipeText}>Done</Text>
+                  </View>
+                )
+              }
+              renderRightActions={() => (
+                <View style={styles.deleteAction}>
+                  <Text style={styles.swipeText}>Delete</Text>
+                </View>
               )}
+              onSwipeableOpen={(direction) => {
+                if (direction === "left") completeTask(item.id);
+                if (direction === "right") confirmDeleteTask(item.id);
+              }}
+            >
+              <AnimatedCard index={index}>
+                <View
+                  style={[
+                    styles.card,
+                    item.completed && styles.completedCard,
+                    isUrgent && styles.urgentCard,
+                  ]}
+                >
+                  <Text style={styles.name}>{item.name}</Text>
 
-              <Text style={styles.meta}>
-                🪙 {item.coins_reward} •{" "}
-                {item.due_date || "No due date"}
-              </Text>
+                  {!!item.description && (
+                    <Text style={styles.description}>{item.description}</Text>
+                  )}
 
-              <Pressable
-                style={styles.editButton}
-                onPress={() =>
-                  router.push({
-                    pathname: "/edit-task",
-                    params: {
-                      id: item.id,
-                      name: item.name,
-                      description: item.description || "",
-                      due_date: item.due_date || "",
-                    },
-                  })
-                }
-              >
-                <Text style={styles.editText}>Edit</Text>
-              </Pressable>
-            </View>
-          </Swipeable>
-        )}
+                  <View style={styles.metaRow}>
+                    <Text style={styles.meta}>🪙 {item.coins_reward}</Text>
+
+                    <Text style={[styles.meta, isUrgent && styles.urgentText]}>
+                      {item.due_date || "No due date"}
+                    </Text>
+                  </View>
+
+                  <Text
+                    style={[
+                      styles.status,
+                      item.completed && styles.statusDone,
+                    ]}
+                  >
+                    {item.completed ? "Completed" : "Swipe to complete"}
+                  </Text>
+
+                  <Pressable
+                    style={styles.editButton}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/edit-task",
+                        params: {
+                          id: item.id,
+                          name: item.name,
+                          description: item.description || "",
+                          due_date: item.due_date || "",
+                          difficulty: item.difficulty || "medium",
+                          custom_coins: item.custom_coins || "",
+                          recurrence: item.recurrence || "none",
+                        },
+                      })
+                    }
+                  >
+                    <Text style={styles.editText}>Edit</Text>
+                  </Pressable>
+                </View>
+              </AnimatedCard>
+            </Swipeable>
+          );
+        }}
       />
     </View>
   );
 }
 
+function AnimatedCard({ children, index = 0 }) {
+  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(18);
+
+  useEffect(() => {
+    opacity.value = withDelay(index * 55, withTiming(1, { duration: 260 }));
+    translateY.value = withDelay(index * 55, withTiming(0, { duration: 260 }));
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  return <Animated.View style={animatedStyle}>{children}</Animated.View>;
+}
+
+function RewardToast({ message }) {
+  const scale = useSharedValue(0.9);
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (message) {
+      opacity.value = withTiming(1, { duration: 180 });
+      scale.value = withSequence(withSpring(1.08), withSpring(1));
+    } else {
+      opacity.value = withTiming(0, { duration: 150 });
+      scale.value = withTiming(0.9, { duration: 150 });
+    }
+  }, [message]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: scale.value }],
+  }));
+
+  if (!message) return null;
+
+  return (
+    <Animated.View style={[styles.toast, animatedStyle]}>
+      <Text style={styles.toastText}>{message}</Text>
+    </Animated.View>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: "#F6F7FB" },
-  listContent: { paddingBottom: 120 },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  loadingText: { marginTop: 10 },
-
-  header: { marginBottom: 10 },
-  eyebrow: { color: "#6B7280", fontWeight: "bold" },
-  title: { fontSize: 32, fontWeight: "bold" },
-
-  balanceCard: {
-    marginTop: 10,
-    backgroundColor: "black",
-    padding: 16,
-    borderRadius: 16,
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
   },
-  balanceLabel: { color: "#aaa" },
-  balanceValue: { color: "white", fontSize: 28, fontWeight: "bold" },
-
-  addButton: {
+  listContent: {
+    paddingBottom: 120,
+  },
+  center: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: colors.background,
+  },
+  loadingText: {
+    color: colors.textMuted,
     marginTop: 10,
-    backgroundColor: "#2563EB",
+  },
+  balanceCard: {
+    marginTop: spacing.md,
+    backgroundColor: colors.primaryBright,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    ...shadows.glow,
+  },
+  balanceLabel: {
+    color: "rgba(255,255,255,0.8)",
+    fontWeight: "800",
+    textTransform: "uppercase",
+    fontSize: 12,
+  },
+  balanceValue: {
+    color: "white",
+    fontSize: 32,
+    fontWeight: "900",
+    marginTop: 4,
+  },
+  addButton: {
+    marginTop: spacing.md,
+    backgroundColor: colors.accent,
     padding: 14,
-    borderRadius: 12,
+    borderRadius: radii.lg,
     alignItems: "center",
   },
-  addButtonText: { color: "white", fontWeight: "bold" },
-
-  message: {
-    marginTop: 10,
-    backgroundColor: "#DCFCE7",
-    padding: 10,
-    borderRadius: 10,
+  addButtonText: {
+    color: colors.textDark,
+    fontWeight: "900",
   },
-
-  emptyCard: { alignItems: "center", marginTop: 40 },
-  emptyTitle: { fontWeight: "bold", fontSize: 18 },
-  emptyText: { color: "#666" },
-
+  toast: {
+    marginTop: 12,
+    backgroundColor: "rgba(34, 197, 94, 0.18)",
+    borderColor: colors.accent,
+    borderWidth: 1,
+    padding: 12,
+    borderRadius: radii.lg,
+    alignItems: "center",
+  },
+  toastText: {
+    color: colors.accent,
+    fontWeight: "900",
+  },
+  emptyCard: {
+    marginTop: spacing.lg,
+    backgroundColor: colors.surface,
+    padding: spacing.lg,
+    borderRadius: radii.xl,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  emptyTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  emptyText: {
+    color: colors.textMuted,
+    marginTop: 6,
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  emptyButton: {
+    backgroundColor: colors.accent,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: radii.md,
+  },
+  emptyButtonText: {
+    color: colors.textDark,
+    fontWeight: "900",
+  },
   card: {
-    backgroundColor: "white",
-    padding: 16,
-    borderRadius: 16,
+    backgroundColor: colors.surface,
+    padding: spacing.md,
+    borderRadius: radii.lg,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  completedCard: {
+    opacity: 0.5,
+  },
+  urgentCard: {
+    borderColor: colors.danger || "#EF4444",
+  },
+  name: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: colors.text,
+  },
+  description: {
+    color: colors.textMuted,
+    marginTop: 4,
+    lineHeight: 20,
+  },
+  metaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 8,
+    gap: 10,
+  },
+  meta: {
+    color: colors.textMuted,
+    fontWeight: "700",
+  },
+  urgentText: {
+    color: colors.danger || "#EF4444",
+  },
+  status: {
+    marginTop: 10,
+    color: colors.primaryBright,
+    fontWeight: "700",
+  },
+  statusDone: {
+    color: colors.accent,
+  },
+  editButton: {
+    marginTop: 12,
+    backgroundColor: colors.surfaceElevated,
+    padding: 12,
+    borderRadius: radii.md,
+    alignItems: "center",
+  },
+  editText: {
+    color: colors.text,
+    fontWeight: "900",
+  },
+  completeAction: {
+    backgroundColor: colors.accent,
+    justifyContent: "center",
+    alignItems: "center",
+    width: 100,
+    borderRadius: radii.lg,
     marginBottom: 12,
   },
-  name: { fontSize: 16, fontWeight: "bold" },
-  description: { color: "#666", marginTop: 4 },
-  meta: { marginTop: 6, color: "#444" },
-
-  editButton: {
-    marginTop: 10,
-    backgroundColor: "#eee",
-    padding: 10,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  editText: { fontWeight: "bold" },
-
-  completeAction: {
-    backgroundColor: "green",
-    justifyContent: "center",
-    alignItems: "center",
-    width: 100,
-  },
   deleteAction: {
-    backgroundColor: "red",
+    backgroundColor: colors.danger || "#EF4444",
     justifyContent: "center",
     alignItems: "center",
     width: 100,
+    borderRadius: radii.lg,
+    marginBottom: 12,
   },
-  swipeText: { color: "white", fontWeight: "bold" },
+  swipeText: {
+    color: "white",
+    fontWeight: "900",
+  },
 });

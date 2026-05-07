@@ -4,13 +4,17 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { BrandMark } from "../components/BrandMark";
 import { api } from "../lib/api";
+import { colors, radii, shadows, spacing } from "../lib/theme";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("admin@example.com");
@@ -35,32 +39,44 @@ export default function LoginScreen() {
       await SecureStore.setItemAsync("token", data.token);
       global.token = data.token;
 
-      console.log("TOKEN:", data.token);
-      console.log("USER:", data.user);
-
       router.replace("/(tabs)/dashboard");
     } catch (error) {
-      Alert.alert("Login failed", error.message);
+      Alert.alert("Login failed", error.message || "Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.eyebrow}>Welcome back</Text>
-      <Text style={styles.title}>Habio</Text>
-      <Text style={styles.subtitle}>Build habits. Earn rewards.</Text>
+    <KeyboardAvoidingView
+      style={styles.screen}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <View style={styles.glow} />
+
+      <View style={styles.header}>
+        <BrandMark size={82} />
+
+        <Text style={styles.eyebrow}>Welcome back</Text>
+        <Text style={styles.title}>Habio</Text>
+        <Text style={styles.subtitle}>Build habits. Earn rewards.</Text>
+      </View>
 
       <View style={styles.card}>
+        <Text style={styles.cardTitle}>Log in</Text>
+        <Text style={styles.cardSubtitle}>
+          Keep your streaks moving and claim your wins.
+        </Text>
+
         <Text style={styles.label}>Email</Text>
         <TextInput
           style={styles.input}
           placeholder="you@example.com"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={colors.textMuted}
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
+          autoCorrect={false}
           keyboardType="email-address"
         />
 
@@ -68,92 +84,131 @@ export default function LoginScreen() {
         <TextInput
           style={styles.input}
           placeholder="Password"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={colors.textMuted}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
         />
 
         <Pressable
-          style={[styles.button, loading && styles.buttonDisabled]}
+          style={({ pressed }) => [
+            styles.button,
+            pressed && !loading && styles.buttonPressed,
+            loading && styles.buttonDisabled,
+          ]}
           onPress={handleLogin}
           disabled={loading}
         >
           {loading ? (
-            <ActivityIndicator color="white" />
+            <ActivityIndicator color={colors.textDark} />
           ) : (
             <Text style={styles.buttonText}>Log In</Text>
           )}
         </Pressable>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: "#F6F7FB",
+    backgroundColor: colors.background,
     justifyContent: "center",
-    padding: 20,
+    padding: spacing.lg,
+    overflow: "hidden",
+  },
+  glow: {
+    position: "absolute",
+    top: -90,
+    right: -80,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: colors.accent,
+    opacity: 0.18,
+  },
+  header: {
+    alignItems: "center",
+    marginBottom: spacing.lg,
   },
   eyebrow: {
-    fontSize: 13,
-    color: "#6B7280",
-    fontWeight: "800",
+    fontSize: 12,
+    color: colors.accent,
+    fontWeight: "900",
     textTransform: "uppercase",
-    letterSpacing: 0.8,
-    textAlign: "center",
+    letterSpacing: 1,
+    marginTop: spacing.md,
   },
   title: {
-    fontSize: 44,
+    fontSize: 46,
     fontWeight: "900",
-    color: "#111827",
-    textAlign: "center",
-    marginTop: 4,
+    color: colors.text,
+    letterSpacing: -1.5,
+    marginTop: spacing.xs,
   },
   subtitle: {
-    color: "#6B7280",
-    textAlign: "center",
-    marginTop: 6,
-    marginBottom: 24,
-    fontWeight: "600",
+    color: colors.textMuted,
+    marginTop: spacing.xs,
+    fontWeight: "700",
   },
   card: {
-    backgroundColor: "white",
-    borderRadius: 22,
-    padding: 18,
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    padding: spacing.lg,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
+    ...shadows.card,
   },
-  label: {
-    color: "#374151",
+  cardTitle: {
+    color: colors.text,
+    fontSize: 24,
     fontWeight: "900",
-    marginBottom: 8,
-    marginTop: 4,
+    marginBottom: spacing.xs,
   },
-  input: {
-    backgroundColor: "#F9FAFB",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    padding: 14,
-    borderRadius: 14,
-    marginBottom: 14,
-    color: "#111827",
+  cardSubtitle: {
+    color: colors.textMuted,
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: spacing.lg,
     fontWeight: "600",
   },
+  label: {
+    color: colors.text,
+    fontWeight: "900",
+    marginBottom: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  input: {
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 15,
+    borderRadius: radii.md,
+    marginBottom: spacing.md,
+    color: colors.text,
+    fontWeight: "700",
+  },
   button: {
-    backgroundColor: "#2563EB",
+    backgroundColor: colors.accent,
     padding: 16,
-    borderRadius: 16,
+    borderRadius: radii.lg,
     alignItems: "center",
-    marginTop: 4,
+    marginTop: spacing.sm,
+    shadowColor: colors.accent,
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  buttonPressed: {
+    transform: [{ scale: 0.98 }],
+    opacity: 0.9,
   },
   buttonDisabled: {
     opacity: 0.65,
   },
   buttonText: {
-    color: "white",
+    color: colors.textDark,
     fontWeight: "900",
     fontSize: 16,
   },

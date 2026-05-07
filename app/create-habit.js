@@ -1,15 +1,17 @@
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-    Alert,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
+import { BrandHeader } from "../components/BrandMark";
 import { api } from "../lib/api";
+import { colors, radii, shadows, spacing } from "../lib/theme";
 
 export default function CreateHabitScreen() {
   const [name, setName] = useState("");
@@ -48,20 +50,18 @@ export default function CreateHabitScreen() {
       contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled"
     >
-      <View style={styles.header}>
-        <Text style={styles.eyebrow}>New habit</Text>
-        <Text style={styles.title}>Create Habit</Text>
-        <Text style={styles.subtitle}>
-          Build a repeatable daily action and earn coins every time you complete it.
-        </Text>
-      </View>
+      <BrandHeader eyebrow="New Habit" title="Create Habit" />
+
+      <Text style={styles.subtitle}>
+        Build a repeatable action and earn coins every time you complete it.
+      </Text>
 
       <View style={styles.card}>
         <Text style={styles.label}>Habit name</Text>
         <TextInput
           style={styles.input}
           placeholder="e.g. Drink water"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={colors.textMuted}
           value={name}
           onChangeText={setName}
         />
@@ -70,7 +70,7 @@ export default function CreateHabitScreen() {
         <TextInput
           style={[styles.input, styles.textarea]}
           placeholder="Optional notes"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={colors.textMuted}
           value={description}
           onChangeText={setDescription}
           multiline
@@ -82,14 +82,21 @@ export default function CreateHabitScreen() {
           </View>
 
           <View style={styles.previewText}>
-            <Text style={styles.previewTitle}>{name.trim() || "Your habit"}</Text>
-            <Text style={styles.previewSubtitle}>Daily • Medium • 10 coins</Text>
+            <Text style={styles.previewTitle}>
+              {name.trim() || "Your habit"}
+            </Text>
+            <Text style={styles.previewSubtitle}>
+              Daily • Medium • 10 coins
+            </Text>
           </View>
         </View>
       </View>
 
       <Pressable
-        style={[styles.button, submitting && styles.buttonDisabled]}
+        style={[
+          styles.button,
+          submitting && styles.buttonDisabled,
+        ]}
         onPress={createHabit}
         disabled={submitting}
       >
@@ -111,118 +118,124 @@ export default function CreateHabitScreen() {
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    backgroundColor: "#F6F7FB",
+    backgroundColor: colors.background,
   },
   container: {
-    padding: 20,
-    paddingTop: 34,
-    paddingBottom: 40,
+    padding: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
   },
-  header: {
-    marginBottom: 18,
-  },
-  eyebrow: {
-    fontSize: 13,
-    color: "#6B7280",
-    fontWeight: "800",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-  },
-  title: {
-    fontSize: 36,
-    fontWeight: "900",
-    color: "#111827",
-    marginTop: 2,
-  },
+
   subtitle: {
-    color: "#6B7280",
-    marginTop: 8,
-    lineHeight: 21,
+    color: colors.textMuted,
+    marginTop: spacing.sm,
+    marginBottom: spacing.lg,
+    lineHeight: 20,
     fontWeight: "600",
   },
+
   card: {
-    backgroundColor: "white",
-    borderRadius: 22,
-    padding: 18,
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    padding: spacing.lg,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
-    marginBottom: 16,
+    borderColor: colors.border,
+    marginBottom: spacing.md,
+    ...shadows.card,
   },
+
   label: {
-    color: "#374151",
+    color: colors.text,
     fontWeight: "900",
     marginBottom: 8,
     marginTop: 4,
   },
+
   input: {
-    backgroundColor: "#F9FAFB",
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
     padding: 14,
-    borderRadius: 14,
-    marginBottom: 14,
-    color: "#111827",
-    fontWeight: "600",
+    borderRadius: radii.md,
+    marginBottom: spacing.md,
+    color: colors.text,
+    fontWeight: "700",
   },
+
   textarea: {
     height: 96,
     textAlignVertical: "top",
   },
+
   previewBox: {
-    marginTop: 4,
-    backgroundColor: "#F9FAFB",
-    borderRadius: 18,
-    padding: 14,
+    marginTop: spacing.sm,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radii.lg,
+    padding: spacing.md,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
   },
+
   iconCircle: {
     width: 46,
     height: 46,
-    borderRadius: 999,
-    backgroundColor: "#FEF3C7",
+    borderRadius: radii.pill,
+    backgroundColor: "rgba(34, 197, 94, 0.18)",
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.accent,
   },
+
   iconText: {
-    fontSize: 24,
+    fontSize: 22,
   },
+
   previewText: {
     flex: 1,
   },
+
   previewTitle: {
     fontSize: 17,
     fontWeight: "900",
-    color: "#111827",
+    color: colors.text,
   },
+
   previewSubtitle: {
     marginTop: 3,
-    color: "#6B7280",
+    color: colors.textMuted,
     fontWeight: "700",
   },
+
   button: {
-    backgroundColor: "#2563EB",
+    backgroundColor: colors.accent,
     padding: 16,
-    borderRadius: 16,
+    borderRadius: radii.lg,
     alignItems: "center",
+    marginTop: spacing.sm,
+    ...shadows.glow,
   },
+
   buttonDisabled: {
     opacity: 0.65,
   },
+
   buttonText: {
-    color: "white",
+    color: colors.textDark,
     fontWeight: "900",
     fontSize: 16,
   },
+
   cancelButton: {
-    padding: 16,
+    padding: spacing.md,
     alignItems: "center",
   },
+
   cancelText: {
-    color: "#6B7280",
+    color: colors.textMuted,
     fontWeight: "800",
   },
 });

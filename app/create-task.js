@@ -2,16 +2,18 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-    Alert,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
+import { BrandHeader } from "../components/BrandMark";
 import { api } from "../lib/api";
+import { colors, radii, shadows, spacing } from "../lib/theme";
 
 function formatDate(date) {
   return date.toISOString().split("T")[0];
@@ -54,10 +56,7 @@ export default function CreateTaskScreen() {
     if (Platform.OS === "android") {
       setShowPicker(false);
     }
-
-    if (selectedDate) {
-      setDueDate(selectedDate);
-    }
+    if (selectedDate) setDueDate(selectedDate);
   }
 
   return (
@@ -66,20 +65,18 @@ export default function CreateTaskScreen() {
       contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled"
     >
-      <View style={styles.header}>
-        <Text style={styles.eyebrow}>New task</Text>
-        <Text style={styles.title}>Create Task</Text>
-        <Text style={styles.subtitle}>
-          Capture a task, assign a due date, and turn completion into coins.
-        </Text>
-      </View>
+      <BrandHeader eyebrow="New Task" title="Create Task" />
+
+      <Text style={styles.subtitle}>
+        Capture a task, assign a due date, and turn completion into coins.
+      </Text>
 
       <View style={styles.card}>
         <Text style={styles.label}>Task name</Text>
         <TextInput
           style={styles.input}
           placeholder="e.g. Clean kitchen"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={colors.textMuted}
           value={name}
           onChangeText={setName}
         />
@@ -88,27 +85,35 @@ export default function CreateTaskScreen() {
         <TextInput
           style={[styles.input, styles.textarea]}
           placeholder="Optional notes"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={colors.textMuted}
           value={description}
           onChangeText={setDescription}
           multiline
         />
 
         <Text style={styles.label}>Due date</Text>
-        <Pressable style={styles.dateButton} onPress={() => setShowPicker(true)}>
+
+        <Pressable
+          style={styles.dateButton}
+          onPress={() => setShowPicker(true)}
+        >
           <View>
-            <Text style={styles.dateButtonLabel}>
+            <Text style={styles.dateLabel}>
               {dueDate ? "Selected date" : "No due date"}
             </Text>
-            <Text style={styles.dateButtonText}>
+            <Text style={styles.dateText}>
               {dueDate ? formatDate(dueDate) : "Tap to pick a date"}
             </Text>
           </View>
+
           <Text style={styles.dateIcon}>📅</Text>
         </Pressable>
 
         {dueDate && (
-          <Pressable style={styles.clearDateButton} onPress={() => setDueDate(null)}>
+          <Pressable
+            style={styles.clearDateButton}
+            onPress={() => setDueDate(null)}
+          >
             <Text style={styles.clearDateText}>Clear due date</Text>
           </Pressable>
         )}
@@ -121,6 +126,22 @@ export default function CreateTaskScreen() {
             onChange={handleDateChange}
           />
         )}
+
+        {/* Preview */}
+        <View style={styles.previewBox}>
+          <View style={styles.iconCircle}>
+            <Text style={styles.iconText}>📌</Text>
+          </View>
+
+          <View style={styles.previewText}>
+            <Text style={styles.previewTitle}>
+              {name.trim() || "Your task"}
+            </Text>
+            <Text style={styles.previewSubtitle}>
+              {dueDate ? formatDate(dueDate) : "No due date"} • Medium • Coins
+            </Text>
+          </View>
+        </View>
       </View>
 
       <Pressable
@@ -146,122 +167,168 @@ export default function CreateTaskScreen() {
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    backgroundColor: "#F6F7FB",
+    backgroundColor: colors.background,
   },
   container: {
-    padding: 20,
-    paddingTop: 34,
-    paddingBottom: 40,
+    padding: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
   },
-  header: {
-    marginBottom: 18,
-  },
-  eyebrow: {
-    fontSize: 13,
-    color: "#6B7280",
-    fontWeight: "800",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-  },
-  title: {
-    fontSize: 36,
-    fontWeight: "900",
-    color: "#111827",
-    marginTop: 2,
-  },
+
   subtitle: {
-    color: "#6B7280",
-    marginTop: 8,
-    lineHeight: 21,
+    color: colors.textMuted,
+    marginTop: spacing.sm,
+    marginBottom: spacing.lg,
+    lineHeight: 20,
     fontWeight: "600",
   },
+
   card: {
-    backgroundColor: "white",
-    borderRadius: 22,
-    padding: 18,
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    padding: spacing.lg,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
-    marginBottom: 16,
+    borderColor: colors.border,
+    marginBottom: spacing.md,
+    ...shadows.card,
   },
+
   label: {
-    color: "#374151",
+    color: colors.text,
     fontWeight: "900",
     marginBottom: 8,
     marginTop: 4,
   },
+
   input: {
-    backgroundColor: "#F9FAFB",
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
     padding: 14,
-    borderRadius: 14,
-    marginBottom: 14,
-    color: "#111827",
-    fontWeight: "600",
+    borderRadius: radii.md,
+    marginBottom: spacing.md,
+    color: colors.text,
+    fontWeight: "700",
   },
+
   textarea: {
     height: 96,
     textAlignVertical: "top",
   },
+
   dateButton: {
-    backgroundColor: "#F9FAFB",
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
     padding: 14,
-    borderRadius: 14,
-    marginBottom: 10,
+    borderRadius: radii.md,
+    marginBottom: spacing.sm,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  dateButtonLabel: {
-    color: "#6B7280",
+
+  dateLabel: {
+    color: colors.textMuted,
     fontSize: 12,
     fontWeight: "800",
     textTransform: "uppercase",
-    letterSpacing: 0.5,
   },
-  dateButtonText: {
-    color: "#111827",
+
+  dateText: {
+    color: colors.text,
     fontSize: 16,
     fontWeight: "900",
     marginTop: 3,
   },
+
   dateIcon: {
-    fontSize: 24,
+    fontSize: 22,
   },
+
   clearDateButton: {
     alignSelf: "flex-start",
-    backgroundColor: "#FEE2E2",
+    backgroundColor: "rgba(239, 68, 68, 0.18)",
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 999,
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
+
   clearDateText: {
-    color: "#B91C1C",
+    color: colors.danger || "#EF4444",
     fontWeight: "900",
   },
-  button: {
-    backgroundColor: "#2563EB",
-    padding: 16,
-    borderRadius: 16,
+
+  previewBox: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    flexDirection: "row",
     alignItems: "center",
+    gap: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
+
+  iconCircle: {
+    width: 46,
+    height: 46,
+    borderRadius: radii.pill,
+    backgroundColor: "rgba(37, 99, 235, 0.18)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.primaryBright,
+  },
+
+  iconText: {
+    fontSize: 22,
+  },
+
+  previewText: {
+    flex: 1,
+  },
+
+  previewTitle: {
+    fontSize: 17,
+    fontWeight: "900",
+    color: colors.text,
+  },
+
+  previewSubtitle: {
+    marginTop: 3,
+    color: colors.textMuted,
+    fontWeight: "700",
+  },
+
+  button: {
+    backgroundColor: colors.accent,
+    padding: 16,
+    borderRadius: radii.lg,
+    alignItems: "center",
+    marginTop: spacing.sm,
+    ...shadows.glow,
+  },
+
   buttonDisabled: {
     opacity: 0.65,
   },
+
   buttonText: {
-    color: "white",
+    color: colors.textDark,
     fontWeight: "900",
     fontSize: 16,
   },
+
   cancelButton: {
-    padding: 16,
+    padding: spacing.md,
     alignItems: "center",
   },
+
   cancelText: {
-    color: "#6B7280",
+    color: colors.textMuted,
     fontWeight: "800",
   },
 });

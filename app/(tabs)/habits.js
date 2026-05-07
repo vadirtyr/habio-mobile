@@ -10,7 +10,17 @@ import {
   View,
 } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSequence,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
+import { BrandHeader } from "../../components/BrandMark";
 import { api } from "../../lib/api";
+import { colors, radii, shadows, spacing } from "../../lib/theme";
 
 export default function HabitsScreen() {
   const [habits, setHabits] = useState([]);
@@ -48,23 +58,11 @@ export default function HabitsScreen() {
 
     try {
       const data = await api.post(`/habits/${habitId}/complete`);
-      setMessage(`+${data.coins_earned} coins earned`);
+      setMessage(`+${data.coins_earned} coins`);
       setBalance(data.new_balance);
-      setTimeout(() => setMessage(null), 2200);
+      setTimeout(() => setMessage(null), 1800);
     } catch (error) {
-      setHabits((current) =>
-        current.map((h) =>
-          h.id === habitId
-            ? {
-                ...h,
-                completed_today: false,
-                streak: Math.max(0, h.streak - 1),
-              }
-            : h
-        )
-      );
-
-      setBalance((b) => Math.max(0, b - (habit.coins_per_completion || 0)));
+      fetchHabits();
       Alert.alert("Error", error.message);
     }
   }
@@ -85,21 +83,16 @@ export default function HabitsScreen() {
 
   async function deleteHabit(habit) {
     const previous = habits;
-
     setHabits((current) => current.filter((h) => h.id !== habit.id));
 
     try {
       await api.delete(`/habits/${habit.id}`);
       setMessage("Habit deleted");
-      setTimeout(() => setMessage(null), 1800);
+      setTimeout(() => setMessage(null), 1600);
     } catch (error) {
       setHabits(previous);
       Alert.alert("Error", error.message);
     }
-  }
-
-  async function handleLogout() {
-    await api.logout();
   }
 
   useEffect(() => {
@@ -115,7 +108,7 @@ export default function HabitsScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator color={colors.accent} />
         <Text style={styles.loadingText}>Loading habits...</Text>
       </View>
     );
@@ -130,20 +123,11 @@ export default function HabitsScreen() {
         onRefresh={fetchHabits}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
-          <View style={styles.header}>
-            <View style={styles.topRow}>
-              <View>
-                <Text style={styles.eyebrow}>Today</Text>
-                <Text style={styles.title}>Habits</Text>
-              </View>
-
-              <Pressable style={styles.logoutButton} onPress={handleLogout}>
-                <Text style={styles.logoutText}>Logout</Text>
-              </Pressable>
-            </View>
+          <View>
+            <BrandHeader eyebrow="Today" title="Your Habits" />
 
             <View style={styles.balanceCard}>
-              <Text style={styles.balanceLabel}>Coin balance</Text>
+              <Text style={styles.balanceLabel}>Coins</Text>
               <Text style={styles.balanceValue}>{balance}</Text>
             </View>
 
@@ -154,14 +138,14 @@ export default function HabitsScreen() {
               <Text style={styles.addButtonText}>+ Add Habit</Text>
             </Pressable>
 
-            {message && <Text style={styles.message}>{message}</Text>}
+            <RewardToast message={message} />
           </View>
         }
         ListEmptyComponent={
           <View style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>No habits yet</Text>
             <Text style={styles.emptyText}>
-              Add your first habit and start earning coins.
+              Start building momentum today.
             </Text>
             <Pressable
               style={styles.emptyButton}
@@ -171,16 +155,12 @@ export default function HabitsScreen() {
             </Pressable>
           </View>
         }
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <Swipeable
-            leftThreshold={80}
-            rightThreshold={80}
-            overshootLeft={false}
-            overshootRight={false}
             renderLeftActions={() =>
               item.completed_today ? null : (
                 <View style={styles.completeAction}>
-                  <Text style={styles.swipeText}>Complete</Text>
+                  <Text style={styles.swipeText}>Done</Text>
                 </View>
               )
             }
@@ -194,57 +174,58 @@ export default function HabitsScreen() {
               if (direction === "right") confirmDeleteHabit(item.id);
             }}
           >
-            <View style={[styles.card, item.completed_today && styles.completedCard]}>
-              <View style={styles.cardTop}>
-                <View style={styles.iconCircle}>
-                  <Text style={styles.iconText}>🔥</Text>
+            <AnimatedCard index={index}>
+              <View
+                style={[
+                  styles.card,
+                  item.completed_today && styles.completedCard,
+                ]}
+              >
+                <Text style={styles.name}>{item.name}</Text>
+
+                {!!item.description && (
+                  <Text style={styles.description}>{item.description}</Text>
+                )}
+
+                <View style={styles.metaRow}>
+                  <Text style={styles.meta}>🔥 {item.streak}</Text>
+                  <Text style={styles.meta}>
+                    🪙 {item.coins_per_completion}
+                  </Text>
                 </View>
 
-                <View style={styles.cardText}>
-                  <Text style={styles.name}>{item.name}</Text>
-                  {!!item.description && (
-                    <Text style={styles.description}>{item.description}</Text>
-                  )}
-                </View>
-              </View>
-
-              <View style={styles.metaRow}>
-                <Text style={styles.metaPill}>🔥 {item.streak} streak</Text>
-                <Text style={styles.metaPill}>
-                  🪙 {item.coins_per_completion} coins
-                </Text>
                 <Text
                   style={[
-                    styles.statusPill,
+                    styles.status,
                     item.completed_today && styles.statusDone,
                   ]}
                 >
                   {item.completed_today
-                    ? "Done today"
-                    : "Swipe right to complete • left to delete"}
+                    ? "Completed today"
+                    : "Swipe to complete"}
                 </Text>
-              </View>
 
-              <Pressable
-                style={styles.editButton}
-                onPress={() =>
-                  router.push({
-                    pathname: "/edit-habit",
-                    params: {
-                      id: item.id,
-                      name: item.name,
-                      description: item.description || "",
-                      frequency: item.frequency || "daily",
-                      difficulty: item.difficulty || "medium",
-                      custom_coins: item.custom_coins || "",
-                      icon: item.icon || "flame",
-                    },
-                  })
-                }
-              >
-                <Text style={styles.editText}>Edit</Text>
-              </Pressable>
-            </View>
+                <Pressable
+                  style={styles.editButton}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/edit-habit",
+                      params: {
+                        id: item.id,
+                        name: item.name,
+                        description: item.description || "",
+                        frequency: item.frequency || "daily",
+                        difficulty: item.difficulty || "medium",
+                        custom_coins: item.custom_coins || "",
+                        icon: item.icon || "flame",
+                      },
+                    })
+                  }
+                >
+                  <Text style={styles.editText}>Edit</Text>
+                </Pressable>
+              </View>
+            </AnimatedCard>
           </Swipeable>
         )}
       />
@@ -252,225 +233,230 @@ export default function HabitsScreen() {
   );
 }
 
+function AnimatedCard({ children, index = 0 }) {
+  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(18);
+
+  useEffect(() => {
+    opacity.value = withDelay(index * 55, withTiming(1, { duration: 260 }));
+    translateY.value = withDelay(index * 55, withTiming(0, { duration: 260 }));
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  return <Animated.View style={animatedStyle}>{children}</Animated.View>;
+}
+
+function RewardToast({ message }) {
+  const scale = useSharedValue(0.9);
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (message) {
+      opacity.value = withTiming(1, { duration: 180 });
+      scale.value = withSequence(withSpring(1.08), withSpring(1));
+    } else {
+      opacity.value = withTiming(0, { duration: 150 });
+      scale.value = withTiming(0.9, { duration: 150 });
+    }
+  }, [message]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: scale.value }],
+  }));
+
+  if (!message) return null;
+
+  return (
+    <Animated.View style={[styles.toast, animatedStyle]}>
+      <Text style={styles.toastText}>{message}</Text>
+    </Animated.View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 22,
-    paddingHorizontal: 20,
-    backgroundColor: "#F6F7FB",
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
   },
   listContent: {
-    paddingBottom: 110,
+    paddingBottom: 120,
   },
   center: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    gap: 10,
-    backgroundColor: "#F6F7FB",
+    backgroundColor: colors.background,
   },
   loadingText: {
-    color: "#6B7280",
-    fontWeight: "600",
+    color: colors.textMuted,
+    marginTop: 10,
   },
-  header: {
-    marginBottom: 6,
-  },
-  topRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
+
   eyebrow: {
-    fontSize: 13,
-    color: "#6B7280",
-    fontWeight: "700",
+    color: colors.accent,
+    fontSize: 12,
+    fontWeight: "900",
     textTransform: "uppercase",
-    letterSpacing: 0.8,
   },
   title: {
-    fontSize: 36,
+    fontSize: 32,
     fontWeight: "900",
-    color: "#111827",
-    marginTop: 2,
+    color: colors.text,
+    marginTop: 4,
   },
-  logoutButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: "#FEE2E2",
-  },
-  logoutText: {
-    color: "#B91C1C",
-    fontWeight: "800",
-  },
+
   balanceCard: {
-    marginTop: 18,
-    backgroundColor: "#111827",
-    borderRadius: 22,
-    padding: 18,
+    marginTop: spacing.md,
+    backgroundColor: colors.primaryBright,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    ...shadows.glow,
   },
   balanceLabel: {
-    color: "#D1D5DB",
-    fontSize: 13,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.7,
+    color: "rgba(255,255,255,0.8)",
   },
   balanceValue: {
     color: "white",
-    fontSize: 34,
+    fontSize: 32,
     fontWeight: "900",
-    marginTop: 4,
   },
+
   addButton: {
-    marginTop: 14,
-    backgroundColor: "#2563EB",
-    padding: 15,
-    borderRadius: 16,
+    marginTop: spacing.md,
+    backgroundColor: colors.accent,
+    padding: 14,
+    borderRadius: radii.lg,
     alignItems: "center",
   },
   addButtonText: {
-    color: "white",
+    color: colors.textDark,
     fontWeight: "900",
-    fontSize: 16,
   },
-  message: {
+
+  toast: {
     marginTop: 12,
-    backgroundColor: "#DCFCE7",
-    color: "#166534",
+    backgroundColor: "rgba(34, 197, 94, 0.18)",
+    borderColor: colors.accent,
+    borderWidth: 1,
     padding: 12,
-    borderRadius: 14,
-    textAlign: "center",
+    borderRadius: radii.lg,
+    alignItems: "center",
+  },
+  toastText: {
+    color: colors.accent,
     fontWeight: "900",
   },
+
   emptyCard: {
-    marginTop: 16,
-    backgroundColor: "white",
-    padding: 22,
-    borderRadius: 22,
+    marginTop: spacing.lg,
+    backgroundColor: colors.surface,
+    padding: spacing.lg,
+    borderRadius: radii.xl,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
   },
   emptyTitle: {
-    fontSize: 20,
+    color: colors.text,
+    fontSize: 18,
     fontWeight: "900",
-    color: "#111827",
   },
   emptyText: {
-    color: "#6B7280",
-    textAlign: "center",
+    color: colors.textMuted,
     marginTop: 6,
     marginBottom: 16,
+    textAlign: "center",
   },
   emptyButton: {
-    backgroundColor: "#111827",
+    backgroundColor: colors.accent,
     paddingVertical: 12,
     paddingHorizontal: 18,
-    borderRadius: 14,
+    borderRadius: radii.md,
   },
   emptyButtonText: {
-    color: "white",
+    color: colors.textDark,
     fontWeight: "900",
   },
-  completeAction: {
-    backgroundColor: "#16A34A",
-    justifyContent: "center",
-    alignItems: "center",
-    width: 118,
-    borderRadius: 22,
-    marginBottom: 14,
-  },
-  deleteAction: {
-    backgroundColor: "#DC2626",
-    justifyContent: "center",
-    alignItems: "center",
-    width: 118,
-    borderRadius: 22,
-    marginBottom: 14,
-  },
-  swipeText: {
-    color: "white",
-    fontWeight: "900",
-  },
+
   card: {
-    backgroundColor: "white",
-    padding: 16,
-    borderRadius: 22,
-    marginBottom: 14,
+    backgroundColor: colors.surface,
+    padding: spacing.md,
+    borderRadius: radii.lg,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
   },
   completedCard: {
-    opacity: 0.62,
+    opacity: 0.5,
   },
-  cardTop: {
-    flexDirection: "row",
-    gap: 12,
-    alignItems: "flex-start",
-  },
-  iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 999,
-    backgroundColor: "#FEF3C7",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  iconText: {
-    fontSize: 22,
-  },
-  cardText: {
-    flex: 1,
-  },
+
   name: {
     fontSize: 18,
     fontWeight: "900",
-    color: "#111827",
+    color: colors.text,
   },
   description: {
-    color: "#6B7280",
+    color: colors.textMuted,
     marginTop: 4,
     lineHeight: 20,
   },
+
   metaRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 14,
+    gap: 10,
+    marginTop: 8,
   },
-  metaPill: {
-    backgroundColor: "#F3F4F6",
-    color: "#374151",
-    paddingVertical: 7,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-    fontWeight: "800",
-    fontSize: 12,
+  meta: {
+    color: colors.textMuted,
+    fontWeight: "700",
   },
-  statusPill: {
-    backgroundColor: "#DBEAFE",
-    color: "#1D4ED8",
-    paddingVertical: 7,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-    fontWeight: "900",
-    fontSize: 12,
+
+  status: {
+    marginTop: 10,
+    color: colors.primaryBright,
+    fontWeight: "700",
   },
   statusDone: {
-    backgroundColor: "#DCFCE7",
-    color: "#166534",
+    color: colors.accent,
   },
+
   editButton: {
     marginTop: 12,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: colors.surfaceElevated,
     padding: 12,
-    borderRadius: 14,
+    borderRadius: radii.md,
     alignItems: "center",
   },
   editText: {
-    color: "#111827",
+    color: colors.text,
+    fontWeight: "900",
+  },
+
+  completeAction: {
+    backgroundColor: colors.accent,
+    justifyContent: "center",
+    alignItems: "center",
+    width: 100,
+    borderRadius: radii.lg,
+    marginBottom: 12,
+  },
+  deleteAction: {
+    backgroundColor: colors.danger || "#EF4444",
+    justifyContent: "center",
+    alignItems: "center",
+    width: 100,
+    borderRadius: radii.lg,
+    marginBottom: 12,
+  },
+  swipeText: {
+    color: "white",
     fontWeight: "900",
   },
 });
