@@ -1,13 +1,14 @@
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Pressable,
   StyleSheet,
   Text,
-  View,
+  View
 } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
 import Animated, {
@@ -18,6 +19,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
+import { AnimatedPressable } from "../../components/AnimatedPressable";
 import { BrandHeader } from "../../components/BrandMark";
 import { api } from "../../lib/api";
 import { colors, radii, shadows, spacing } from "../../lib/theme";
@@ -58,6 +60,11 @@ export default function HabitsScreen() {
 
     try {
       const data = await api.post(`/habits/${habitId}/complete`);
+
+      await Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Success
+      );
+
       setMessage(`+${data.coins_earned} coins`);
       setBalance(data.new_balance);
       setTimeout(() => setMessage(null), 1800);
@@ -87,6 +94,11 @@ export default function HabitsScreen() {
 
     try {
       await api.delete(`/habits/${habit.id}`);
+
+      await Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Warning
+      );
+
       setMessage("Habit deleted");
       setTimeout(() => setMessage(null), 1600);
     } catch (error) {
@@ -131,28 +143,30 @@ export default function HabitsScreen() {
               <Text style={styles.balanceValue}>{balance}</Text>
             </View>
 
-            <Pressable
+            <AnimatedPressable
               style={styles.addButton}
               onPress={() => router.push("/create-habit")}
             >
-              <Text style={styles.addButtonText}>+ Add Habit</Text>
-            </Pressable>
+              <Feather name="plus-circle" size={18} color={colors.textDark} />
+              <Text style={styles.addButtonText}>Add Habit</Text>
+            </AnimatedPressable>
 
             <RewardToast message={message} />
           </View>
         }
         ListEmptyComponent={
           <View style={styles.emptyCard}>
+            <Feather name="target" size={34} color={colors.accent} />
             <Text style={styles.emptyTitle}>No habits yet</Text>
             <Text style={styles.emptyText}>
               Start building momentum today.
             </Text>
-            <Pressable
+            <AnimatedPressable
               style={styles.emptyButton}
               onPress={() => router.push("/create-habit")}
             >
               <Text style={styles.emptyButtonText}>Create Habit</Text>
-            </Pressable>
+            </AnimatedPressable>
           </View>
         }
         renderItem={({ item, index }) => (
@@ -160,12 +174,18 @@ export default function HabitsScreen() {
             renderLeftActions={() =>
               item.completed_today ? null : (
                 <View style={styles.completeAction}>
-                  <Text style={styles.swipeText}>Done</Text>
+                  <Feather
+                    name="check-circle"
+                    size={22}
+                    color={colors.textDark}
+                  />
+                  <Text style={styles.completeActionText}>Done</Text>
                 </View>
               )
             }
             renderRightActions={() => (
               <View style={styles.deleteAction}>
+                <Feather name="trash-2" size={22} color="white" />
                 <Text style={styles.swipeText}>Delete</Text>
               </View>
             )}
@@ -181,17 +201,51 @@ export default function HabitsScreen() {
                   item.completed_today && styles.completedCard,
                 ]}
               >
-                <Text style={styles.name}>{item.name}</Text>
+                <View style={styles.cardTop}>
+                  <View
+                    style={[
+                      styles.iconCircle,
+                      item.completed_today && styles.iconCircleDone,
+                    ]}
+                  >
+                    <Feather
+                      name={item.completed_today ? "check" : "zap"}
+                      size={22}
+                      color={
+                        item.completed_today
+                          ? colors.textDark
+                          : colors.accent
+                      }
+                    />
+                  </View>
 
-                {!!item.description && (
-                  <Text style={styles.description}>{item.description}</Text>
-                )}
+                  <View style={styles.cardText}>
+                    <Text style={styles.name}>{item.name}</Text>
+
+                    {!!item.description && (
+                      <Text style={styles.description}>
+                        {item.description}
+                      </Text>
+                    )}
+                  </View>
+                </View>
 
                 <View style={styles.metaRow}>
-                  <Text style={styles.meta}>🔥 {item.streak}</Text>
-                  <Text style={styles.meta}>
-                    🪙 {item.coins_per_completion}
-                  </Text>
+                  <View style={styles.metaPill}>
+                    <Feather name="trending-up" size={14} color={colors.textMuted} />
+                    <Text style={styles.metaText}>{item.streak} streak</Text>
+                  </View>
+
+                  <View style={styles.metaPill}>
+                    <MaterialCommunityIcons
+                      name="gold"
+                      size={15}
+                      color={colors.textMuted}
+                    />
+                    <Text style={styles.metaText}>
+                      {item.coins_per_completion} coins
+                    </Text>
+                  </View>
                 </View>
 
                 <Text
@@ -205,7 +259,7 @@ export default function HabitsScreen() {
                     : "Swipe to complete"}
                 </Text>
 
-                <Pressable
+                <AnimatedPressable
                   style={styles.editButton}
                   onPress={() =>
                     router.push({
@@ -222,8 +276,9 @@ export default function HabitsScreen() {
                     })
                   }
                 >
+                  <Feather name="edit-3" size={16} color={colors.text} />
                   <Text style={styles.editText}>Edit</Text>
-                </Pressable>
+                </AnimatedPressable>
               </View>
             </AnimatedCard>
           </Swipeable>
@@ -299,19 +354,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
 
-  eyebrow: {
-    color: colors.accent,
-    fontSize: 12,
-    fontWeight: "900",
-    textTransform: "uppercase",
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "900",
-    color: colors.text,
-    marginTop: 4,
-  },
-
   balanceCard: {
     marginTop: spacing.md,
     backgroundColor: colors.primaryBright,
@@ -321,11 +363,15 @@ const styles = StyleSheet.create({
   },
   balanceLabel: {
     color: "rgba(255,255,255,0.8)",
+    fontWeight: "900",
+    textTransform: "uppercase",
+    fontSize: 12,
   },
   balanceValue: {
     color: "white",
     fontSize: 32,
     fontWeight: "900",
+    marginTop: 4,
   },
 
   addButton: {
@@ -334,6 +380,9 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: radii.lg,
     alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
   },
   addButtonText: {
     color: colors.textDark,
@@ -362,11 +411,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderColor: colors.border,
+    ...shadows.card,
   },
   emptyTitle: {
     color: colors.text,
     fontSize: 18,
     fontWeight: "900",
+    marginTop: spacing.sm,
   },
   emptyText: {
     color: colors.textMuted,
@@ -392,9 +443,32 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: colors.border,
+    ...shadows.card,
   },
   completedCard: {
-    opacity: 0.5,
+    opacity: 0.58,
+  },
+  cardTop: {
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "flex-start",
+  },
+  iconCircle: {
+    width: 46,
+    height: 46,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surfaceElevated,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  iconCircleDone: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  cardText: {
+    flex: 1,
   },
 
   name: {
@@ -410,18 +484,29 @@ const styles = StyleSheet.create({
 
   metaRow: {
     flexDirection: "row",
-    gap: 10,
-    marginTop: 8,
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 12,
   },
-  meta: {
+  metaPill: {
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radii.pill,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  metaText: {
     color: colors.textMuted,
-    fontWeight: "700",
+    fontWeight: "800",
+    fontSize: 12,
   },
 
   status: {
     marginTop: 10,
     color: colors.primaryBright,
-    fontWeight: "700",
+    fontWeight: "800",
   },
   statusDone: {
     color: colors.accent,
@@ -433,6 +518,9 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: radii.md,
     alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 7,
   },
   editText: {
     color: colors.text,
@@ -443,17 +531,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     justifyContent: "center",
     alignItems: "center",
-    width: 100,
+    width: 105,
     borderRadius: radii.lg,
     marginBottom: 12,
+    gap: 4,
+  },
+  completeActionText: {
+    color: colors.textDark,
+    fontWeight: "900",
   },
   deleteAction: {
     backgroundColor: colors.danger || "#EF4444",
     justifyContent: "center",
     alignItems: "center",
-    width: 100,
+    width: 105,
     borderRadius: radii.lg,
     marginBottom: 12,
+    gap: 4,
   },
   swipeText: {
     color: "white",
