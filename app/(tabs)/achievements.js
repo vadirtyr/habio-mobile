@@ -1,3 +1,4 @@
+import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -15,18 +16,23 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { BrandHeader } from "../../components/BrandMark";
+import { useAuth } from "../../context/AuthContext";
 import { api } from "../../lib/api";
 import { colors, radii, shadows, spacing } from "../../lib/theme";
 
 export default function AchievementsScreen() {
+  const { token } = useAuth();
+
   const [achievements, setAchievements] = useState([]);
   const [earnedCount, setEarnedCount] = useState(0);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
   async function fetchAchievements() {
+    if (!token) return;
+
     try {
-      const data = await api.get("/achievements");
+      const data = await api.get("/achievements", token);
 
       setAchievements(data.items || []);
       setEarnedCount(data.earned_count || 0);
@@ -40,12 +46,12 @@ export default function AchievementsScreen() {
 
   useEffect(() => {
     fetchAchievements();
-  }, []);
+  }, [token]);
 
   useFocusEffect(
     useCallback(() => {
       fetchAchievements();
-    }, [])
+    }, [token])
   );
 
   if (loading) {
@@ -80,6 +86,7 @@ export default function AchievementsScreen() {
         }
         ListEmptyComponent={
           <View style={styles.emptyCard}>
+            <Feather name="award" size={36} color={colors.accent} />
             <Text style={styles.emptyTitle}>No achievements yet</Text>
             <Text style={styles.emptyText}>
               Complete habits, tasks, and rewards to unlock badges.
@@ -96,9 +103,11 @@ export default function AchievementsScreen() {
                     item.earned && styles.iconCircleEarned,
                   ]}
                 >
-                  <Text style={styles.iconText}>
-                    {item.earned ? "🏆" : "🔒"}
-                  </Text>
+                  <Feather
+                    name={item.earned ? "award" : "lock"}
+                    size={22}
+                    color={item.earned ? colors.textDark : colors.textMuted}
+                  />
                 </View>
 
                 <View style={styles.cardText}>
@@ -118,18 +127,37 @@ export default function AchievementsScreen() {
               </View>
 
               <View style={styles.metaRow}>
-                <Text style={styles.metaPill}>
-                  {item.raw_progress || 0} / {item.target}
-                </Text>
+                <View style={styles.metaPill}>
+                  <Feather
+                    name="trending-up"
+                    size={14}
+                    color={colors.textMuted}
+                  />
+                  <Text style={styles.metaText}>
+                    {item.raw_progress || 0} / {item.target}
+                  </Text>
+                </View>
 
-                <Text
+                <View
                   style={[
                     styles.statusPill,
                     item.earned && styles.statusDone,
                   ]}
                 >
-                  {item.earned ? "Unlocked" : `${item.percent || 0}%`}
-                </Text>
+                  <Feather
+                    name={item.earned ? "check-circle" : "clock"}
+                    size={14}
+                    color={item.earned ? colors.accent : colors.primaryBright}
+                  />
+                  <Text
+                    style={[
+                      styles.statusText,
+                      item.earned && styles.statusDoneText,
+                    ]}
+                  >
+                    {item.earned ? "Unlocked" : `${item.percent || 0}%`}
+                  </Text>
+                </View>
               </View>
             </View>
           </AnimatedCard>
@@ -211,11 +239,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderColor: colors.border,
+    ...shadows.card,
   },
   emptyTitle: {
     fontSize: 20,
     fontWeight: "900",
     color: colors.text,
+    marginTop: spacing.sm,
   },
   emptyText: {
     color: colors.textMuted,
@@ -253,11 +283,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   iconCircleEarned: {
-    backgroundColor: "rgba(34, 197, 94, 0.18)",
+    backgroundColor: colors.accent,
     borderColor: colors.accent,
-  },
-  iconText: {
-    fontSize: 23,
   },
   cardText: {
     flex: 1,
@@ -299,24 +326,37 @@ const styles = StyleSheet.create({
   },
   metaPill: {
     backgroundColor: colors.surfaceElevated,
-    color: colors.textMuted,
+    borderRadius: radii.pill,
     paddingVertical: 7,
     paddingHorizontal: 10,
-    borderRadius: radii.pill,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  metaText: {
+    color: colors.textMuted,
     fontWeight: "900",
     fontSize: 12,
   },
+
   statusPill: {
     backgroundColor: "rgba(37, 99, 235, 0.18)",
-    color: colors.primaryBright,
+    borderRadius: radii.pill,
     paddingVertical: 7,
     paddingHorizontal: 10,
-    borderRadius: radii.pill,
-    fontWeight: "900",
-    fontSize: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   statusDone: {
     backgroundColor: "rgba(34, 197, 94, 0.18)",
+  },
+  statusText: {
+    color: colors.primaryBright,
+    fontWeight: "900",
+    fontSize: 12,
+  },
+  statusDoneText: {
     color: colors.accent,
   },
 });

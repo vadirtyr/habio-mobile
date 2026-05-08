@@ -10,10 +10,12 @@ import {
   View,
 } from "react-native";
 import { BrandHeader } from "../components/BrandMark";
+import { useAuth } from "../context/AuthContext";
 import { api } from "../lib/api";
 import { colors, radii, shadows, spacing } from "../lib/theme";
 
 export default function EditHabitScreen() {
+  const { token } = useAuth();
   const params = useLocalSearchParams();
 
   const [name, setName] = useState(params.name || "");
@@ -21,6 +23,8 @@ export default function EditHabitScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   async function updateHabit() {
+    if (!token) return;
+
     if (!name.trim()) {
       Alert.alert("Missing name", "Enter a habit name.");
       return;
@@ -30,14 +34,20 @@ export default function EditHabitScreen() {
     setSubmitting(true);
 
     try {
-      await api.put(`/habits/${params.id}`, {
-        name: name.trim(),
-        description: description.trim(),
-        frequency: params.frequency || "daily",
-        difficulty: params.difficulty || "medium",
-        custom_coins: params.custom_coins ? Number(params.custom_coins) : null,
-        icon: params.icon || "flame",
-      });
+      await api.put(
+        `/habits/${params.id}`,
+        {
+          name: name.trim(),
+          description: description.trim(),
+          frequency: params.frequency || "daily",
+          difficulty: params.difficulty || "medium",
+          custom_coins: params.custom_coins
+            ? Number(params.custom_coins)
+            : null,
+          icon: params.icon || "flame",
+        },
+        token
+      );
 
       router.replace("/(tabs)/habits");
     } catch (error) {
@@ -56,7 +66,7 @@ export default function EditHabitScreen() {
       <BrandHeader eyebrow="Edit Habit" title="Update Habit" />
 
       <Text style={styles.subtitle}>
-        Adjust the habit name or notes without losing your progress.
+        Adjust the habit details without losing your progress.
       </Text>
 
       <View style={styles.card}>
@@ -78,6 +88,23 @@ export default function EditHabitScreen() {
           onChangeText={setDescription}
           multiline
         />
+
+        <View style={styles.previewBox}>
+          <View style={styles.iconCircle}>
+            <Text style={styles.iconText}>🔥</Text>
+          </View>
+
+          <View style={styles.previewText}>
+            <Text style={styles.previewTitle}>
+              {name.trim() || "Your habit"}
+            </Text>
+            <Text style={styles.previewSubtitle}>
+              {params.frequency || "daily"} •{" "}
+              {params.difficulty || "medium"} •{" "}
+              {params.custom_coins || 10} coins
+            </Text>
+          </View>
+        </View>
       </View>
 
       <Pressable
@@ -145,6 +172,43 @@ const styles = StyleSheet.create({
   textarea: {
     height: 96,
     textAlignVertical: "top",
+  },
+  previewBox: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  iconCircle: {
+    width: 46,
+    height: 46,
+    borderRadius: radii.pill,
+    backgroundColor: "rgba(34, 197, 94, 0.18)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  iconText: {
+    fontSize: 22,
+  },
+  previewText: {
+    flex: 1,
+  },
+  previewTitle: {
+    fontSize: 17,
+    fontWeight: "900",
+    color: colors.text,
+  },
+  previewSubtitle: {
+    marginTop: 3,
+    color: colors.textMuted,
+    fontWeight: "700",
   },
   button: {
     backgroundColor: colors.accent,

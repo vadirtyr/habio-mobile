@@ -8,7 +8,7 @@ import {
   FlatList,
   StyleSheet,
   Text,
-  View
+  View,
 } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
 import Animated, {
@@ -21,21 +21,26 @@ import Animated, {
 } from "react-native-reanimated";
 import { AnimatedPressable } from "../../components/AnimatedPressable";
 import { BrandHeader } from "../../components/BrandMark";
+import { useAuth } from "../../context/AuthContext";
 import { api } from "../../lib/api";
 import { colors, radii, shadows, spacing } from "../../lib/theme";
 
 export default function HabitsScreen() {
+  const { token } = useAuth();
+
   const [habits, setHabits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState(null);
   const [balance, setBalance] = useState(0);
 
   async function fetchHabits() {
+    if (!token) return;
+
     try {
-      const statsData = await api.get("/stats");
+      const statsData = await api.get("/stats", token);
       setBalance(statsData.coin_balance);
 
-      const data = await api.get("/habits");
+      const data = await api.get("/habits", token);
       setHabits(data);
     } catch (error) {
       Alert.alert("Error", error.message);
@@ -46,7 +51,7 @@ export default function HabitsScreen() {
 
   async function completeHabit(habitId) {
     const habit = habits.find((h) => h.id === habitId);
-    if (!habit || habit.completed_today) return;
+    if (!habit || habit.completed_today || !token) return;
 
     setHabits((current) =>
       current.map((h) =>
@@ -59,7 +64,7 @@ export default function HabitsScreen() {
     setBalance((b) => b + (habit.coins_per_completion || 0));
 
     try {
-      const data = await api.post(`/habits/${habitId}/complete`);
+      const data = await api.post(`/habits/${habitId}/complete`, {}, token);
 
       await Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Success
@@ -89,11 +94,13 @@ export default function HabitsScreen() {
   }
 
   async function deleteHabit(habit) {
+    if (!token) return;
+
     const previous = habits;
     setHabits((current) => current.filter((h) => h.id !== habit.id));
 
     try {
-      await api.delete(`/habits/${habit.id}`);
+      await api.delete(`/habits/${habit.id}`, token);
 
       await Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Warning
@@ -109,12 +116,12 @@ export default function HabitsScreen() {
 
   useEffect(() => {
     fetchHabits();
-  }, []);
+  }, [token]);
 
   useFocusEffect(
     useCallback(() => {
       fetchHabits();
-    }, [])
+    }, [token])
   );
 
   if (loading) {
@@ -232,7 +239,11 @@ export default function HabitsScreen() {
 
                 <View style={styles.metaRow}>
                   <View style={styles.metaPill}>
-                    <Feather name="trending-up" size={14} color={colors.textMuted} />
+                    <Feather
+                      name="trending-up"
+                      size={14}
+                      color={colors.textMuted}
+                    />
                     <Text style={styles.metaText}>{item.streak} streak</Text>
                   </View>
 
@@ -353,7 +364,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 10,
   },
-
   balanceCard: {
     marginTop: spacing.md,
     backgroundColor: colors.primaryBright,
@@ -373,7 +383,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     marginTop: 4,
   },
-
   addButton: {
     marginTop: spacing.md,
     backgroundColor: colors.accent,
@@ -388,7 +397,6 @@ const styles = StyleSheet.create({
     color: colors.textDark,
     fontWeight: "900",
   },
-
   toast: {
     marginTop: 12,
     backgroundColor: "rgba(34, 197, 94, 0.18)",
@@ -402,7 +410,6 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontWeight: "900",
   },
-
   emptyCard: {
     marginTop: spacing.lg,
     backgroundColor: colors.surface,
@@ -435,7 +442,6 @@ const styles = StyleSheet.create({
     color: colors.textDark,
     fontWeight: "900",
   },
-
   card: {
     backgroundColor: colors.surface,
     padding: spacing.md,
@@ -470,7 +476,6 @@ const styles = StyleSheet.create({
   cardText: {
     flex: 1,
   },
-
   name: {
     fontSize: 18,
     fontWeight: "900",
@@ -481,7 +486,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     lineHeight: 20,
   },
-
   metaRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -502,7 +506,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     fontSize: 12,
   },
-
   status: {
     marginTop: 10,
     color: colors.primaryBright,
@@ -511,7 +514,6 @@ const styles = StyleSheet.create({
   statusDone: {
     color: colors.accent,
   },
-
   editButton: {
     marginTop: 12,
     backgroundColor: colors.surfaceElevated,
@@ -526,7 +528,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: "900",
   },
-
   completeAction: {
     backgroundColor: colors.accent,
     justifyContent: "center",

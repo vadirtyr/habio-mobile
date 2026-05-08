@@ -1,10 +1,11 @@
+import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -17,18 +18,24 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
+import { AnimatedPressable } from "../../components/AnimatedPressable";
 import { BrandHeader } from "../../components/BrandMark";
+import { useAuth } from "../../context/AuthContext";
 import { api } from "../../lib/api";
 import { colors, radii, shadows, spacing } from "../../lib/theme";
 
 export default function QuestsScreen() {
+  const { token } = useAuth();
+
   const [quests, setQuests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState(null);
 
   async function fetchQuests() {
+    if (!token) return;
+
     try {
-      const data = await api.get("/quests");
+      const data = await api.get("/quests", token);
       setQuests(data.items || []);
     } catch (error) {
       Alert.alert("Error", error.message);
@@ -38,8 +45,14 @@ export default function QuestsScreen() {
   }
 
   async function claimQuest(quest) {
+    if (!token) return;
+
     try {
-      const data = await api.post(`/quests/${quest.id}/claim`);
+      const data = await api.post(`/quests/${quest.id}/claim`, {}, token);
+
+      await Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Success
+      );
 
       setMessage(`+${data.coins_earned} coins claimed`);
       fetchQuests();
@@ -52,12 +65,12 @@ export default function QuestsScreen() {
 
   useEffect(() => {
     fetchQuests();
-  }, []);
+  }, [token]);
 
   useFocusEffect(
     useCallback(() => {
       fetchQuests();
-    }, [])
+    }, [token])
   );
 
   if (loading) {
@@ -96,6 +109,7 @@ export default function QuestsScreen() {
         }
         ListEmptyComponent={
           <View style={styles.emptyCard}>
+            <Feather name="flag" size={36} color={colors.accent} />
             <Text style={styles.emptyTitle}>No quests available</Text>
             <Text style={styles.emptyText}>
               Complete habits and tasks to make progress.
@@ -118,9 +132,21 @@ export default function QuestsScreen() {
                     item.completed && styles.iconCircleComplete,
                   ]}
                 >
-                  <Text style={styles.iconText}>
-                    {item.claimed ? "✅" : item.claimable ? "🎯" : "🚩"}
-                  </Text>
+                  <Feather
+                    name={
+                      item.claimed
+                        ? "check-circle"
+                        : item.claimable
+                        ? "target"
+                        : "flag"
+                    }
+                    size={22}
+                    color={
+                      item.claimed || item.claimable
+                        ? colors.accent
+                        : colors.textMuted
+                    }
+                  />
                 </View>
 
                 <View style={styles.cardText}>
@@ -140,16 +166,27 @@ export default function QuestsScreen() {
               </View>
 
               <View style={styles.metaRow}>
-                <Text style={styles.metaPill}>
-                  {item.progress || 0} / {item.target}
-                </Text>
-                <Text style={styles.metaPill}>🪙 {item.reward}</Text>
-                <Text style={styles.metaPill}>
-                  {item.period === "daily" ? "Daily" : "Weekly"}
-                </Text>
+                <View style={styles.metaPill}>
+                  <Feather name="trending-up" size={14} color={colors.textMuted} />
+                  <Text style={styles.metaText}>
+                    {item.progress || 0} / {item.target}
+                  </Text>
+                </View>
+
+                <View style={styles.metaPill}>
+                  <Feather name="gift" size={14} color={colors.textMuted} />
+                  <Text style={styles.metaText}>{item.reward} coins</Text>
+                </View>
+
+                <View style={styles.metaPill}>
+                  <Feather name="calendar" size={14} color={colors.textMuted} />
+                  <Text style={styles.metaText}>
+                    {item.period === "daily" ? "Daily" : "Weekly"}
+                  </Text>
+                </View>
               </View>
 
-              <Pressable
+              <AnimatedPressable
                 style={[
                   styles.claimButton,
                   item.claimable && !item.claimed && styles.claimButtonReady,
@@ -158,6 +195,21 @@ export default function QuestsScreen() {
                 disabled={!item.claimable || item.claimed}
                 onPress={() => claimQuest(item)}
               >
+                <Feather
+                  name={
+                    item.claimed
+                      ? "check-circle"
+                      : item.claimable
+                      ? "gift"
+                      : "clock"
+                  }
+                  size={17}
+                  color={
+                    item.claimable && !item.claimed
+                      ? colors.textDark
+                      : colors.textMuted
+                  }
+                />
                 <Text
                   style={[
                     styles.claimButtonText,
@@ -170,7 +222,7 @@ export default function QuestsScreen() {
                     ? "Claim Reward"
                     : "In Progress"}
                 </Text>
-              </Pressable>
+              </AnimatedPressable>
             </View>
           </AnimatedCard>
         )}
@@ -293,11 +345,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderColor: colors.border,
+    ...shadows.card,
   },
   emptyTitle: {
     fontSize: 20,
     fontWeight: "900",
     color: colors.text,
+    marginTop: spacing.sm,
   },
   emptyText: {
     color: colors.textMuted,
@@ -340,9 +394,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(34, 197, 94, 0.18)",
     borderColor: colors.accent,
   },
-  iconText: {
-    fontSize: 23,
-  },
   cardText: {
     flex: 1,
   },
@@ -383,10 +434,15 @@ const styles = StyleSheet.create({
   },
   metaPill: {
     backgroundColor: colors.surfaceElevated,
-    color: colors.textMuted,
+    borderRadius: radii.pill,
     paddingVertical: 7,
     paddingHorizontal: 10,
-    borderRadius: radii.pill,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  metaText: {
+    color: colors.textMuted,
     fontWeight: "900",
     fontSize: 12,
   },
@@ -397,8 +453,11 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: radii.lg,
     alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
     borderColor: colors.border,
+    flexDirection: "row",
+    gap: 8,
   },
   claimButtonReady: {
     backgroundColor: colors.accent,

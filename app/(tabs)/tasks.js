@@ -8,7 +8,7 @@ import {
   FlatList,
   StyleSheet,
   Text,
-  View
+  View,
 } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
 import Animated, {
@@ -21,21 +21,26 @@ import Animated, {
 } from "react-native-reanimated";
 import { AnimatedPressable } from "../../components/AnimatedPressable";
 import { BrandHeader } from "../../components/BrandMark";
+import { useAuth } from "../../context/AuthContext";
 import { api } from "../../lib/api";
 import { colors, radii, shadows, spacing } from "../../lib/theme";
 
 export default function TasksScreen() {
+  const { token } = useAuth();
+
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState(null);
   const [balance, setBalance] = useState(0);
 
   async function fetchTasks() {
+    if (!token) return;
+
     try {
-      const statsData = await api.get("/stats");
+      const statsData = await api.get("/stats", token);
       setBalance(statsData.coin_balance);
 
-      const data = await api.get("/tasks");
+      const data = await api.get("/tasks", token);
       setTasks(data);
     } catch (error) {
       Alert.alert("Error", error.message);
@@ -46,7 +51,7 @@ export default function TasksScreen() {
 
   async function completeTask(taskId) {
     const task = tasks.find((t) => t.id === taskId);
-    if (!task || task.completed) return;
+    if (!task || task.completed || !token) return;
 
     setTasks((current) =>
       current.map((t) => (t.id === taskId ? { ...t, completed: true } : t))
@@ -55,7 +60,7 @@ export default function TasksScreen() {
     setBalance((b) => b + (task.coins_reward || 0));
 
     try {
-      const data = await api.post(`/tasks/${taskId}/complete`);
+      const data = await api.post(`/tasks/${taskId}/complete`, {}, token);
 
       await Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Success
@@ -85,11 +90,13 @@ export default function TasksScreen() {
   }
 
   async function deleteTask(task) {
+    if (!token) return;
+
     const previous = tasks;
     setTasks((current) => current.filter((t) => t.id !== task.id));
 
     try {
-      await api.delete(`/tasks/${task.id}`);
+      await api.delete(`/tasks/${task.id}`, token);
 
       await Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Warning
@@ -105,12 +112,12 @@ export default function TasksScreen() {
 
   useEffect(() => {
     fetchTasks();
-  }, []);
+  }, [token]);
 
   useFocusEffect(
     useCallback(() => {
       fetchTasks();
-    }, [])
+    }, [token])
   );
 
   if (loading) {
@@ -383,7 +390,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 10,
   },
-
   balanceCard: {
     marginTop: spacing.md,
     backgroundColor: colors.primaryBright,
@@ -403,7 +409,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     marginTop: 4,
   },
-
   addButton: {
     marginTop: spacing.md,
     backgroundColor: colors.accent,
@@ -418,7 +423,6 @@ const styles = StyleSheet.create({
     color: colors.textDark,
     fontWeight: "900",
   },
-
   toast: {
     marginTop: 12,
     backgroundColor: "rgba(34, 197, 94, 0.18)",
@@ -432,7 +436,6 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontWeight: "900",
   },
-
   emptyCard: {
     marginTop: spacing.lg,
     backgroundColor: colors.surface,
@@ -465,7 +468,6 @@ const styles = StyleSheet.create({
     color: colors.textDark,
     fontWeight: "900",
   },
-
   card: {
     backgroundColor: colors.surface,
     padding: spacing.md,
@@ -507,7 +509,6 @@ const styles = StyleSheet.create({
   cardText: {
     flex: 1,
   },
-
   name: {
     fontSize: 18,
     fontWeight: "900",
@@ -518,7 +519,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     lineHeight: 20,
   },
-
   metaRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -542,7 +542,6 @@ const styles = StyleSheet.create({
   urgentText: {
     color: colors.danger || "#EF4444",
   },
-
   status: {
     marginTop: 10,
     color: colors.primaryBright,
@@ -554,7 +553,6 @@ const styles = StyleSheet.create({
   statusUrgent: {
     color: colors.danger || "#EF4444",
   },
-
   editButton: {
     marginTop: 12,
     backgroundColor: colors.surfaceElevated,
@@ -569,7 +567,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: "900",
   },
-
   completeAction: {
     backgroundColor: colors.accent,
     justifyContent: "center",

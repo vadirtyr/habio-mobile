@@ -10,15 +10,20 @@ import {
   View,
 } from "react-native";
 import { BrandHeader } from "../components/BrandMark";
+import { useAuth } from "../context/AuthContext";
 import { api } from "../lib/api";
 import { colors, radii, shadows, spacing } from "../lib/theme";
 
 export default function CreateHabitScreen() {
+  const { token } = useAuth();
+
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   async function createHabit() {
+    if (!token) return;
+
     if (!name.trim()) {
       Alert.alert("Missing name", "Enter a habit name.");
       return;
@@ -28,13 +33,17 @@ export default function CreateHabitScreen() {
     setSubmitting(true);
 
     try {
-      await api.post("/habits", {
-        name: name.trim(),
-        description: description.trim(),
-        frequency: "daily",
-        difficulty: "medium",
-        icon: "flame",
-      });
+      await api.post(
+        "/habits",
+        {
+          name: name.trim(),
+          description: description.trim(),
+          frequency: "daily",
+          difficulty: "medium",
+          icon: "flame",
+        },
+        token
+      );
 
       router.replace("/(tabs)/habits");
     } catch (error) {
@@ -93,10 +102,7 @@ export default function CreateHabitScreen() {
       </View>
 
       <Pressable
-        style={[
-          styles.button,
-          submitting && styles.buttonDisabled,
-        ]}
+        style={[styles.button, submitting && styles.buttonDisabled]}
         onPress={createHabit}
         disabled={submitting}
       >
@@ -125,7 +131,6 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
   },
-
   subtitle: {
     color: colors.textMuted,
     marginTop: spacing.sm,
@@ -133,7 +138,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: "600",
   },
-
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.xl,
@@ -143,14 +147,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     ...shadows.card,
   },
-
   label: {
     color: colors.text,
     fontWeight: "900",
     marginBottom: 8,
     marginTop: 4,
   },
-
   input: {
     backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
@@ -161,12 +163,10 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: "700",
   },
-
   textarea: {
     height: 96,
     textAlignVertical: "top",
   },
-
   previewBox: {
     marginTop: spacing.sm,
     backgroundColor: colors.surfaceElevated,
@@ -178,7 +178,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-
   iconCircle: {
     width: 46,
     height: 46,
@@ -189,27 +188,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.accent,
   },
-
   iconText: {
     fontSize: 22,
   },
-
   previewText: {
     flex: 1,
   },
-
   previewTitle: {
     fontSize: 17,
     fontWeight: "900",
     color: colors.text,
   },
-
   previewSubtitle: {
     marginTop: 3,
     color: colors.textMuted,
     fontWeight: "700",
   },
-
   button: {
     backgroundColor: colors.accent,
     padding: 16,
@@ -218,22 +212,18 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     ...shadows.glow,
   },
-
   buttonDisabled: {
     opacity: 0.65,
   },
-
   buttonText: {
     color: colors.textDark,
     fontWeight: "900",
     fontSize: 16,
   },
-
   cancelButton: {
     padding: spacing.md,
     alignItems: "center",
   },
-
   cancelText: {
     color: colors.textMuted,
     fontWeight: "800",

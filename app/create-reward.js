@@ -10,16 +10,21 @@ import {
   View,
 } from "react-native";
 import { BrandHeader } from "../components/BrandMark";
+import { useAuth } from "../context/AuthContext";
 import { api } from "../lib/api";
 import { colors, radii, shadows, spacing } from "../lib/theme";
 
 export default function CreateRewardScreen() {
+  const { token } = useAuth();
+
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [cost, setCost] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   async function createReward() {
+    if (!token) return;
+
     const parsedCost = Number(cost);
 
     if (!name.trim()) {
@@ -36,12 +41,16 @@ export default function CreateRewardScreen() {
     setSubmitting(true);
 
     try {
-      await api.post("/rewards", {
-        name: name.trim(),
-        description: description.trim(),
-        cost: parsedCost,
-        icon: "gift",
-      });
+      await api.post(
+        "/rewards",
+        {
+          name: name.trim(),
+          description: description.trim(),
+          cost: parsedCost,
+          icon: "gift",
+        },
+        token
+      );
 
       router.replace("/(tabs)/rewards");
     } catch (error) {
@@ -93,7 +102,6 @@ export default function CreateRewardScreen() {
           keyboardType="numeric"
         />
 
-        {/* Preview */}
         <View style={styles.previewBox}>
           <View style={styles.iconCircle}>
             <Text style={styles.iconText}>🎁</Text>
@@ -140,7 +148,6 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
   },
-
   subtitle: {
     color: colors.textMuted,
     marginTop: spacing.sm,
@@ -148,7 +155,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: "600",
   },
-
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.xl,
@@ -158,14 +164,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     ...shadows.card,
   },
-
   label: {
     color: colors.text,
     fontWeight: "900",
     marginBottom: 8,
     marginTop: 4,
   },
-
   input: {
     backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
@@ -176,12 +180,10 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: "700",
   },
-
   textarea: {
     height: 96,
     textAlignVertical: "top",
   },
-
   previewBox: {
     marginTop: spacing.sm,
     backgroundColor: colors.surfaceElevated,
@@ -193,7 +195,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-
   iconCircle: {
     width: 46,
     height: 46,
@@ -204,27 +205,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.accent,
   },
-
   iconText: {
     fontSize: 22,
   },
-
   previewText: {
     flex: 1,
   },
-
   previewTitle: {
     fontSize: 17,
     fontWeight: "900",
     color: colors.text,
   },
-
   previewSubtitle: {
     marginTop: 3,
     color: colors.textMuted,
     fontWeight: "700",
   },
-
   button: {
     backgroundColor: colors.accent,
     padding: 16,
@@ -233,22 +229,18 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     ...shadows.glow,
   },
-
   buttonDisabled: {
     opacity: 0.65,
   },
-
   buttonText: {
     color: colors.textDark,
     fontWeight: "900",
     fontSize: 16,
   },
-
   cancelButton: {
     padding: spacing.md,
     alignItems: "center",
   },
-
   cancelText: {
     color: colors.textMuted,
     fontWeight: "800",

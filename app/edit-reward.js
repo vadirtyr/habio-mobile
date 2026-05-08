@@ -10,10 +10,12 @@ import {
   View,
 } from "react-native";
 import { BrandHeader } from "../components/BrandMark";
+import { useAuth } from "../context/AuthContext";
 import { api } from "../lib/api";
 import { colors, radii, shadows, spacing } from "../lib/theme";
 
 export default function EditRewardScreen() {
+  const { token } = useAuth();
   const params = useLocalSearchParams();
 
   const [name, setName] = useState(params.name || "");
@@ -22,6 +24,8 @@ export default function EditRewardScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   async function updateReward() {
+    if (!token) return;
+
     const parsedCost = Number(cost);
 
     if (!name.trim()) {
@@ -38,12 +42,16 @@ export default function EditRewardScreen() {
     setSubmitting(true);
 
     try {
-      await api.put(`/rewards/${params.id}`, {
-        name: name.trim(),
-        description: description.trim(),
-        cost: parsedCost,
-        icon: params.icon || "gift",
-      });
+      await api.put(
+        `/rewards/${params.id}`,
+        {
+          name: name.trim(),
+          description: description.trim(),
+          cost: parsedCost,
+          icon: params.icon || "gift",
+        },
+        token
+      );
 
       router.replace("/(tabs)/rewards");
     } catch (error) {

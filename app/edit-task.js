@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { BrandHeader } from "../components/BrandMark";
+import { useAuth } from "../context/AuthContext";
 import { api } from "../lib/api";
 import { colors, radii, shadows, spacing } from "../lib/theme";
 
@@ -20,6 +21,7 @@ function formatDate(date) {
 }
 
 export default function EditTaskScreen() {
+  const { token } = useAuth();
   const params = useLocalSearchParams();
 
   const [name, setName] = useState(params.name || "");
@@ -31,6 +33,8 @@ export default function EditTaskScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   async function updateTask() {
+    if (!token) return;
+
     if (!name.trim()) {
       Alert.alert("Missing name", "Enter a task name.");
       return;
@@ -40,14 +44,18 @@ export default function EditTaskScreen() {
     setSubmitting(true);
 
     try {
-      await api.put(`/tasks/${params.id}`, {
-        name: name.trim(),
-        description: description.trim(),
-        difficulty: params.difficulty || "medium",
-        custom_coins: params.custom_coins ? Number(params.custom_coins) : null,
-        due_date: dueDate ? formatDate(dueDate) : null,
-        recurrence: params.recurrence || "none",
-      });
+      await api.put(
+        `/tasks/${params.id}`,
+        {
+          name: name.trim(),
+          description: description.trim(),
+          difficulty: params.difficulty || "medium",
+          custom_coins: params.custom_coins ? Number(params.custom_coins) : null,
+          due_date: dueDate ? formatDate(dueDate) : null,
+          recurrence: params.recurrence || "none",
+        },
+        token
+      );
 
       router.replace("/(tabs)/tasks");
     } catch (error) {
@@ -61,7 +69,10 @@ export default function EditTaskScreen() {
     if (Platform.OS === "android") {
       setShowPicker(false);
     }
-    if (selectedDate) setDueDate(selectedDate);
+
+    if (selectedDate) {
+      setDueDate(selectedDate);
+    }
   }
 
   return (
@@ -132,7 +143,6 @@ export default function EditTaskScreen() {
           />
         )}
 
-        {/* Preview */}
         <View style={styles.previewBox}>
           <View style={styles.iconCircle}>
             <Text style={styles.iconText}>📌</Text>
@@ -143,7 +153,8 @@ export default function EditTaskScreen() {
               {name.trim() || "Your task"}
             </Text>
             <Text style={styles.previewSubtitle}>
-              {dueDate ? formatDate(dueDate) : "No due date"} • Medium • Coins
+              {dueDate ? formatDate(dueDate) : "No due date"} •{" "}
+              {params.difficulty || "Medium"} • Coins
             </Text>
           </View>
         </View>
@@ -179,7 +190,6 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
   },
-
   subtitle: {
     color: colors.textMuted,
     marginTop: spacing.sm,
@@ -187,7 +197,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: "600",
   },
-
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.xl,
@@ -197,14 +206,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     ...shadows.card,
   },
-
   label: {
     color: colors.text,
     fontWeight: "900",
     marginBottom: 8,
     marginTop: 4,
   },
-
   input: {
     backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
@@ -215,12 +222,10 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: "700",
   },
-
   textarea: {
     height: 96,
     textAlignVertical: "top",
   },
-
   dateButton: {
     backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
@@ -232,25 +237,21 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-
   dateLabel: {
     color: colors.textMuted,
     fontSize: 12,
     fontWeight: "800",
     textTransform: "uppercase",
   },
-
   dateText: {
     color: colors.text,
     fontSize: 16,
     fontWeight: "900",
     marginTop: 3,
   },
-
   dateIcon: {
     fontSize: 22,
   },
-
   clearDateButton: {
     alignSelf: "flex-start",
     backgroundColor: "rgba(239, 68, 68, 0.18)",
@@ -259,12 +260,10 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     marginBottom: spacing.sm,
   },
-
   clearDateText: {
     color: colors.danger || "#EF4444",
     fontWeight: "900",
   },
-
   previewBox: {
     marginTop: spacing.sm,
     backgroundColor: colors.surfaceElevated,
@@ -276,7 +275,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-
   iconCircle: {
     width: 46,
     height: 46,
@@ -287,27 +285,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.primaryBright,
   },
-
   iconText: {
     fontSize: 22,
   },
-
   previewText: {
     flex: 1,
   },
-
   previewTitle: {
     fontSize: 17,
     fontWeight: "900",
     color: colors.text,
   },
-
   previewSubtitle: {
     marginTop: 3,
     color: colors.textMuted,
     fontWeight: "700",
   },
-
   button: {
     backgroundColor: colors.accent,
     padding: 16,
@@ -316,22 +309,18 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     ...shadows.glow,
   },
-
   buttonDisabled: {
     opacity: 0.65,
   },
-
   buttonText: {
     color: colors.textDark,
     fontWeight: "900",
     fontSize: 16,
   },
-
   cancelButton: {
     padding: spacing.md,
     alignItems: "center",
   },
-
   cancelText: {
     color: colors.textMuted,
     fontWeight: "800",
