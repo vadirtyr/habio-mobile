@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import { useState } from "react";
 import {
   Alert,
@@ -39,11 +40,17 @@ export default function LoginScreen() {
         throw new Error("Invalid login response");
       }
 
-      // ✅ THIS is the critical fix
       await login(data.token);
 
-      // Navigate into app
-      router.replace("/(tabs)/dashboard");
+      const hasCreatedFirstHabit = await SecureStore.getItemAsync(
+        "hasCreatedFirstHabit"
+      );
+
+      if (hasCreatedFirstHabit === "true") {
+        router.replace("/(tabs)/dashboard");
+      } else {
+        router.replace("/create-habit?firstHabit=true");
+      }
     } catch (error) {
       Alert.alert("Login failed", error.message);
     } finally {

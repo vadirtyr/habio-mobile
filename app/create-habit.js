@@ -1,4 +1,5 @@
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import { useState } from "react";
 import {
   Alert,
@@ -16,8 +17,13 @@ import { colors, radii, shadows, spacing } from "../lib/theme";
 
 export default function CreateHabitScreen() {
   const { token } = useAuth();
+  const params = useLocalSearchParams();
 
-  const [name, setName] = useState("");
+  const isFirstHabit = params.firstHabit === "true";
+  const suggestedName = typeof params.name === "string" ? params.name : "";
+  const category = typeof params.category === "string" ? params.category : "";
+
+  const [name, setName] = useState(suggestedName);
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -41,15 +47,29 @@ export default function CreateHabitScreen() {
           frequency: "daily",
           difficulty: "medium",
           icon: "flame",
+          category: category || null,
         },
         token
       );
 
-      router.replace("/(tabs)/habits");
+      if (isFirstHabit) {
+        await SecureStore.setItemAsync("hasCreatedFirstHabit", "true");
+        router.replace("/(tabs)/dashboard");
+      } else {
+        router.replace("/(tabs)/habits");
+      }
     } catch (error) {
       Alert.alert("Error", error.message);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  function handleCancel() {
+    if (isFirstHabit) {
+      router.replace("/choose-habit");
+    } else {
+      router.replace("/(tabs)/habits");
     }
   }
 
@@ -59,11 +79,22 @@ export default function CreateHabitScreen() {
       contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled"
     >
-      <BrandHeader eyebrow="New Habit" title="Create Habit" />
+      <BrandHeader
+        eyebrow={isFirstHabit ? "Start Here" : "New Habit"}
+        title={isFirstHabit ? "Create Your First Habit" : "Create Habit"}
+      />
 
       <Text style={styles.subtitle}>
-        Build a repeatable action and earn coins every time you complete it.
+        {isFirstHabit
+          ? "Start simple. You can use this suggestion or customize it before creating your first habit."
+          : "Build a repeatable action and earn coins every time you complete it."}
       </Text>
+
+      {category ? (
+        <View style={styles.categoryPill}>
+          <Text style={styles.categoryText}>{category}</Text>
+        </View>
+      ) : null}
 
       <View style={styles.card}>
         <Text style={styles.label}>Habit name</Text>
@@ -111,11 +142,10 @@ export default function CreateHabitScreen() {
         </Text>
       </Pressable>
 
-      <Pressable
-        style={styles.cancelButton}
-        onPress={() => router.replace("/(tabs)/habits")}
-      >
-        <Text style={styles.cancelText}>Cancel</Text>
+      <Pressable style={styles.cancelButton} onPress={handleCancel}>
+        <Text style={styles.cancelText}>
+          {isFirstHabit ? "Choose a different habit" : "Cancel"}
+        </Text>
       </Pressable>
     </ScrollView>
   );
@@ -134,9 +164,24 @@ const styles = StyleSheet.create({
   subtitle: {
     color: colors.textMuted,
     marginTop: spacing.sm,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
     lineHeight: 20,
     fontWeight: "600",
+  },
+  categoryPill: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(34, 197, 94, 0.16)",
+    borderWidth: 1,
+    borderColor: colors.accent,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: radii.pill,
+    marginBottom: spacing.lg,
+  },
+  categoryText: {
+    color: colors.accent,
+    fontWeight: "900",
+    textTransform: "capitalize",
   },
   card: {
     backgroundColor: colors.surface,
