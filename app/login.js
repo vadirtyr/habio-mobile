@@ -44,13 +44,9 @@ export default function LoginScreen() {
       }
 
       await login(data.token);
-
       router.replace("/(tabs)/habits");
     } catch (error) {
-      Alert.alert(
-        "Login failed",
-        error?.message || "Unable to log in."
-      );
+      Alert.alert("Login failed", error?.message || "Unable to log in.");
     } finally {
       setSubmitting(false);
     }
@@ -64,9 +60,7 @@ export default function LoginScreen() {
       <View style={styles.content}>
         <BrandHeader />
 
-        <Text style={styles.subtitle}>
-          Build habits. Earn rewards.
-        </Text>
+        <Text style={styles.subtitle}>Build habits. Earn rewards.</Text>
 
         <View style={styles.card}>
           <Text style={styles.label}>Email</Text>
@@ -94,10 +88,7 @@ export default function LoginScreen() {
           />
 
           <Pressable
-            style={[
-              styles.button,
-              submitting && styles.buttonDisabled,
-            ]}
+            style={[styles.button, submitting && styles.buttonDisabled]}
             onPress={handleLogin}
             disabled={submitting}
           >
