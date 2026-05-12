@@ -21,7 +21,7 @@ export default function Index() {
   }
 
   if (isLoggedIn) {
-    return <Redirect href="/(tabs)/habits" />;
+    return <Redirect href="/(tabs)/dashboard" />;
   }
 
   return <Redirect href="/login" />;

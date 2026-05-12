@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import { useState } from "react";
 import {
   Alert,
@@ -44,7 +45,17 @@ export default function LoginScreen() {
       }
 
       await login(data.token);
-      router.replace("/(tabs)/habits");
+
+      const hasCompletedOnboarding = await SecureStore.getItemAsync(
+        "hasCompletedOnboarding"
+      );
+
+      if (!hasCompletedOnboarding) {
+        router.replace("/onboarding");
+        return;
+      }
+
+      router.replace("/(tabs)/dashboard");
     } catch (error) {
       Alert.alert("Login failed", error?.message || "Unable to log in.");
     } finally {
@@ -113,13 +124,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-
   content: {
     flex: 1,
     justifyContent: "center",
     padding: spacing.lg,
   },
-
   subtitle: {
     color: colors.textMuted,
     marginTop: spacing.sm,
@@ -128,7 +137,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     lineHeight: 22,
   },
-
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.xl,
@@ -138,14 +146,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     ...shadows.card,
   },
-
   label: {
     color: colors.text,
     fontWeight: "800",
     marginBottom: 8,
     marginTop: 4,
   },
-
   input: {
     backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
@@ -156,7 +162,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: "600",
   },
-
   button: {
     backgroundColor: colors.accent,
     paddingVertical: 16,
@@ -165,17 +170,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     ...shadows.glow,
   },
-
   buttonDisabled: {
     opacity: 0.65,
   },
-
   buttonText: {
     color: colors.textDark,
     fontWeight: "900",
     fontSize: 16,
   },
-
   registerText: {
     textAlign: "center",
     color: colors.accent,
