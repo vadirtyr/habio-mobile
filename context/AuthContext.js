@@ -12,7 +12,18 @@ export function AuthProvider({ children }) {
     async function loadToken() {
       try {
         const storedToken = await SecureStore.getItemAsync("token");
-        setToken(storedToken || null);
+
+        if (storedToken) {
+          global.token = storedToken;
+          setToken(storedToken);
+        } else {
+          global.token = null;
+          setToken(null);
+        }
+      } catch (error) {
+        console.log("Failed to load auth token:", error);
+        global.token = null;
+        setToken(null);
       } finally {
         setAuthLoading(false);
       }
@@ -22,18 +33,38 @@ export function AuthProvider({ children }) {
   }, []);
 
   async function login(newToken) {
-    await SecureStore.setItemAsync("token", newToken);
-    setToken(newToken);
+    try {
+      await SecureStore.setItemAsync("token", newToken);
+      global.token = newToken;
+      setToken(newToken);
+    } catch (error) {
+      console.log("Failed to save auth token:", error);
+      throw error;
+    }
   }
 
   async function logout() {
-    await SecureStore.deleteItemAsync("token");
-    setToken(null);
-    router.replace("/login");
+    try {
+      await SecureStore.deleteItemAsync("token");
+    } catch (error) {
+      console.log("Failed to delete auth token:", error);
+    } finally {
+      global.token = null;
+      setToken(null);
+      router.replace("/login");
+    }
   }
 
   return (
-    <AuthContext.Provider value={{ token, authLoading, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        token,
+        authLoading,
+        isLoggedIn: !!token,
+        login,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

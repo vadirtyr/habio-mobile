@@ -22,6 +22,14 @@ import { useAuth } from "../../context/AuthContext";
 import { api } from "../../lib/api";
 import { colors, radii, shadows, spacing } from "../../lib/theme";
 
+function getNextBonusTarget(streak = 0) {
+  if (streak < 3) return { target: 3, bonus: 5, remaining: 3 - streak };
+  if (streak < 7) return { target: 7, bonus: 15, remaining: 7 - streak };
+  if (streak < 14) return { target: 14, bonus: 30, remaining: 14 - streak };
+  if (streak < 30) return { target: 30, bonus: 75, remaining: 30 - streak };
+  return { target: 30, bonus: 75, remaining: 0 };
+}
+
 export default function DashboardScreen() {
   const { token, logout } = useAuth();
 
@@ -95,11 +103,23 @@ export default function DashboardScreen() {
         .sort((a, b) => a.cost - b.cost)
         .find((r) => r.cost > stats.coin_balance);
 
+    const topHabitStreak = habits
+      .slice()
+      .sort((a, b) => (b.streak || 0) - (a.streak || 0))[0];
+
+    const currentStreak = stats.current_max_streak || 0;
+    const bestStreak = stats.best_streak || 0;
+    const nextBonus = getNextBonusTarget(currentStreak);
+
     return {
       incompleteHabits,
       pendingTasks,
       claimableQuests,
       nextReward,
+      topHabitStreak,
+      currentStreak,
+      bestStreak,
+      nextBonus,
     };
   }, [stats, habits, tasks, quests, rewards]);
 
@@ -112,8 +132,16 @@ export default function DashboardScreen() {
     );
   }
 
-  const { incompleteHabits, pendingTasks, claimableQuests, nextReward } =
-    smartData;
+  const {
+    incompleteHabits,
+    pendingTasks,
+    claimableQuests,
+    nextReward,
+    topHabitStreak,
+    currentStreak,
+    bestStreak,
+    nextBonus,
+  } = smartData;
 
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.container}>
@@ -138,15 +166,53 @@ export default function DashboardScreen() {
         </View>
       </AnimatedCard>
 
+      <AnimatedCard index={1}>
+        <View style={styles.streakCard}>
+          <View style={styles.streakTop}>
+            <View style={styles.streakIcon}>
+              <Feather name="zap" size={24} color={colors.textDark} />
+            </View>
+
+            <View style={styles.streakText}>
+              <Text style={styles.streakEyebrow}>Daily Streak</Text>
+              <Text style={styles.streakTitle}>{currentStreak} days</Text>
+              <Text style={styles.streakSub}>
+                Best streak: {bestStreak} days
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.streakDivider} />
+
+          <Text style={styles.bonusTitle}>Next bonus</Text>
+          <Text style={styles.bonusText}>
+            {nextBonus.remaining > 0
+              ? `${nextBonus.remaining} more day${
+                  nextBonus.remaining === 1 ? "" : "s"
+                } to unlock +${nextBonus.bonus} bonus coins at ${nextBonus.target} days.`
+              : `+${nextBonus.bonus} bonus coins active at ${nextBonus.target}+ days.`}
+          </Text>
+
+          {topHabitStreak ? (
+            <View style={styles.topHabitPill}>
+              <Feather name="trending-up" size={14} color={colors.accent} />
+              <Text style={styles.topHabitText}>
+                Top habit: {topHabitStreak.name} • {topHabitStreak.streak || 0}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      </AnimatedCard>
+
       <View style={styles.grid}>
-        <StatCard index={1} label="Habits" value={stats.habits_count} icon="repeat" />
-        <StatCard index={2} label="Tasks" value={stats.tasks_pending} icon="check-square" />
-        <StatCard index={3} label="Streak" value={stats.current_max_streak} icon="trending-up" />
-        <StatCard index={4} label="Quests" value={claimableQuests.length} icon="target" highlight />
+        <StatCard index={2} label="Habits" value={stats.habits_count} icon="repeat" />
+        <StatCard index={3} label="Tasks" value={stats.tasks_pending} icon="check-square" />
+        <StatCard index={4} label="Best Streak" value={bestStreak} icon="award" />
+        <StatCard index={5} label="Quests" value={claimableQuests.length} icon="target" highlight />
       </View>
 
       <SmartSection
-        index={5}
+        index={6}
         title="Do next"
         emptyText="No habits left for today."
         actionText="View Habits"
@@ -160,7 +226,7 @@ export default function DashboardScreen() {
       />
 
       <SmartSection
-        index={6}
+        index={7}
         title="Pending tasks"
         emptyText="No pending tasks."
         actionText="View Tasks"
@@ -174,7 +240,7 @@ export default function DashboardScreen() {
       />
 
       <SmartSection
-        index={7}
+        index={8}
         title="Quests ready"
         emptyText="No quests ready to claim."
         actionText="View Quests"
@@ -189,7 +255,7 @@ export default function DashboardScreen() {
       />
 
       {nextReward && (
-        <AnimatedCard index={8}>
+        <AnimatedCard index={9}>
           <View style={styles.rewardCard}>
             <View style={styles.rewardIcon}>
               <Feather name="gift" size={24} color={colors.accent} />
@@ -364,6 +430,83 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.82)",
     marginTop: 6,
     fontWeight: "700",
+  },
+
+  streakCard: {
+    marginTop: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    ...shadows.card,
+  },
+  streakTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  streakIcon: {
+    width: 54,
+    height: 54,
+    borderRadius: radii.pill,
+    backgroundColor: colors.accent,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  streakText: {
+    flex: 1,
+  },
+  streakEyebrow: {
+    color: colors.accent,
+    fontSize: 12,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  streakTitle: {
+    color: colors.text,
+    fontSize: 28,
+    fontWeight: "900",
+    marginTop: 2,
+  },
+  streakSub: {
+    color: colors.textMuted,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  streakDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: spacing.md,
+  },
+  bonusTitle: {
+    color: colors.text,
+    fontWeight: "900",
+    fontSize: 16,
+  },
+  bonusText: {
+    color: colors.textMuted,
+    fontWeight: "700",
+    lineHeight: 20,
+    marginTop: 4,
+  },
+  topHabitPill: {
+    marginTop: spacing.md,
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(34, 197, 94, 0.16)",
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: radii.pill,
+    paddingVertical: 8,
+    paddingHorizontal: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+  topHabitText: {
+    color: colors.accent,
+    fontWeight: "900",
+    fontSize: 12,
   },
 
   grid: {

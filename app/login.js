@@ -1,5 +1,4 @@
 import { router } from "expo-router";
-import * as SecureStore from "expo-secure-store";
 import { useState } from "react";
 import {
   Alert,
@@ -9,6 +8,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+
 import { BrandHeader } from "../components/BrandMark";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../lib/api";
@@ -28,6 +28,7 @@ export default function LoginScreen() {
     }
 
     if (submitting) return;
+
     setSubmitting(true);
 
     try {
@@ -37,22 +38,14 @@ export default function LoginScreen() {
       });
 
       if (!data?.token) {
-        throw new Error("Invalid login response");
+        throw new Error("Invalid login response.");
       }
 
       await login(data.token);
 
-      const hasCreatedFirstHabit = await SecureStore.getItemAsync(
-        "hasCreatedFirstHabit"
-      );
-
-      if (hasCreatedFirstHabit === "true") {
-        router.replace("/(tabs)/dashboard");
-      } else {
-        router.replace("/create-habit?firstHabit=true");
-      }
+      router.replace("/(tabs)/habits");
     } catch (error) {
-      Alert.alert("Login failed", error.message);
+      Alert.alert("Login failed", error.message || "Unable to log in.");
     } finally {
       setSubmitting(false);
     }
@@ -60,7 +53,7 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <BrandHeader eyebrow="Welcome back" title="Log in to Habio" />
+      <BrandHeader />
 
       <Text style={styles.subtitle}>
         Continue building your streaks and earning rewards.
@@ -70,32 +63,39 @@ export default function LoginScreen() {
         <Text style={styles.label}>Email</Text>
         <TextInput
           style={styles.input}
-          placeholder="you@example.com"
-          placeholderTextColor={colors.textMuted}
-          autoCapitalize="none"
-          keyboardType="email-address"
           value={email}
           onChangeText={setEmail}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="email-address"
+          placeholder="you@example.com"
+          placeholderTextColor={colors.textMuted}
         />
 
         <Text style={styles.label}>Password</Text>
         <TextInput
           style={styles.input}
-          placeholder="Password"
-          placeholderTextColor={colors.textMuted}
-          secureTextEntry
           value={password}
           onChangeText={setPassword}
+          secureTextEntry
+          placeholder="Password"
+          placeholderTextColor={colors.textMuted}
         />
+
+        <Pressable
+          style={[styles.button, submitting && styles.buttonDisabled]}
+          onPress={handleLogin}
+          disabled={submitting}
+        >
+          <Text style={styles.buttonText}>
+            {submitting ? "Logging in..." : "Log In"}
+          </Text>
+        </Pressable>
       </View>
 
-      <Pressable
-        style={[styles.button, submitting && styles.buttonDisabled]}
-        onPress={handleLogin}
-        disabled={submitting}
-      >
-        <Text style={styles.buttonText}>
-          {submitting ? "Logging in..." : "Log In"}
+      <Pressable onPress={() => router.push("/register")}>
+        <Text style={styles.registerText}>
+          Don&apos;t have an account? Create one
         </Text>
       </Pressable>
     </View>
@@ -155,5 +155,11 @@ const styles = StyleSheet.create({
     color: colors.textDark,
     fontWeight: "900",
     fontSize: 16,
+  },
+  registerText: {
+    textAlign: "center",
+    color: colors.accent,
+    fontWeight: "800",
+    marginTop: spacing.sm,
   },
 });

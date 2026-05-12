@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Modal,
   StyleSheet,
   Text,
   View,
@@ -32,6 +33,7 @@ export default function HabitsScreen() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState(null);
   const [balance, setBalance] = useState(0);
+  const [streakCelebration, setStreakCelebration] = useState(null);
 
   async function fetchHabits() {
     if (!token) return;
@@ -70,9 +72,29 @@ export default function HabitsScreen() {
         Haptics.NotificationFeedbackType.Success
       );
 
-      setMessage(`+${data.coins_earned} coins`);
+      const bonus = data.streak_bonus || 0;
+
+      setMessage(
+        bonus > 0
+          ? `+${data.base_coins} coins • +${bonus} streak bonus`
+          : `+${data.coins_earned} coins`
+      );
+
       setBalance(data.new_balance);
-      setTimeout(() => setMessage(null), 1800);
+
+      if (bonus > 0) {
+        setStreakCelebration({
+          habitName: habit.name,
+          streak: data.streak,
+          baseCoins: data.base_coins,
+          bonus,
+          total: data.coins_earned,
+        });
+
+        setTimeout(() => setStreakCelebration(null), 2200);
+      }
+
+      setTimeout(() => setMessage(null), 2200);
     } catch (error) {
       fetchHabits();
       Alert.alert("Error", error.message);
@@ -135,6 +157,8 @@ export default function HabitsScreen() {
 
   return (
     <View style={styles.container}>
+      <StreakCelebration data={streakCelebration} />
+
       <FlatList
         data={habits}
         keyExtractor={(item) => item.id}
@@ -148,6 +172,9 @@ export default function HabitsScreen() {
             <View style={styles.balanceCard}>
               <Text style={styles.balanceLabel}>Coins</Text>
               <Text style={styles.balanceValue}>{balance}</Text>
+              <Text style={styles.balanceSub}>
+                Streak bonuses start at 3 days.
+              </Text>
             </View>
 
             <AnimatedPressable
@@ -242,9 +269,16 @@ export default function HabitsScreen() {
                     <Feather
                       name="trending-up"
                       size={14}
-                      color={colors.textMuted}
+                      color={getStreakColor(item.streak)}
                     />
-                    <Text style={styles.metaText}>{item.streak} streak</Text>
+                    <Text
+                      style={[
+                        styles.metaText,
+                        item.streak >= 3 && styles.streakMetaText,
+                      ]}
+                    >
+                      {item.streak} streak
+                    </Text>
                   </View>
 
                   <View style={styles.metaPill}>
@@ -255,6 +289,17 @@ export default function HabitsScreen() {
                     />
                     <Text style={styles.metaText}>
                       {item.coins_per_completion} coins
+                    </Text>
+                  </View>
+
+                  <View style={styles.metaPill}>
+                    <Feather
+                      name="award"
+                      size={14}
+                      color={colors.textMuted}
+                    />
+                    <Text style={styles.metaText}>
+                      {getNextBonusText(item.streak)}
                     </Text>
                   </View>
                 </View>
@@ -297,6 +342,20 @@ export default function HabitsScreen() {
       />
     </View>
   );
+}
+
+function getStreakColor(streak = 0) {
+  if (streak >= 7) return colors.accent;
+  if (streak >= 3) return colors.primaryBright;
+  return colors.textMuted;
+}
+
+function getNextBonusText(streak = 0) {
+  if (streak < 3) return `${3 - streak} days to bonus`;
+  if (streak < 7) return `${7 - streak} days to +15`;
+  if (streak < 14) return `${14 - streak} days to +30`;
+  if (streak < 30) return `${30 - streak} days to +75`;
+  return "+75 bonus active";
 }
 
 function AnimatedCard({ children, index = 0 }) {
@@ -344,6 +403,53 @@ function RewardToast({ message }) {
   );
 }
 
+function StreakCelebration({ data }) {
+  const scale = useSharedValue(0.55);
+  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(28);
+
+  useEffect(() => {
+    if (data) {
+      opacity.value = withTiming(1, { duration: 160 });
+      translateY.value = withSpring(0);
+      scale.value = withSequence(withSpring(1.12), withSpring(1));
+    } else {
+      opacity.value = withTiming(0, { duration: 160 });
+      translateY.value = withTiming(28, { duration: 160 });
+      scale.value = withTiming(0.55, { duration: 160 });
+    }
+  }, [data]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }, { scale: scale.value }],
+  }));
+
+  if (!data) return null;
+
+  return (
+    <Modal visible transparent animationType="none">
+      <View style={styles.celebrationOverlay}>
+        <Animated.View style={[styles.celebrationCard, animatedStyle]}>
+          <View style={styles.celebrationIconCircle}>
+            <Feather name="zap" size={38} color={colors.textDark} />
+          </View>
+
+          <Text style={styles.celebrationEyebrow}>Streak Bonus</Text>
+          <Text style={styles.celebrationTitle}>{data.streak} days strong</Text>
+          <Text style={styles.celebrationName}>{data.habitName}</Text>
+
+          <View style={styles.bonusBreakdown}>
+            <Text style={styles.bonusLine}>Base coins: +{data.baseCoins}</Text>
+            <Text style={styles.bonusLine}>Bonus coins: +{data.bonus}</Text>
+            <Text style={styles.bonusTotal}>Total earned: +{data.total}</Text>
+          </View>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -383,6 +489,11 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     marginTop: 4,
   },
+  balanceSub: {
+    color: "rgba(255,255,255,0.8)",
+    marginTop: 4,
+    fontWeight: "700",
+  },
   addButton: {
     marginTop: spacing.md,
     backgroundColor: colors.accent,
@@ -409,6 +520,7 @@ const styles = StyleSheet.create({
   toastText: {
     color: colors.accent,
     fontWeight: "900",
+    textAlign: "center",
   },
   emptyCard: {
     marginTop: spacing.lg,
@@ -506,6 +618,9 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     fontSize: 12,
   },
+  streakMetaText: {
+    color: colors.accent,
+  },
   status: {
     marginTop: 10,
     color: colors.primaryBright,
@@ -553,5 +668,72 @@ const styles = StyleSheet.create({
   swipeText: {
     color: "white",
     fontWeight: "900",
+  },
+
+  celebrationOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.78)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: spacing.lg,
+  },
+  celebrationCard: {
+    width: "100%",
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    padding: spacing.xl,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    alignItems: "center",
+    ...shadows.glow,
+  },
+  celebrationIconCircle: {
+    width: 74,
+    height: 74,
+    borderRadius: radii.pill,
+    backgroundColor: colors.accent,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: spacing.md,
+  },
+  celebrationEyebrow: {
+    color: colors.accent,
+    fontSize: 14,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  celebrationTitle: {
+    color: colors.text,
+    fontSize: 30,
+    fontWeight: "900",
+    marginTop: spacing.sm,
+    textAlign: "center",
+  },
+  celebrationName: {
+    color: colors.textMuted,
+    fontWeight: "800",
+    marginTop: spacing.xs,
+    textAlign: "center",
+  },
+  bonusBreakdown: {
+    marginTop: spacing.lg,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    width: "100%",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  bonusLine: {
+    color: colors.textMuted,
+    fontWeight: "800",
+    marginBottom: 6,
+  },
+  bonusTotal: {
+    color: colors.accent,
+    fontWeight: "900",
+    fontSize: 18,
+    marginTop: 4,
   },
 });
