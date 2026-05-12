@@ -1,23 +1,24 @@
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-import Animated, {
-    useAnimatedStyle,
-    useSharedValue,
-    withDelay,
-    withSpring,
-    withTiming,
-} from "react-native-reanimated";
+import { useState } from "react";
+import {
+    Alert,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
+} from "react-native";
+
 import { BrandHeader } from "../components/BrandMark";
+import { api } from "../lib/api";
 import { colors, radii, shadows, spacing } from "../lib/theme";
 
-const HABIT_CATEGORIES = [
+const habitCategories = [
   {
-    id: "health",
-    title: "Health",
+    key: "health",
+    label: "Health",
     icon: "heart",
-    description: "Feel better and build your foundation.",
     habits: [
       "Drink water",
       "Take vitamins",
@@ -27,10 +28,9 @@ const HABIT_CATEGORIES = [
     ],
   },
   {
-    id: "fitness",
-    title: "Fitness",
+    key: "fitness",
+    label: "Fitness",
     icon: "activity",
-    description: "Move your body and build energy.",
     habits: [
       "Do 10 pushups",
       "Go for a walk",
@@ -40,10 +40,9 @@ const HABIT_CATEGORIES = [
     ],
   },
   {
-    id: "mind",
-    title: "Mind",
+    key: "mind",
+    label: "Mind",
     icon: "book-open",
-    description: "Train focus, calm, and clarity.",
     habits: [
       "Read for 10 minutes",
       "Journal one sentence",
@@ -53,10 +52,9 @@ const HABIT_CATEGORIES = [
     ],
   },
   {
-    id: "productivity",
-    title: "Productivity",
-    icon: "check-square",
-    description: "Make progress without overthinking.",
+    key: "productivity",
+    label: "Productivity",
+    icon: "check-circle",
     habits: [
       "Plan tomorrow",
       "Clear inbox",
@@ -68,226 +66,373 @@ const HABIT_CATEGORIES = [
 ];
 
 export default function ChooseHabitScreen() {
-  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [selectedCategoryKey, setSelectedCategoryKey] = useState("health");
+  const [selectedHabits, setSelectedHabits] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
 
-  const title = selectedCategory ? selectedCategory.title : "Choose a Category";
-  const subtitle = selectedCategory
-    ? "Pick a starter habit. You can customize it before saving."
-    : "Start with an area you want to improve first.";
+  const selectedCategory =
+    habitCategories.find((category) => category.key === selectedCategoryKey) ||
+    habitCategories[0];
 
-  function chooseHabit(habit) {
-    router.push({
-      pathname: "/create-habit",
-      params: {
-        firstHabit: "true",
-        name: habit,
-        category: selectedCategory.title,
-      },
+  function toggleHabit(habitName) {
+    setSelectedHabits((current) => {
+      if (current.includes(habitName)) {
+        return current.filter((habit) => habit !== habitName);
+      }
+
+      return [...current, habitName];
     });
   }
 
-  function goBack() {
-    if (selectedCategory) {
-      setSelectedCategory(null);
-    } else {
+  async function createSelectedHabits() {
+    if (selectedHabits.length === 0) {
+      Alert.alert(
+        "Choose at least one habit",
+        "Pick one or more habits to start."
+      );
+      return;
+    }
+
+    if (submitting) return;
+
+    setSubmitting(true);
+
+    try {
+      await Promise.all(
+        selectedHabits.map((habitName) =>
+          api.post("/habits", {
+            name: habitName,
+            frequency: "daily",
+            coins_per_completion: 5,
+          })
+        )
+      );
+
       router.replace("/(tabs)/dashboard");
+    } catch (error) {
+      Alert.alert(
+        "Could not create habits",
+        error?.message || "Please try again."
+      );
+    } finally {
+      setSubmitting(false);
     }
   }
 
+  function skipHabitSetup() {
+    router.replace("/(tabs)/dashboard");
+  }
+
   return (
-    <View style={styles.page}>
-      <View style={styles.header}>
-        <BrandHeader eyebrow="First Habit" title={title} />
-        <Text style={styles.subtitle}>{subtitle}</Text>
+    <ScrollView style={styles.page} contentContainerStyle={styles.container}>
+      <BrandHeader />
+
+      <Text style={styles.title}>Choose your starter habits</Text>
+      <Text style={styles.subtitle}>
+        Pick a category, then select one or more habits to start with.
+      </Text>
+
+      <View style={styles.categoryGrid}>
+        {habitCategories.map((category) => {
+          const isSelected = selectedCategoryKey === category.key;
+
+          return (
+            <Pressable
+              key={category.key}
+              style={[
+                styles.categoryCard,
+                isSelected && styles.categoryCardSelected,
+              ]}
+              onPress={() => setSelectedCategoryKey(category.key)}
+            >
+              <Feather
+                name={category.icon}
+                size={22}
+                color={isSelected ? colors.textDark : colors.accent}
+              />
+              <Text
+                style={[
+                  styles.categoryText,
+                  isSelected && styles.categoryTextSelected,
+                ]}
+              >
+                {category.label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
-      {selectedCategory ? (
-        <FlatList
-          data={selectedCategory.habits}
-          keyExtractor={(item) => item}
-          contentContainerStyle={styles.listContent}
-          ListHeaderComponent={
-            <Pressable style={styles.backButton} onPress={goBack}>
-              <Feather name="arrow-left" size={17} color={colors.text} />
-              <Text style={styles.backText}>Back to categories</Text>
-            </Pressable>
-          }
-          renderItem={({ item, index }) => (
-            <AnimatedCard index={index}>
-              <Pressable
-                style={styles.habitCard}
-                onPress={() => chooseHabit(item)}
+      <View style={styles.habitCard}>
+        <Text style={styles.sectionTitle}>{selectedCategory.label} habits</Text>
+
+        {selectedCategory.habits.map((habitName) => {
+          const isSelected = selectedHabits.includes(habitName);
+
+          return (
+            <Pressable
+              key={habitName}
+              style={[styles.habitRow, isSelected && styles.habitRowSelected]}
+              onPress={() => toggleHabit(habitName)}
+            >
+              <View
+                style={[
+                  styles.checkCircle,
+                  isSelected && styles.checkCircleSelected,
+                ]}
               >
-                <View style={styles.iconCircle}>
-                  <Feather
-                    name={selectedCategory.icon}
-                    size={22}
-                    color={colors.accent}
-                  />
-                </View>
+                {isSelected && (
+                  <Feather name="check" size={16} color={colors.textDark} />
+                )}
+              </View>
 
-                <View style={styles.cardText}>
-                  <Text style={styles.cardTitle}>{item}</Text>
-                  <Text style={styles.cardSubtitle}>
-                    Daily • Medium • 10 coins
-                  </Text>
-                </View>
-
-                <Feather
-                  name="chevron-right"
-                  size={22}
-                  color={colors.textMuted}
-                />
-              </Pressable>
-            </AnimatedCard>
-          )}
-        />
-      ) : (
-        <FlatList
-          data={HABIT_CATEGORIES}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          renderItem={({ item, index }) => (
-            <AnimatedCard index={index}>
-              <Pressable
-                style={styles.categoryCard}
-                onPress={() => setSelectedCategory(item)}
+              <Text
+                style={[
+                  styles.habitText,
+                  isSelected && styles.habitTextSelected,
+                ]}
               >
-                <View style={styles.iconCircle}>
-                  <Feather name={item.icon} size={22} color={colors.accent} />
-                </View>
-
-                <View style={styles.cardText}>
-                  <Text style={styles.cardTitle}>{item.title}</Text>
-                  <Text style={styles.cardSubtitle}>{item.description}</Text>
-                </View>
-
-                <Feather
-                  name="chevron-right"
-                  size={22}
-                  color={colors.textMuted}
-                />
-              </Pressable>
-            </AnimatedCard>
-          )}
-          ListFooterComponent={
-            <Pressable style={styles.skipButton} onPress={goBack}>
-              <Text style={styles.skipText}>Skip for now</Text>
+                {habitName}
+              </Text>
             </Pressable>
-          }
-        />
+          );
+        })}
+      </View>
+
+      {selectedHabits.length > 0 && (
+        <View style={styles.selectedBox}>
+          <Text style={styles.selectedTitle}>
+            Selected habits: {selectedHabits.length}
+          </Text>
+
+          <View style={styles.selectedPills}>
+            {selectedHabits.map((habitName) => (
+              <Pressable
+                key={habitName}
+                style={styles.selectedPill}
+                onPress={() => toggleHabit(habitName)}
+              >
+                <Text style={styles.selectedPillText}>{habitName}</Text>
+                <Feather name="x" size={13} color={colors.accent} />
+              </Pressable>
+            ))}
+          </View>
+        </View>
       )}
-    </View>
+
+      <Pressable
+        style={[
+          styles.primaryButton,
+          (submitting || selectedHabits.length === 0) &&
+            styles.primaryButtonDisabled,
+        ]}
+        onPress={createSelectedHabits}
+        disabled={submitting}
+      >
+        <Text style={styles.primaryButtonText}>
+          {submitting
+            ? "Creating habits..."
+            : selectedHabits.length === 0
+            ? "Select habits to continue"
+            : `Start with ${selectedHabits.length} habit${
+                selectedHabits.length === 1 ? "" : "s"
+              }`}
+        </Text>
+      </Pressable>
+
+      <Pressable style={styles.skipButton} onPress={skipHabitSetup}>
+        <Text style={styles.skipText}>Skip for now</Text>
+      </Pressable>
+    </ScrollView>
   );
-}
-
-function AnimatedCard({ children, index = 0 }) {
-  const opacity = useSharedValue(0);
-  const translateY = useSharedValue(18);
-
-  useEffect(() => {
-    opacity.value = withDelay(index * 55, withTiming(1, { duration: 260 }));
-    translateY.value = withDelay(index * 55, withSpring(0));
-  }, []);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: translateY.value }],
-  }));
-
-  return <Animated.View style={animatedStyle}>{children}</Animated.View>;
 }
 
 const styles = StyleSheet.create({
   page: {
     flex: 1,
     backgroundColor: colors.background,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
   },
-  header: {
-    marginBottom: spacing.md,
-  },
-  subtitle: {
-    color: colors.textMuted,
-    marginTop: spacing.sm,
-    lineHeight: 20,
-    fontWeight: "700",
-  },
-  listContent: {
+
+  container: {
+    padding: spacing.lg,
     paddingBottom: 120,
   },
+
+  title: {
+    color: colors.text,
+    fontSize: 28,
+    fontWeight: "900",
+    marginTop: spacing.lg,
+  },
+
+  subtitle: {
+    color: colors.textMuted,
+    fontSize: 16,
+    fontWeight: "600",
+    lineHeight: 22,
+    marginTop: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+
+  categoryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginBottom: spacing.lg,
+  },
+
   categoryCard: {
+    width: "48%",
     backgroundColor: colors.surface,
-    borderRadius: radii.xl,
+    borderRadius: radii.lg,
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
-    marginBottom: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
+    gap: 10,
     ...shadows.card,
   },
+
+  categoryCardSelected: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+
+  categoryText: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "900",
+  },
+
+  categoryTextSelected: {
+    color: colors.textDark,
+  },
+
   habitCard: {
     backgroundColor: colors.surface,
     borderRadius: radii.xl,
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
-    marginBottom: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
     ...shadows.card,
   },
-  iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: radii.pill,
-    backgroundColor: "rgba(34, 197, 94, 0.16)",
+
+  sectionTitle: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: "900",
+    marginBottom: spacing.sm,
+  },
+
+  habitRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: radii.md,
     borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceElevated,
+    marginTop: 10,
+  },
+
+  habitRowSelected: {
     borderColor: colors.accent,
+    backgroundColor: "rgba(34, 197, 94, 0.16)",
+  },
+
+  checkCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: colors.border,
+    marginRight: 12,
     alignItems: "center",
     justifyContent: "center",
   },
-  cardText: {
-    flex: 1,
+
+  checkCircleSelected: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
-  cardTitle: {
+
+  habitText: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "800",
+  },
+
+  habitTextSelected: {
+    color: colors.accent,
+  },
+
+  selectedBox: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    marginTop: spacing.lg,
+    ...shadows.card,
+  },
+
+  selectedTitle: {
     color: colors.text,
     fontWeight: "900",
-    fontSize: 17,
+    marginBottom: spacing.sm,
   },
-  cardSubtitle: {
-    color: colors.textMuted,
-    marginTop: 4,
-    fontWeight: "700",
-    lineHeight: 18,
+
+  selectedPills: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
   },
-  backButton: {
-    alignSelf: "flex-start",
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: radii.pill,
+
+  selectedPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginBottom: spacing.md,
+    gap: 6,
+    backgroundColor: "rgba(34, 197, 94, 0.16)",
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: radii.pill,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
   },
-  backText: {
-    color: colors.text,
+
+  selectedPillText: {
+    color: colors.accent,
+    fontWeight: "900",
+    fontSize: 12,
+  },
+
+  primaryButton: {
+    backgroundColor: colors.accent,
+    borderRadius: radii.lg,
+    paddingVertical: 16,
+    alignItems: "center",
+    marginTop: spacing.lg,
+    ...shadows.glow,
+  },
+
+  primaryButtonDisabled: {
+    opacity: 0.65,
+  },
+
+  primaryButtonText: {
+    color: colors.textDark,
+    fontSize: 16,
     fontWeight: "900",
   },
+
   skipButton: {
-    padding: spacing.md,
+    paddingVertical: 16,
     alignItems: "center",
   },
+
   skipText: {
     color: colors.textMuted,
-    fontWeight: "900",
+    fontWeight: "800",
   },
 });

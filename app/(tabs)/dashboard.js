@@ -1,5 +1,6 @@
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -16,6 +17,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
+
 import { AnimatedPressable } from "../../components/AnimatedPressable";
 import { BrandHeader } from "../../components/BrandMark";
 import { useAuth } from "../../context/AuthContext";
@@ -27,6 +29,7 @@ function getNextBonusTarget(streak = 0) {
   if (streak < 7) return { target: 7, bonus: 15, remaining: 7 - streak };
   if (streak < 14) return { target: 14, bonus: 30, remaining: 14 - streak };
   if (streak < 30) return { target: 30, bonus: 75, remaining: 30 - streak };
+
   return { target: 30, bonus: 75, remaining: 0 };
 }
 
@@ -46,11 +49,11 @@ export default function DashboardScreen() {
     try {
       const [statsData, questsData, habitsData, tasksData, rewardsData] =
         await Promise.all([
-          api.get("/stats", token),
-          api.get("/quests", token),
-          api.get("/habits", token),
-          api.get("/tasks", token),
-          api.get("/rewards", token),
+          api.get("/stats"),
+          api.get("/quests"),
+          api.get("/habits"),
+          api.get("/tasks"),
+          api.get("/rewards"),
         ]);
 
       setStats(statsData);
@@ -63,6 +66,11 @@ export default function DashboardScreen() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function restartOnboarding() {
+    await SecureStore.deleteItemAsync("hasCompletedOnboarding");
+    router.push("/onboarding");
   }
 
   useEffect(() => {
@@ -78,7 +86,9 @@ export default function DashboardScreen() {
   const smartData = useMemo(() => {
     if (!stats) return null;
 
-    const incompleteHabits = habits.filter((h) => !h.completed_today).slice(0, 3);
+    const incompleteHabits = habits
+      .filter((h) => !h.completed_today)
+      .slice(0, 3);
 
     const pendingTasks = tasks
       .filter((t) => !t.completed)
@@ -126,7 +136,7 @@ export default function DashboardScreen() {
   if (loading || !stats || !smartData) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
+        <ActivityIndicator size="large" color={colors.accent} />
         <Text style={styles.loadingText}>Loading your progress...</Text>
       </View>
     );
@@ -145,91 +155,105 @@ export default function DashboardScreen() {
 
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.container}>
-      <BrandHeader eyebrow="Overview" title="Dashboard" />
+      <BrandHeader />
 
-      <AnimatedCard index={0}>
-        <View style={styles.heroCard}>
-          <Text style={styles.heroLabel}>Coin Balance</Text>
+      <AnimatedCard index={0} style={styles.heroCard}>
+        <Text style={styles.heroLabel}>Coin Balance</Text>
 
-          <View style={styles.heroRow}>
-            <MaterialCommunityIcons name="gold" size={36} color="white" />
-            <Text style={styles.heroValue}>{stats.coin_balance}</Text>
-          </View>
-
-          <Text style={styles.heroSub}>
-            {nextReward
-              ? stats.coin_balance >= nextReward.cost
-                ? `You can redeem ${nextReward.name}`
-                : `${nextReward.cost - stats.coin_balance} coins until ${nextReward.name}`
-              : "Keep earning rewards"}
-          </Text>
+        <View style={styles.heroRow}>
+          <MaterialCommunityIcons name="medal" size={34} color="white" />
+          <Text style={styles.heroValue}>{stats.coin_balance}</Text>
         </View>
+
+        <Text style={styles.heroSub}>
+          {nextReward
+            ? stats.coin_balance >= nextReward.cost
+              ? `You can redeem ${nextReward.name}`
+              : `${nextReward.cost - stats.coin_balance} coins until ${
+                  nextReward.name
+                }`
+            : "Keep earning rewards"}
+        </Text>
       </AnimatedCard>
 
-      <AnimatedCard index={1}>
-        <View style={styles.streakCard}>
-          <View style={styles.streakTop}>
-            <View style={styles.streakIcon}>
-              <Feather name="zap" size={24} color={colors.textDark} />
-            </View>
-
-            <View style={styles.streakText}>
-              <Text style={styles.streakEyebrow}>Daily Streak</Text>
-              <Text style={styles.streakTitle}>{currentStreak} days</Text>
-              <Text style={styles.streakSub}>
-                Best streak: {bestStreak} days
-              </Text>
-            </View>
+      <AnimatedCard index={1} style={styles.streakCard}>
+        <View style={styles.streakTop}>
+          <View style={styles.streakIcon}>
+            <MaterialCommunityIcons
+              name="fire"
+              size={30}
+              color={colors.textDark}
+            />
           </View>
 
-          <View style={styles.streakDivider} />
-
-          <Text style={styles.bonusTitle}>Next bonus</Text>
-          <Text style={styles.bonusText}>
-            {nextBonus.remaining > 0
-              ? `${nextBonus.remaining} more day${
-                  nextBonus.remaining === 1 ? "" : "s"
-                } to unlock +${nextBonus.bonus} bonus coins at ${nextBonus.target} days.`
-              : `+${nextBonus.bonus} bonus coins active at ${nextBonus.target}+ days.`}
-          </Text>
-
-          {topHabitStreak ? (
-            <View style={styles.topHabitPill}>
-              <Feather name="trending-up" size={14} color={colors.accent} />
-              <Text style={styles.topHabitText}>
-                Top habit: {topHabitStreak.name} • {topHabitStreak.streak || 0}
-              </Text>
-            </View>
-          ) : null}
+          <View style={styles.streakText}>
+            <Text style={styles.streakEyebrow}>Daily Streak</Text>
+            <Text style={styles.streakTitle}>{currentStreak} days</Text>
+            <Text style={styles.streakSub}>Best streak: {bestStreak} days</Text>
+          </View>
         </View>
+
+        <View style={styles.streakDivider} />
+
+        <Text style={styles.bonusTitle}>Next bonus</Text>
+        <Text style={styles.bonusText}>
+          {nextBonus.remaining > 0
+            ? `${nextBonus.remaining} more day${
+                nextBonus.remaining === 1 ? "" : "s"
+              } to unlock +${nextBonus.bonus} bonus coins at ${
+                nextBonus.target
+              } days.`
+            : `+${nextBonus.bonus} bonus coins active at ${nextBonus.target}+ days.`}
+        </Text>
+
+        {topHabitStreak ? (
+          <View style={styles.topHabitPill}>
+            <Feather name="zap" size={14} color={colors.accent} />
+            <Text style={styles.topHabitText}>
+              Top habit: {topHabitStreak.name} • {topHabitStreak.streak || 0}
+            </Text>
+          </View>
+        ) : null}
       </AnimatedCard>
 
       <View style={styles.grid}>
-        <StatCard index={2} label="Habits" value={stats.habits_count} icon="repeat" />
-        <StatCard index={3} label="Tasks" value={stats.tasks_pending} icon="check-square" />
-        <StatCard index={4} label="Best Streak" value={bestStreak} icon="award" />
-        <StatCard index={5} label="Quests" value={claimableQuests.length} icon="target" highlight />
+        <StatCard
+          label="Habits"
+          value={habits.length}
+          icon="repeat"
+          index={2}
+        />
+        <StatCard label="Tasks" value={tasks.length} icon="check-square" index={3} />
+        <StatCard label="Quests" value={quests.length} icon="target" index={4} />
+        <StatCard
+          label="Rewards"
+          value={rewards.length}
+          icon="gift"
+          index={5}
+          highlight
+        />
       </View>
 
       <SmartSection
-        index={6}
-        title="Do next"
-        emptyText="No habits left for today."
-        actionText="View Habits"
+        title="Today’s habits"
+        emptyText="All habits are complete for today."
+        actionText="View habits"
         onPress={() => router.push("/(tabs)/habits")}
         items={incompleteHabits.map((h) => ({
           id: h.id,
           icon: "zap",
           title: h.name,
-          subtitle: `${h.streak || 0} streak • ${h.coins_per_completion || 0} coins`,
+          subtitle: `${h.streak || 0} streak • ${
+            h.coins_per_completion || 0
+          } coins`,
         }))}
+        index={6}
       />
 
       <SmartSection
-        index={7}
-        title="Pending tasks"
+        title="Upcoming tasks"
         emptyText="No pending tasks."
-        actionText="View Tasks"
+        actionText="View tasks"
         onPress={() => router.push("/(tabs)/tasks")}
         items={pendingTasks.map((t) => ({
           id: t.id,
@@ -237,13 +261,13 @@ export default function DashboardScreen() {
           title: t.name,
           subtitle: t.due_date ? `Due ${t.due_date}` : "No due date",
         }))}
+        index={7}
       />
 
       <SmartSection
-        index={8}
-        title="Quests ready"
+        title="Claimable quests"
         emptyText="No quests ready to claim."
-        actionText="View Quests"
+        actionText="View quests"
         onPress={() => router.push("/(tabs)/quests")}
         items={claimableQuests.slice(0, 3).map((q) => ({
           id: q.id,
@@ -251,33 +275,32 @@ export default function DashboardScreen() {
           title: q.name,
           subtitle: `${q.reward || 0} coin reward`,
         }))}
+        index={8}
         highlight
       />
 
       {nextReward && (
-        <AnimatedCard index={9}>
-          <View style={styles.rewardCard}>
-            <View style={styles.rewardIcon}>
-              <Feather name="gift" size={24} color={colors.accent} />
-            </View>
-
-            <View style={styles.rewardText}>
-              <Text style={styles.rewardTitle}>Next reward</Text>
-              <Text style={styles.rewardName}>{nextReward.name}</Text>
-              <Text style={styles.rewardSub}>
-                {stats.coin_balance >= nextReward.cost
-                  ? "Ready to redeem"
-                  : `${nextReward.cost - stats.coin_balance} coins away`}
-              </Text>
-            </View>
-
-            <AnimatedPressable
-              style={styles.rewardButton}
-              onPress={() => router.push("/(tabs)/rewards")}
-            >
-              <Text style={styles.rewardButtonText}>Open</Text>
-            </AnimatedPressable>
+        <AnimatedCard index={9} style={styles.rewardCard}>
+          <View style={styles.rewardIcon}>
+            <Feather name="gift" size={24} color={colors.accent} />
           </View>
+
+          <View style={styles.rewardText}>
+            <Text style={styles.rewardTitle}>Next reward</Text>
+            <Text style={styles.rewardName}>{nextReward.name}</Text>
+            <Text style={styles.rewardSub}>
+              {stats.coin_balance >= nextReward.cost
+                ? "Ready to redeem"
+                : `${nextReward.cost - stats.coin_balance} coins away`}
+            </Text>
+          </View>
+
+          <AnimatedPressable
+            style={styles.rewardButton}
+            onPress={() => router.push("/(tabs)/rewards")}
+          >
+            <Text style={styles.rewardButtonText}>Open</Text>
+          </AnimatedPressable>
         </AnimatedCard>
       )}
 
@@ -296,8 +319,16 @@ export default function DashboardScreen() {
           style={styles.primaryButton}
           onPress={() => router.push("/create-task")}
         >
-          <Feather name="plus-circle" size={18} color={colors.textDark} />
+          <Feather name="check-square" size={18} color={colors.textDark} />
           <Text style={styles.primaryText}>Add Task</Text>
+        </AnimatedPressable>
+
+        <AnimatedPressable
+          style={styles.secondaryButton}
+          onPress={restartOnboarding}
+        >
+          <Feather name="refresh-cw" size={18} color={colors.text} />
+          <Text style={styles.secondaryText}>Restart Onboarding</Text>
         </AnimatedPressable>
 
         <AnimatedPressable style={styles.secondaryButton} onPress={logout}>
@@ -335,31 +366,34 @@ function SmartSection({
   highlight,
 }) {
   return (
-    <AnimatedCard index={index}>
-      <View style={[styles.smartCard, highlight && styles.smartHighlight]}>
-        <View style={styles.smartHeader}>
-          <Text style={styles.smartTitle}>{title}</Text>
-          <AnimatedPressable style={styles.smartAction} onPress={onPress}>
-            <Text style={styles.smartActionText}>{actionText}</Text>
-          </AnimatedPressable>
-        </View>
+    <AnimatedCard
+      index={index}
+      style={[styles.smartCard, highlight && styles.smartHighlight]}
+    >
+      <View style={styles.smartHeader}>
+        <Text style={styles.smartTitle}>{title}</Text>
 
-        {items.length === 0 ? (
-          <Text style={styles.emptyInline}>{emptyText}</Text>
-        ) : (
-          items.map((item) => (
-            <View key={item.id} style={styles.smartItem}>
-              <View style={styles.smartIcon}>
-                <Feather name={item.icon} size={17} color={colors.accent} />
-              </View>
-              <View style={styles.smartItemText}>
-                <Text style={styles.smartItemTitle}>{item.title}</Text>
-                <Text style={styles.smartItemSub}>{item.subtitle}</Text>
-              </View>
-            </View>
-          ))
-        )}
+        <AnimatedPressable style={styles.smartAction} onPress={onPress}>
+          <Text style={styles.smartActionText}>{actionText}</Text>
+        </AnimatedPressable>
       </View>
+
+      {items.length === 0 ? (
+        <Text style={styles.emptyInline}>{emptyText}</Text>
+      ) : (
+        items.map((item) => (
+          <View key={item.id} style={styles.smartItem}>
+            <View style={styles.smartIcon}>
+              <Feather name={item.icon} size={16} color={colors.accent} />
+            </View>
+
+            <View style={styles.smartItemText}>
+              <Text style={styles.smartItemTitle}>{item.title}</Text>
+              <Text style={styles.smartItemSub}>{item.subtitle}</Text>
+            </View>
+          </View>
+        ))
+      )}
     </AnimatedCard>
   );
 }
@@ -378,7 +412,7 @@ function AnimatedCard({ children, index = 0, style }) {
     transform: [{ translateY: translateY.value }],
   }));
 
-  return <Animated.View style={[animatedStyle, style]}>{children}</Animated.View>;
+  return <Animated.View style={[style, animatedStyle]}>{children}</Animated.View>;
 }
 
 const styles = StyleSheet.create({
@@ -401,7 +435,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 10,
   },
-
   heroCard: {
     marginTop: spacing.md,
     backgroundColor: colors.primaryBright,
@@ -431,7 +464,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontWeight: "700",
   },
-
   streakCard: {
     marginTop: spacing.lg,
     backgroundColor: colors.surface,
@@ -508,7 +540,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     fontSize: 12,
   },
-
   grid: {
     marginTop: spacing.lg,
     flexDirection: "row",
@@ -540,7 +571,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontWeight: "700",
   },
-
   smartCard: {
     marginTop: spacing.lg,
     backgroundColor: colors.surface,
@@ -606,7 +636,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     fontWeight: "700",
   },
-
   rewardCard: {
     marginTop: spacing.lg,
     backgroundColor: colors.surface,
@@ -657,7 +686,6 @@ const styles = StyleSheet.create({
     color: colors.textDark,
     fontWeight: "900",
   },
-
   section: {
     marginTop: spacing.xl,
   },
@@ -692,6 +720,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     gap: 8,
+    marginBottom: 10,
   },
   secondaryText: {
     color: colors.text,

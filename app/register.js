@@ -2,6 +2,8 @@ import { router } from "expo-router";
 import { useState } from "react";
 import {
     Alert,
+    KeyboardAvoidingView,
+    Platform,
     Pressable,
     StyleSheet,
     Text,
@@ -10,13 +12,10 @@ import {
 } from "react-native";
 
 import { BrandHeader } from "../components/BrandMark";
-import { useAuth } from "../context/AuthContext";
 import { api } from "../lib/api";
 import { colors, radii, shadows, spacing } from "../lib/theme";
 
 export default function RegisterScreen() {
-  const { login } = useAuth();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -25,8 +24,8 @@ export default function RegisterScreen() {
   async function handleRegister() {
     const cleanEmail = email.trim().toLowerCase();
 
-    if (!cleanEmail || !password || !confirmPassword) {
-      Alert.alert("Missing fields", "Enter email and password.");
+    if (!cleanEmail || !password.trim() || !confirmPassword.trim()) {
+      Alert.alert("Missing fields", "Please enter your email and password.");
       return;
     }
 
@@ -36,7 +35,7 @@ export default function RegisterScreen() {
     }
 
     if (password !== confirmPassword) {
-      Alert.alert("Passwords do not match", "Try entering them again.");
+      Alert.alert("Passwords do not match", "Please try again.");
       return;
     }
 
@@ -45,25 +44,21 @@ export default function RegisterScreen() {
     setSubmitting(true);
 
     try {
-      const data = await api.post("/auth/register", {
+      await api.post("/auth/register", {
         email: cleanEmail,
         password,
       });
 
-      if (data?.token) {
-        await login(data.token);
-        router.replace("/(tabs)/habits");
-      } else {
-        Alert.alert(
-          "Account created",
-          "Your account was created. Please log in."
-        );
-        router.replace("/login");
-      }
+      Alert.alert(
+        "Account created",
+        "Your account was created. Please log in to start onboarding."
+      );
+
+      router.replace("/login");
     } catch (error) {
       Alert.alert(
         "Registration failed",
-        error.message || "Unable to create account."
+        error?.message || "Unable to create account."
       );
     } finally {
       setSubmitting(false);
@@ -71,61 +66,69 @@ export default function RegisterScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <BrandHeader />
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <View style={styles.content}>
+        <BrandHeader />
 
-      <Text style={styles.subtitle}>
-        Create your Habio account and start building better days.
-      </Text>
+        <Text style={styles.subtitle}>
+          Create your Habio account and start building better days.
+        </Text>
 
-      <View style={styles.card}>
-        <Text style={styles.label}>Email</Text>
-        <TextInput
-          style={styles.input}
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="email-address"
-          placeholder="you@example.com"
-          placeholderTextColor={colors.textMuted}
-        />
+        <View style={styles.card}>
+          <Text style={styles.label}>Email</Text>
 
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          style={styles.input}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          placeholder="At least 6 characters"
-          placeholderTextColor={colors.textMuted}
-        />
+          <TextInput
+            style={styles.input}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            placeholder="you@example.com"
+            placeholderTextColor={colors.textMuted}
+          />
 
-        <Text style={styles.label}>Confirm password</Text>
-        <TextInput
-          style={styles.input}
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          secureTextEntry
-          placeholder="Re-enter password"
-          placeholderTextColor={colors.textMuted}
-        />
+          <Text style={styles.label}>Password</Text>
 
-        <Pressable
-          style={[styles.button, submitting && styles.buttonDisabled]}
-          onPress={handleRegister}
-          disabled={submitting}
-        >
-          <Text style={styles.buttonText}>
-            {submitting ? "Creating account..." : "Create Account"}
-          </Text>
+          <TextInput
+            style={styles.input}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            placeholder="At least 6 characters"
+            placeholderTextColor={colors.textMuted}
+          />
+
+          <Text style={styles.label}>Confirm password</Text>
+
+          <TextInput
+            style={styles.input}
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            secureTextEntry
+            placeholder="Re-enter password"
+            placeholderTextColor={colors.textMuted}
+          />
+
+          <Pressable
+            style={[styles.button, submitting && styles.buttonDisabled]}
+            onPress={handleRegister}
+            disabled={submitting}
+          >
+            <Text style={styles.buttonText}>
+              {submitting ? "Creating account..." : "Create Account"}
+            </Text>
+          </Pressable>
+        </View>
+
+        <Pressable onPress={() => router.replace("/login")}>
+          <Text style={styles.loginText}>Already have an account? Log in</Text>
         </Pressable>
       </View>
-
-      <Pressable onPress={() => router.replace("/login")}>
-        <Text style={styles.loginText}>Already have an account? Log in</Text>
-      </Pressable>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -133,15 +136,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-    padding: spacing.lg,
+  },
+  content: {
+    flex: 1,
     justifyContent: "center",
+    padding: spacing.lg,
   },
   subtitle: {
     color: colors.textMuted,
     marginTop: spacing.sm,
     marginBottom: spacing.lg,
-    lineHeight: 20,
+    fontSize: 16,
     fontWeight: "600",
+    lineHeight: 22,
   },
   card: {
     backgroundColor: colors.surface,
@@ -154,7 +161,7 @@ const styles = StyleSheet.create({
   },
   label: {
     color: colors.text,
-    fontWeight: "900",
+    fontWeight: "800",
     marginBottom: 8,
     marginTop: 4,
   },
@@ -162,17 +169,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 14,
     borderRadius: radii.md,
+    padding: 14,
     marginBottom: spacing.md,
     color: colors.text,
-    fontWeight: "700",
+    fontWeight: "600",
   },
   button: {
     backgroundColor: colors.accent,
-    padding: 16,
+    paddingVertical: 16,
     borderRadius: radii.lg,
     alignItems: "center",
+    marginTop: spacing.sm,
     ...shadows.glow,
   },
   buttonDisabled: {
@@ -186,7 +194,7 @@ const styles = StyleSheet.create({
   loginText: {
     textAlign: "center",
     color: colors.accent,
-    fontWeight: "800",
+    fontWeight: "700",
     marginTop: spacing.sm,
   },
 });
