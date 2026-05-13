@@ -1,730 +1,444 @@
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import * as SecureStore from "expo-secure-store";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
+  RefreshControl,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withSpring,
-  withTiming,
-} from "react-native-reanimated";
 
-import { AnimatedPressable } from "../../components/AnimatedPressable";
 import { BrandHeader } from "../../components/BrandMark";
+import ThemedButton from "../../components/ThemedButton";
+import ThemedCard from "../../components/ThemedCard";
+import ThemedScreen from "../../components/ThemedScreen";
+import ThemedText from "../../components/ThemedText";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../hooks/useTheme";
 import { api } from "../../lib/api";
-import { colors, radii, shadows, spacing } from "../../lib/theme";
-
-function getNextBonusTarget(streak = 0) {
-  if (streak < 3) return { target: 3, bonus: 5, remaining: 3 - streak };
-  if (streak < 7) return { target: 7, bonus: 15, remaining: 7 - streak };
-  if (streak < 14) return { target: 14, bonus: 30, remaining: 14 - streak };
-  if (streak < 30) return { target: 30, bonus: 75, remaining: 30 - streak };
-
-  return { target: 30, bonus: 75, remaining: 0 };
-}
 
 export default function DashboardScreen() {
   const { token, logout } = useAuth();
+  const { theme, themeName, setThemeName } = useTheme();
 
-  const [stats, setStats] = useState(null);
-  const [quests, setQuests] = useState([]);
-  const [habits, setHabits] = useState([]);
-  const [tasks, setTasks] = useState([]);
-  const [rewards, setRewards] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  async function fetchDashboard() {
+  const [stats, setStats] = useState({
+    coin_balance: 0,
+    completed_today: 0,
+    streak_days: 0,
+    total_habits: 0,
+    total_tasks: 0,
+  });
+
+  async function loadDashboard() {
     if (!token) return;
 
     try {
-      const [statsData, questsData, habitsData, tasksData, rewardsData] =
-        await Promise.all([
-          api.get("/stats"),
-          api.get("/quests"),
-          api.get("/habits"),
-          api.get("/tasks"),
-          api.get("/rewards"),
-        ]);
+      const data = await api.get("/stats", token);
 
-      setStats(statsData);
-      setQuests(questsData.items || []);
-      setHabits(habitsData || []);
-      setTasks(tasksData || []);
-      setRewards(rewardsData || []);
+      setStats({
+        coin_balance: data.coin_balance || 0,
+        completed_today: data.completed_today || 0,
+        streak_days: data.streak_days || 0,
+        total_habits: data.total_habits || 0,
+        total_tasks: data.total_tasks || 0,
+      });
     } catch (error) {
-      Alert.alert("Error", error.message);
+      console.error(error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }
 
-  async function restartOnboarding() {
-    await SecureStore.deleteItemAsync("hasCompletedOnboarding");
-    router.push("/onboarding");
-  }
-
   useEffect(() => {
-    fetchDashboard();
+    loadDashboard();
   }, [token]);
 
   useFocusEffect(
     useCallback(() => {
-      fetchDashboard();
+      loadDashboard();
     }, [token])
   );
 
-  const smartData = useMemo(() => {
-    if (!stats) return null;
+  async function handleRefresh() {
+    setRefreshing(true);
+    await loadDashboard();
+  }
 
-    const incompleteHabits = habits
-      .filter((h) => !h.completed_today)
-      .slice(0, 3);
-
-    const pendingTasks = tasks
-      .filter((t) => !t.completed)
-      .sort((a, b) => {
-        if (!a.due_date && !b.due_date) return 0;
-        if (!a.due_date) return 1;
-        if (!b.due_date) return -1;
-        return new Date(a.due_date) - new Date(b.due_date);
-      })
-      .slice(0, 3);
-
-    const claimableQuests = quests.filter((q) => q.claimable && !q.claimed);
-
-    const affordableRewards = rewards
-      .filter((r) => stats.coin_balance >= r.cost)
-      .sort((a, b) => b.cost - a.cost);
-
-    const nextReward =
-      affordableRewards[0] ||
-      rewards
-        .slice()
-        .sort((a, b) => a.cost - b.cost)
-        .find((r) => r.cost > stats.coin_balance);
-
-    const topHabitStreak = habits
-      .slice()
-      .sort((a, b) => (b.streak || 0) - (a.streak || 0))[0];
-
-    const currentStreak = stats.current_max_streak || 0;
-    const bestStreak = stats.best_streak || 0;
-    const nextBonus = getNextBonusTarget(currentStreak);
-
-    return {
-      incompleteHabits,
-      pendingTasks,
-      claimableQuests,
-      nextReward,
-      topHabitStreak,
-      currentStreak,
-      bestStreak,
-      nextBonus,
-    };
-  }, [stats, habits, tasks, quests, rewards]);
-
-  if (loading || !stats || !smartData) {
+  if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.accent} />
-        <Text style={styles.loadingText}>Loading your progress...</Text>
+      <View
+        style={[
+          styles.loadingContainer,
+          { backgroundColor: theme.colors.background },
+        ]}
+      >
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
 
-  const {
-    incompleteHabits,
-    pendingTasks,
-    claimableQuests,
-    nextReward,
-    topHabitStreak,
-    currentStreak,
-    bestStreak,
-    nextBonus,
-  } = smartData;
-
   return (
-    <ScrollView style={styles.page} contentContainerStyle={styles.container}>
-      <BrandHeader />
+    <ThemedScreen>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={theme.colors.primary}
+          />
+        }
+      >
+        <BrandHeader eyebrow="Overview" title="Dashboard" />
 
-      <AnimatedCard index={0} style={styles.heroCard}>
-        <Text style={styles.heroLabel}>Coin Balance</Text>
+        <ThemedText muted style={styles.subtitle}>
+          Track your progress, build streaks, and earn rewards.
+        </ThemedText>
 
-        <View style={styles.heroRow}>
-          <MaterialCommunityIcons name="medal" size={34} color="white" />
-          <Text style={styles.heroValue}>{stats.coin_balance}</Text>
-        </View>
+        <ThemedCard style={styles.heroCard}>
+          <View style={styles.heroTop}>
+            <View>
+              <ThemedText muted style={styles.heroLabel}>
+                Coin Balance
+              </ThemedText>
 
-        <Text style={styles.heroSub}>
-          {nextReward
-            ? stats.coin_balance >= nextReward.cost
-              ? `You can redeem ${nextReward.name}`
-              : `${nextReward.cost - stats.coin_balance} coins until ${
-                  nextReward.name
-                }`
-            : "Keep earning rewards"}
-        </Text>
-      </AnimatedCard>
+              <ThemedText style={styles.heroBalance}>
+                {stats.coin_balance}
+              </ThemedText>
+            </View>
 
-      <AnimatedCard index={1} style={styles.streakCard}>
-        <View style={styles.streakTop}>
-          <View style={styles.streakIcon}>
-            <MaterialCommunityIcons
-              name="fire"
-              size={30}
-              color={colors.textDark}
+            <View
+              style={[
+                styles.coinIconWrap,
+                { backgroundColor: theme.colors.surfaceAlt },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="circle-multiple"
+                size={34}
+                color={theme.colors.primary}
+              />
+            </View>
+          </View>
+
+          <View style={styles.heroStats}>
+            <MiniStat
+              label="Today"
+              value={stats.completed_today}
+              icon="check-circle-outline"
+              theme={theme}
+            />
+
+            <MiniStat
+              label="Streak"
+              value={stats.streak_days}
+              icon="fire"
+              theme={theme}
+            />
+
+            <MiniStat
+              label="Habits"
+              value={stats.total_habits}
+              icon="repeat"
+              theme={theme}
             />
           </View>
+        </ThemedCard>
 
-          <View style={styles.streakText}>
-            <Text style={styles.streakEyebrow}>Daily Streak</Text>
-            <Text style={styles.streakTitle}>{currentStreak} days</Text>
-            <Text style={styles.streakSub}>Best streak: {bestStreak} days</Text>
-          </View>
+        <View style={styles.sectionHeader}>
+          <ThemedText variant="section">Quick Actions</ThemedText>
         </View>
 
-        <View style={styles.streakDivider} />
+        <View style={styles.actionGrid}>
+          <ActionButton
+            theme={theme}
+            icon="plus-circle-outline"
+            label="New Habit"
+            onPress={() => router.push("/create-habit")}
+          />
 
-        <Text style={styles.bonusTitle}>Next bonus</Text>
-        <Text style={styles.bonusText}>
-          {nextBonus.remaining > 0
-            ? `${nextBonus.remaining} more day${
-                nextBonus.remaining === 1 ? "" : "s"
-              } to unlock +${nextBonus.bonus} bonus coins at ${
-                nextBonus.target
-              } days.`
-            : `+${nextBonus.bonus} bonus coins active at ${nextBonus.target}+ days.`}
-        </Text>
+          <ActionButton
+            theme={theme}
+            icon="clipboard-plus-outline"
+            label="New Task"
+            onPress={() => router.push("/create-task")}
+          />
 
-        {topHabitStreak ? (
-          <View style={styles.topHabitPill}>
-            <Feather name="zap" size={14} color={colors.accent} />
-            <Text style={styles.topHabitText}>
-              Top habit: {topHabitStreak.name} • {topHabitStreak.streak || 0}
-            </Text>
+          <ActionButton
+            theme={theme}
+            icon="gift-outline"
+            label="New Reward"
+            onPress={() => router.push("/create-reward")}
+          />
+
+          <ActionButton
+            theme={theme}
+            icon="palette-outline"
+            label="Theme Store"
+            onPress={() => router.push("/theme-store")}
+          />
+        </View>
+
+        <View style={styles.sectionHeader}>
+          <ThemedText variant="section">Theme Preview</ThemedText>
+        </View>
+
+        <ThemedCard>
+          <ThemedText muted style={styles.themeLabel}>
+            Current Theme
+          </ThemedText>
+
+          <ThemedText style={styles.themeName}>
+            {themeName.charAt(0).toUpperCase() + themeName.slice(1)}
+          </ThemedText>
+
+          <View style={styles.themeButtons}>
+            <ThemePill
+              label="Light"
+              active={themeName === "light"}
+              onPress={() => setThemeName("light")}
+              theme={theme}
+            />
+
+            <ThemePill
+              label="Dark"
+              active={themeName === "dark"}
+              onPress={() => setThemeName("dark")}
+              theme={theme}
+            />
+
+            <ThemePill
+              label="Nature"
+              active={themeName === "nature"}
+              onPress={() => setThemeName("nature")}
+              theme={theme}
+            />
+
+            <ThemePill
+              label="Focus"
+              active={themeName === "focus"}
+              onPress={() => setThemeName("focus")}
+              theme={theme}
+            />
           </View>
-        ) : null}
-      </AnimatedCard>
+        </ThemedCard>
 
-      <View style={styles.grid}>
-        <StatCard
-          label="Habits"
-          value={habits.length}
-          icon="repeat"
-          index={2}
-        />
-        <StatCard label="Tasks" value={tasks.length} icon="check-square" index={3} />
-        <StatCard label="Quests" value={quests.length} icon="target" index={4} />
-        <StatCard
-          label="Rewards"
-          value={rewards.length}
-          icon="gift"
-          index={5}
-          highlight
-        />
-      </View>
+        <View style={styles.sectionHeader}>
+          <ThemedText variant="section">Account</ThemedText>
+        </View>
 
-      <SmartSection
-        title="Today’s habits"
-        emptyText="All habits are complete for today."
-        actionText="View habits"
-        onPress={() => router.push("/(tabs)/habits")}
-        items={incompleteHabits.map((h) => ({
-          id: h.id,
-          icon: "zap",
-          title: h.name,
-          subtitle: `${h.streak || 0} streak • ${
-            h.coins_per_completion || 0
-          } coins`,
-        }))}
-        index={6}
-      />
-
-      <SmartSection
-        title="Upcoming tasks"
-        emptyText="No pending tasks."
-        actionText="View tasks"
-        onPress={() => router.push("/(tabs)/tasks")}
-        items={pendingTasks.map((t) => ({
-          id: t.id,
-          icon: "check-square",
-          title: t.name,
-          subtitle: t.due_date ? `Due ${t.due_date}` : "No due date",
-        }))}
-        index={7}
-      />
-
-      <SmartSection
-        title="Claimable quests"
-        emptyText="No quests ready to claim."
-        actionText="View quests"
-        onPress={() => router.push("/(tabs)/quests")}
-        items={claimableQuests.slice(0, 3).map((q) => ({
-          id: q.id,
-          icon: "target",
-          title: q.name,
-          subtitle: `${q.reward || 0} coin reward`,
-        }))}
-        index={8}
-        highlight
-      />
-
-      {nextReward && (
-        <AnimatedCard index={9} style={styles.rewardCard}>
-          <View style={styles.rewardIcon}>
-            <Feather name="gift" size={24} color={colors.accent} />
-          </View>
-
-          <View style={styles.rewardText}>
-            <Text style={styles.rewardTitle}>Next reward</Text>
-            <Text style={styles.rewardName}>{nextReward.name}</Text>
-            <Text style={styles.rewardSub}>
-              {stats.coin_balance >= nextReward.cost
-                ? "Ready to redeem"
-                : `${nextReward.cost - stats.coin_balance} coins away`}
-            </Text>
-          </View>
-
-          <AnimatedPressable
-            style={styles.rewardButton}
-            onPress={() => router.push("/(tabs)/rewards")}
-          >
-            <Text style={styles.rewardButtonText}>Open</Text>
-          </AnimatedPressable>
-        </AnimatedCard>
-      )}
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Quick actions</Text>
-
-        <AnimatedPressable
-          style={styles.primaryButton}
-          onPress={() => router.push("/create-habit")}
+        <ThemedButton
+          variant="secondary"
+          style={styles.fullButton}
+          onPress={() => router.push("/onboarding")}
         >
-          <Feather name="plus-circle" size={18} color={colors.textDark} />
-          <Text style={styles.primaryText}>Add Habit</Text>
-        </AnimatedPressable>
+          Restart Onboarding
+        </ThemedButton>
 
-        <AnimatedPressable
-          style={styles.primaryButton}
-          onPress={() => router.push("/create-task")}
+        <ThemedButton
+          variant="secondary"
+          style={styles.logoutButton}
+          onPress={logout}
         >
-          <Feather name="check-square" size={18} color={colors.textDark} />
-          <Text style={styles.primaryText}>Add Task</Text>
-        </AnimatedPressable>
-
-        <AnimatedPressable
-          style={styles.secondaryButton}
-          onPress={restartOnboarding}
-        >
-          <Feather name="refresh-cw" size={18} color={colors.text} />
-          <Text style={styles.secondaryText}>Restart Onboarding</Text>
-        </AnimatedPressable>
-
-        <AnimatedPressable style={styles.secondaryButton} onPress={logout}>
-          <Feather name="log-out" size={18} color={colors.text} />
-          <Text style={styles.secondaryText}>Log out</Text>
-        </AnimatedPressable>
-      </View>
-    </ScrollView>
+          Log Out
+        </ThemedButton>
+      </ScrollView>
+    </ThemedScreen>
   );
 }
 
-function StatCard({ label, value, icon, highlight, index }) {
+function MiniStat({ label, value, icon, theme }) {
   return (
-    <AnimatedCard index={index} style={styles.statWrapper}>
-      <View style={[styles.statCard, highlight && styles.statHighlight]}>
-        <Feather
-          name={icon}
-          size={20}
-          color={highlight ? colors.accent : colors.textMuted}
-        />
-        <Text style={styles.statValue}>{value}</Text>
-        <Text style={styles.statLabel}>{label}</Text>
-      </View>
-    </AnimatedCard>
-  );
-}
-
-function SmartSection({
-  title,
-  items,
-  emptyText,
-  actionText,
-  onPress,
-  index,
-  highlight,
-}) {
-  return (
-    <AnimatedCard
-      index={index}
-      style={[styles.smartCard, highlight && styles.smartHighlight]}
+    <View
+      style={[
+        styles.miniStat,
+        {
+          backgroundColor: theme.colors.surfaceAlt,
+          borderColor: theme.colors.border,
+        },
+      ]}
     >
-      <View style={styles.smartHeader}>
-        <Text style={styles.smartTitle}>{title}</Text>
+      <MaterialCommunityIcons
+        name={icon}
+        size={18}
+        color={theme.colors.primary}
+      />
 
-        <AnimatedPressable style={styles.smartAction} onPress={onPress}>
-          <Text style={styles.smartActionText}>{actionText}</Text>
-        </AnimatedPressable>
-      </View>
+      <ThemedText style={styles.miniStatValue}>{value}</ThemedText>
 
-      {items.length === 0 ? (
-        <Text style={styles.emptyInline}>{emptyText}</Text>
-      ) : (
-        items.map((item) => (
-          <View key={item.id} style={styles.smartItem}>
-            <View style={styles.smartIcon}>
-              <Feather name={item.icon} size={16} color={colors.accent} />
-            </View>
-
-            <View style={styles.smartItemText}>
-              <Text style={styles.smartItemTitle}>{item.title}</Text>
-              <Text style={styles.smartItemSub}>{item.subtitle}</Text>
-            </View>
-          </View>
-        ))
-      )}
-    </AnimatedCard>
+      <ThemedText muted style={styles.miniStatLabel}>
+        {label}
+      </ThemedText>
+    </View>
   );
 }
 
-function AnimatedCard({ children, index = 0, style }) {
-  const opacity = useSharedValue(0);
-  const translateY = useSharedValue(20);
+function ActionButton({ icon, label, onPress, theme }) {
+  return (
+    <ThemedButton
+      variant="secondary"
+      style={styles.actionButton}
+      onPress={onPress}
+    >
+      <MaterialCommunityIcons
+        name={icon}
+        size={22}
+        color={theme.colors.primary}
+      />
 
-  useEffect(() => {
-    opacity.value = withDelay(index * 55, withTiming(1, { duration: 260 }));
-    translateY.value = withDelay(index * 55, withSpring(0));
-  }, []);
+      <ThemedText style={styles.actionLabel}>{label}</ThemedText>
+    </ThemedButton>
+  );
+}
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: translateY.value }],
-  }));
-
-  return <Animated.View style={[style, animatedStyle]}>{children}</Animated.View>;
+function ThemePill({ label, active, onPress, theme }) {
+  return (
+    <ThemedButton
+      variant={active ? "primary" : "secondary"}
+      style={[
+        styles.themePill,
+        !active && {
+          borderColor: theme.colors.border,
+        },
+      ]}
+      onPress={onPress}
+    >
+      {label}
+    </ThemedButton>
+  );
 }
 
 const styles = StyleSheet.create({
-  page: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   container: {
-    padding: spacing.lg,
-    paddingTop: spacing.lg,
+    padding: 20,
     paddingBottom: 120,
   },
-  center: {
+
+  loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: colors.background,
   },
-  loadingText: {
-    color: colors.textMuted,
-    marginTop: 10,
-  },
-  heroCard: {
-    marginTop: spacing.md,
-    backgroundColor: colors.primaryBright,
-    borderRadius: radii.xl,
-    padding: spacing.lg,
-    ...shadows.glow,
-  },
-  heroLabel: {
-    color: "rgba(255,255,255,0.8)",
-    fontSize: 12,
-    fontWeight: "900",
-    textTransform: "uppercase",
-  },
-  heroRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginTop: 6,
-  },
-  heroValue: {
-    color: "white",
-    fontSize: 42,
-    fontWeight: "900",
-  },
-  heroSub: {
-    color: "rgba(255,255,255,0.82)",
-    marginTop: 6,
-    fontWeight: "700",
-  },
-  streakCard: {
-    marginTop: spacing.lg,
-    backgroundColor: colors.surface,
-    borderRadius: radii.xl,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.accent,
-    ...shadows.card,
-  },
-  streakTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  streakIcon: {
-    width: 54,
-    height: 54,
-    borderRadius: radii.pill,
-    backgroundColor: colors.accent,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  streakText: {
-    flex: 1,
-  },
-  streakEyebrow: {
-    color: colors.accent,
-    fontSize: 12,
-    fontWeight: "900",
-    textTransform: "uppercase",
-  },
-  streakTitle: {
-    color: colors.text,
-    fontSize: 28,
-    fontWeight: "900",
-    marginTop: 2,
-  },
-  streakSub: {
-    color: colors.textMuted,
-    fontWeight: "700",
-    marginTop: 2,
-  },
-  streakDivider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginVertical: spacing.md,
-  },
-  bonusTitle: {
-    color: colors.text,
-    fontWeight: "900",
-    fontSize: 16,
-  },
-  bonusText: {
-    color: colors.textMuted,
-    fontWeight: "700",
+
+  subtitle: {
+    marginTop: 8,
     lineHeight: 20,
+  },
+
+  heroCard: {
+    marginTop: 18,
+  },
+
+  heroTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  heroLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+
+  heroBalance: {
+    fontSize: 44,
+    fontWeight: "900",
     marginTop: 4,
   },
-  topHabitPill: {
-    marginTop: spacing.md,
-    alignSelf: "flex-start",
-    backgroundColor: "rgba(34, 197, 94, 0.16)",
-    borderWidth: 1,
-    borderColor: colors.accent,
-    borderRadius: radii.pill,
-    paddingVertical: 8,
-    paddingHorizontal: 11,
-    flexDirection: "row",
+
+  coinIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 999,
+    justifyContent: "center",
     alignItems: "center",
-    gap: 7,
   },
-  topHabitText: {
-    color: colors.accent,
+
+  heroStats: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 18,
+  },
+
+  miniStat: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    alignItems: "center",
+  },
+
+  miniStatValue: {
+    fontSize: 20,
     fontWeight: "900",
-    fontSize: 12,
+    marginTop: 4,
   },
-  grid: {
-    marginTop: spacing.lg,
+
+  miniStatLabel: {
+    marginTop: 2,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  sectionHeader: {
+    marginTop: 26,
+    marginBottom: 12,
+  },
+
+  actionGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
   },
-  statWrapper: {
-    width: "48%",
-  },
-  statCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 6,
-    ...shadows.card,
-  },
-  statHighlight: {
-    borderColor: colors.accent,
-    backgroundColor: colors.surfaceElevated,
-  },
-  statValue: {
-    fontSize: 26,
-    fontWeight: "900",
-    color: colors.text,
-  },
-  statLabel: {
-    color: colors.textMuted,
-    fontWeight: "700",
-  },
-  smartCard: {
-    marginTop: spacing.lg,
-    backgroundColor: colors.surface,
-    borderRadius: radii.xl,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
-  },
-  smartHighlight: {
-    borderColor: colors.accent,
-  },
-  smartHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  smartTitle: {
-    color: colors.text,
-    fontWeight: "900",
-    fontSize: 18,
-  },
-  smartAction: {
-    backgroundColor: colors.surfaceElevated,
-    paddingVertical: 7,
-    paddingHorizontal: 10,
-    borderRadius: radii.pill,
-  },
-  smartActionText: {
-    color: colors.text,
-    fontWeight: "900",
-    fontSize: 12,
-  },
-  smartItem: {
-    marginTop: spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  smartIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: radii.pill,
-    backgroundColor: "rgba(34, 197, 94, 0.16)",
+
+  actionButton: {
+    width: "47%",
     alignItems: "center",
     justifyContent: "center",
+    paddingVertical: 18,
+    gap: 8,
   },
-  smartItemText: {
-    flex: 1,
+
+  actionLabel: {
+    fontWeight: "800",
+    textAlign: "center",
   },
-  smartItemTitle: {
-    color: colors.text,
-    fontWeight: "900",
-  },
-  smartItemSub: {
-    color: colors.textMuted,
-    marginTop: 2,
-    fontWeight: "700",
+
+  themeLabel: {
     fontSize: 12,
-  },
-  emptyInline: {
-    color: colors.textMuted,
-    marginTop: spacing.md,
-    fontWeight: "700",
-  },
-  rewardCard: {
-    marginTop: spacing.lg,
-    backgroundColor: colors.surface,
-    borderRadius: radii.xl,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.accent,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    ...shadows.card,
-  },
-  rewardIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: radii.pill,
-    backgroundColor: "rgba(34, 197, 94, 0.16)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  rewardText: {
-    flex: 1,
-  },
-  rewardTitle: {
-    color: colors.accent,
-    fontSize: 12,
-    fontWeight: "900",
+    fontWeight: "800",
     textTransform: "uppercase",
   },
-  rewardName: {
-    color: colors.text,
+
+  themeName: {
+    fontSize: 24,
     fontWeight: "900",
-    fontSize: 17,
-    marginTop: 2,
+    marginTop: 4,
   },
-  rewardSub: {
-    color: colors.textMuted,
-    fontWeight: "700",
-    marginTop: 2,
-  },
-  rewardButton: {
-    backgroundColor: colors.accent,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: radii.md,
-  },
-  rewardButtonText: {
-    color: colors.textDark,
-    fontWeight: "900",
-  },
-  section: {
-    marginTop: spacing.xl,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "900",
-    color: colors.text,
-    marginBottom: spacing.md,
-  },
-  primaryButton: {
-    backgroundColor: colors.accent,
-    padding: 16,
-    borderRadius: radii.lg,
-    alignItems: "center",
-    marginBottom: 10,
+
+  themeButtons: {
     flexDirection: "row",
-    justifyContent: "center",
-    gap: 8,
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 16,
   },
-  primaryText: {
-    color: colors.textDark,
-    fontWeight: "900",
-    fontSize: 16,
+
+  themePill: {
+    minWidth: 90,
   },
-  secondaryButton: {
-    backgroundColor: colors.surface,
-    padding: 16,
-    borderRadius: radii.lg,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: colors.border,
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 8,
-    marginBottom: 10,
+
+  fullButton: {
+    marginBottom: 12,
   },
-  secondaryText: {
-    color: colors.text,
-    fontWeight: "900",
-    fontSize: 16,
+
+  logoutButton: {
+    marginBottom: 40,
   },
 });

@@ -8,7 +8,6 @@ import {
   FlatList,
   Modal,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
 import Animated, {
@@ -19,14 +18,19 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
+
 import { AnimatedPressable } from "../../components/AnimatedPressable";
 import { BrandHeader } from "../../components/BrandMark";
+import ThemedButton from "../../components/ThemedButton";
+import ThemedCard from "../../components/ThemedCard";
+import ThemedText from "../../components/ThemedText";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../hooks/useTheme";
 import { api } from "../../lib/api";
-import { colors, radii, shadows, spacing } from "../../lib/theme";
 
 export default function RewardsScreen() {
   const { token } = useAuth();
+  const { theme } = useTheme();
 
   const [rewards, setRewards] = useState([]);
   const [balance, setBalance] = useState(0);
@@ -42,7 +46,7 @@ export default function RewardsScreen() {
       setBalance(statsData.coin_balance);
 
       const data = await api.get("/rewards", token);
-      setRewards(data);
+      setRewards(Array.isArray(data) ? data : []);
     } catch (error) {
       Alert.alert("Error", error.message);
     } finally {
@@ -123,16 +127,22 @@ export default function RewardsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
-        <Text style={styles.loadingText}>Loading rewards...</Text>
+      <View
+        style={[styles.center, { backgroundColor: theme.colors.background }]}
+      >
+        <ActivityIndicator color={theme.colors.primary} />
+        <ThemedText muted style={styles.loadingText}>
+          Loading rewards...
+        </ThemedText>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <RedeemCelebration reward={redeemedReward} />
+    <View
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
+      <RedeemCelebration reward={redeemedReward} theme={theme} />
 
       <FlatList
         data={rewards}
@@ -144,84 +154,125 @@ export default function RewardsScreen() {
           <View>
             <BrandHeader eyebrow="Spend" title="Rewards" />
 
-            <View style={styles.balanceCard}>
-              <Text style={styles.balanceLabel}>Available Coins</Text>
-              <Text style={styles.balanceValue}>{balance}</Text>
-              <Text style={styles.balanceSub}>Earn it. Spend it well.</Text>
-            </View>
+            <ThemedCard style={styles.balanceCard}>
+              <ThemedText muted style={styles.balanceLabel}>
+                Available Coins
+              </ThemedText>
+              <ThemedText style={styles.balanceValue}>{balance}</ThemedText>
+              <ThemedText muted style={styles.balanceSub}>
+                Earn it. Spend it well.
+              </ThemedText>
+            </ThemedCard>
 
-            <AnimatedPressable
+            <ThemedButton
               style={styles.addButton}
               onPress={() => router.push("/create-reward")}
             >
-              <Feather name="plus-circle" size={18} color={colors.textDark} />
-              <Text style={styles.addButtonText}>Add Reward</Text>
-            </AnimatedPressable>
+              Add Reward
+            </ThemedButton>
 
-            <RewardToast message={message} />
+            <RewardToast message={message} theme={theme} />
           </View>
         }
         ListEmptyComponent={
-          <View style={styles.emptyCard}>
-            <Feather name="gift" size={36} color={colors.accent} />
-            <Text style={styles.emptyTitle}>No rewards yet</Text>
-            <Text style={styles.emptyText}>
-              Add something worth working toward.
-            </Text>
+          <ThemedCard style={styles.emptyCard}>
+            <Feather name="gift" size={36} color={theme.colors.primary} />
 
-            <AnimatedPressable
-              style={styles.emptyButton}
-              onPress={() => router.push("/create-reward")}
-            >
-              <Text style={styles.emptyButtonText}>Create Reward</Text>
-            </AnimatedPressable>
-          </View>
+            <ThemedText variant="section" style={styles.emptyTitle}>
+              No rewards yet
+            </ThemedText>
+
+            <ThemedText muted style={styles.emptyText}>
+              Add something worth working toward.
+            </ThemedText>
+
+            <ThemedButton onPress={() => router.push("/create-reward")}>
+              Create Reward
+            </ThemedButton>
+          </ThemedCard>
         }
         renderItem={({ item, index }) => {
           const canRedeem = balance >= item.cost;
 
           return (
             <AnimatedCard index={index}>
-              <View style={[styles.card, !canRedeem && styles.lockedCard]}>
+              <ThemedCard
+                style={[
+                  styles.card,
+                  !canRedeem && styles.lockedCard,
+                  canRedeem && { borderColor: theme.colors.success },
+                ]}
+              >
                 <View style={styles.cardTop}>
-                  <View style={[styles.iconCircle, canRedeem && styles.iconReady]}>
+                  <View
+                    style={[
+                      styles.iconCircle,
+                      {
+                        backgroundColor: canRedeem
+                          ? theme.colors.surfaceAlt
+                          : theme.colors.surfaceAlt,
+                        borderColor: canRedeem
+                          ? theme.colors.success
+                          : theme.colors.border,
+                      },
+                    ]}
+                  >
                     <Feather
                       name={canRedeem ? "gift" : "lock"}
                       size={22}
-                      color={canRedeem ? colors.accent : colors.textMuted}
+                      color={
+                        canRedeem ? theme.colors.success : theme.colors.muted
+                      }
                     />
                   </View>
 
                   <View style={styles.cardText}>
-                    <Text style={styles.name}>{item.name}</Text>
+                    <ThemedText style={styles.name}>{item.name}</ThemedText>
                     {!!item.description && (
-                      <Text style={styles.description}>{item.description}</Text>
+                      <ThemedText muted style={styles.description}>
+                        {item.description}
+                      </ThemedText>
                     )}
                   </View>
                 </View>
 
                 <View style={styles.metaRow}>
-                  <View style={styles.metaPill}>
-                    <MaterialCommunityIcons
-                      name="gold"
-                      size={15}
-                      color={colors.textMuted}
-                    />
-                    <Text style={styles.metaText}>{item.cost} coins</Text>
-                  </View>
+                  <MetaPill
+                    theme={theme}
+                    icon={
+                      <MaterialCommunityIcons
+                        name="circle-multiple"
+                        size={15}
+                        color={theme.colors.muted}
+                      />
+                    }
+                    text={`${item.cost} coins`}
+                  />
 
-                  <View style={styles.metaPill}>
-                    <Feather name="repeat" size={14} color={colors.textMuted} />
-                    <Text style={styles.metaText}>
-                      {item.times_redeemed || 0} redeemed
-                    </Text>
-                  </View>
+                  <MetaPill
+                    theme={theme}
+                    icon={
+                      <Feather
+                        name="repeat"
+                        size={14}
+                        color={theme.colors.muted}
+                      />
+                    }
+                    text={`${item.times_redeemed || 0} redeemed`}
+                  />
                 </View>
 
                 <AnimatedPressable
                   style={[
                     styles.redeemButton,
-                    !canRedeem && styles.redeemButtonDisabled,
+                    {
+                      backgroundColor: canRedeem
+                        ? theme.colors.success
+                        : theme.colors.surfaceAlt,
+                      borderColor: canRedeem
+                        ? theme.colors.success
+                        : theme.colors.border,
+                    },
                   ]}
                   disabled={!canRedeem}
                   onPress={() => redeemReward(item)}
@@ -229,23 +280,35 @@ export default function RewardsScreen() {
                   <Feather
                     name={canRedeem ? "shopping-bag" : "lock"}
                     size={17}
-                    color={canRedeem ? colors.textDark : colors.textMuted}
+                    color={
+                      canRedeem ? theme.colors.primaryText : theme.colors.muted
+                    }
                   />
-                  <Text
+                  <ThemedText
                     style={[
                       styles.redeemButtonText,
-                      !canRedeem && styles.redeemButtonTextDisabled,
+                      {
+                        color: canRedeem
+                          ? theme.colors.primaryText
+                          : theme.colors.muted,
+                      },
                     ]}
                   >
                     {canRedeem
                       ? "Redeem Reward"
                       : `${item.cost - balance} coins short`}
-                  </Text>
+                  </ThemedText>
                 </AnimatedPressable>
 
                 <View style={styles.secondaryRow}>
                   <AnimatedPressable
-                    style={styles.secondaryButton}
+                    style={[
+                      styles.secondaryButton,
+                      {
+                        backgroundColor: theme.colors.surfaceAlt,
+                        borderColor: theme.colors.border,
+                      },
+                    ]}
                     onPress={() =>
                       router.push({
                         pathname: "/edit-reward",
@@ -259,27 +322,59 @@ export default function RewardsScreen() {
                       })
                     }
                   >
-                    <Feather name="edit-3" size={16} color={colors.text} />
-                    <Text style={styles.secondaryText}>Edit</Text>
+                    <Feather name="edit-3" size={16} color={theme.colors.text} />
+                    <ThemedText style={styles.secondaryText}>Edit</ThemedText>
                   </AnimatedPressable>
 
                   <AnimatedPressable
-                    style={styles.deleteButton}
+                    style={[
+                      styles.deleteButton,
+                      {
+                        backgroundColor: theme.colors.surfaceAlt,
+                        borderColor: theme.colors.danger,
+                      },
+                    ]}
                     onPress={() => confirmDeleteReward(item)}
                   >
                     <Feather
                       name="trash-2"
                       size={16}
-                      color={colors.danger || "#EF4444"}
+                      color={theme.colors.danger}
                     />
-                    <Text style={styles.deleteText}>Delete</Text>
+                    <ThemedText
+                      style={[
+                        styles.deleteText,
+                        { color: theme.colors.danger },
+                      ]}
+                    >
+                      Delete
+                    </ThemedText>
                   </AnimatedPressable>
                 </View>
-              </View>
+              </ThemedCard>
             </AnimatedCard>
           );
         }}
       />
+    </View>
+  );
+}
+
+function MetaPill({ theme, icon, text }) {
+  return (
+    <View
+      style={[
+        styles.metaPill,
+        {
+          backgroundColor: theme.colors.surfaceAlt,
+          borderColor: theme.colors.border,
+        },
+      ]}
+    >
+      {icon}
+      <ThemedText muted style={styles.metaText}>
+        {text}
+      </ThemedText>
     </View>
   );
 }
@@ -301,7 +396,7 @@ function AnimatedCard({ children, index = 0 }) {
   return <Animated.View style={animatedStyle}>{children}</Animated.View>;
 }
 
-function RewardToast({ message }) {
+function RewardToast({ message, theme }) {
   const scale = useSharedValue(0.9);
   const opacity = useSharedValue(0);
 
@@ -323,13 +418,24 @@ function RewardToast({ message }) {
   if (!message) return null;
 
   return (
-    <Animated.View style={[styles.toast, animatedStyle]}>
-      <Text style={styles.toastText}>{message}</Text>
+    <Animated.View
+      style={[
+        styles.toast,
+        animatedStyle,
+        {
+          backgroundColor: theme.colors.surfaceAlt,
+          borderColor: theme.colors.success,
+        },
+      ]}
+    >
+      <ThemedText style={[styles.toastText, { color: theme.colors.success }]}>
+        {message}
+      </ThemedText>
     </Animated.View>
   );
 }
 
-function RedeemCelebration({ reward }) {
+function RedeemCelebration({ reward, theme }) {
   const scale = useSharedValue(0.55);
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(30);
@@ -356,14 +462,34 @@ function RedeemCelebration({ reward }) {
   return (
     <Modal visible transparent animationType="none">
       <View style={styles.celebrationOverlay}>
-        <Animated.View style={[styles.celebrationCard, animatedStyle]}>
-          <View style={styles.celebrationIconCircle}>
-            <Feather name="gift" size={38} color={colors.textDark} />
+        <Animated.View
+          style={[
+            styles.celebrationCard,
+            animatedStyle,
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.success,
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.celebrationIconCircle,
+              { backgroundColor: theme.colors.success },
+            ]}
+          >
+            <Feather name="gift" size={38} color={theme.colors.primaryText} />
           </View>
 
-          <Text style={styles.celebrationTitle}>Reward Redeemed</Text>
-          <Text style={styles.celebrationName}>{reward.name}</Text>
-          <Text style={styles.celebrationText}>Nice work. You earned this.</Text>
+          <ThemedText
+            style={[styles.celebrationTitle, { color: theme.colors.success }]}
+          >
+            Reward Redeemed
+          </ThemedText>
+          <ThemedText style={styles.celebrationName}>{reward.name}</ThemedText>
+          <ThemedText muted style={styles.celebrationText}>
+            Nice work. You earned this.
+          </ThemedText>
         </Animated.View>
       </View>
     </Modal>
@@ -373,9 +499,8 @@ function RedeemCelebration({ reward }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
+    paddingHorizontal: 20,
+    paddingTop: 20,
   },
   listContent: {
     paddingBottom: 120,
@@ -384,110 +509,56 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: colors.background,
   },
   loadingText: {
-    color: colors.textMuted,
     marginTop: 10,
     fontWeight: "700",
   },
-
   balanceCard: {
-    marginTop: spacing.md,
-    backgroundColor: colors.primaryBright,
-    borderRadius: radii.xl,
-    padding: spacing.lg,
-    ...shadows.glow,
+    marginTop: 14,
   },
   balanceLabel: {
-    color: "rgba(255,255,255,0.8)",
     fontSize: 12,
     fontWeight: "900",
     textTransform: "uppercase",
   },
   balanceValue: {
-    color: "white",
     fontSize: 42,
     fontWeight: "900",
     marginTop: 4,
   },
   balanceSub: {
-    color: "rgba(255,255,255,0.78)",
     marginTop: 4,
     fontWeight: "700",
   },
-
   addButton: {
-    marginTop: spacing.md,
-    backgroundColor: colors.accent,
-    padding: 15,
-    borderRadius: radii.lg,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: 8,
+    marginTop: 14,
+    marginBottom: 12,
   },
-  addButtonText: {
-    color: colors.textDark,
-    fontWeight: "900",
-    fontSize: 16,
-  },
-
   toast: {
     marginTop: 12,
-    backgroundColor: "rgba(34, 197, 94, 0.18)",
-    borderColor: colors.accent,
     borderWidth: 1,
     padding: 12,
-    borderRadius: radii.lg,
+    borderRadius: 18,
     alignItems: "center",
   },
   toastText: {
-    color: colors.accent,
     fontWeight: "900",
   },
-
   emptyCard: {
-    marginTop: spacing.lg,
-    backgroundColor: colors.surface,
-    padding: spacing.lg,
-    borderRadius: radii.xl,
+    marginTop: 20,
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: "900",
-    color: colors.text,
-    marginTop: spacing.sm,
+    marginTop: 10,
   },
   emptyText: {
-    color: colors.textMuted,
     textAlign: "center",
     marginTop: 6,
     marginBottom: 16,
   },
-  emptyButton: {
-    backgroundColor: colors.accent,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    borderRadius: radii.md,
-  },
-  emptyButtonText: {
-    color: colors.textDark,
-    fontWeight: "900",
-  },
-
   card: {
-    backgroundColor: colors.surface,
-    padding: spacing.md,
-    borderRadius: radii.xl,
     marginBottom: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
   },
   lockedCard: {
     opacity: 0.72,
@@ -500,16 +571,10 @@ const styles = StyleSheet.create({
   iconCircle: {
     width: 48,
     height: 48,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surfaceElevated,
+    borderRadius: 999,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: colors.border,
-  },
-  iconReady: {
-    backgroundColor: "rgba(34, 197, 94, 0.18)",
-    borderColor: colors.accent,
   },
   cardText: {
     flex: 1,
@@ -517,15 +582,12 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 18,
     fontWeight: "900",
-    color: colors.text,
   },
   description: {
-    color: colors.textMuted,
     marginTop: 4,
     lineHeight: 20,
     fontWeight: "600",
   },
-
   metaRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -533,44 +595,32 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   metaPill: {
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radii.pill,
+    borderRadius: 999,
     paddingVertical: 7,
     paddingHorizontal: 10,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    borderWidth: 1,
   },
   metaText: {
-    color: colors.textMuted,
     fontWeight: "900",
     fontSize: 12,
   },
-
   redeemButton: {
     marginTop: 14,
-    backgroundColor: colors.accent,
     padding: 14,
-    borderRadius: radii.lg,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: 8,
-  },
-  redeemButtonDisabled: {
-    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: colors.border,
   },
   redeemButtonText: {
-    color: colors.textDark,
     fontWeight: "900",
     fontSize: 15,
   },
-  redeemButtonTextDisabled: {
-    color: colors.textMuted,
-  },
-
   secondaryRow: {
     flexDirection: "row",
     gap: 10,
@@ -578,77 +628,67 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     flex: 1,
-    backgroundColor: colors.surfaceElevated,
     padding: 12,
-    borderRadius: radii.md,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: 7,
+    borderWidth: 1,
   },
   secondaryText: {
-    color: colors.text,
     fontWeight: "900",
   },
   deleteButton: {
     flex: 1,
-    backgroundColor: "rgba(239, 68, 68, 0.14)",
     padding: 12,
-    borderRadius: radii.md,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: 7,
+    borderWidth: 1,
   },
   deleteText: {
-    color: colors.danger || "#EF4444",
     fontWeight: "900",
   },
-
   celebrationOverlay: {
     flex: 1,
     backgroundColor: "rgba(15, 23, 42, 0.78)",
     justifyContent: "center",
     alignItems: "center",
-    padding: spacing.lg,
+    padding: 20,
   },
   celebrationCard: {
     width: "100%",
-    backgroundColor: colors.surface,
-    borderRadius: radii.xl,
-    padding: spacing.xl,
+    borderRadius: 24,
+    padding: 24,
     borderWidth: 1,
-    borderColor: colors.accent,
     alignItems: "center",
-    ...shadows.glow,
   },
   celebrationIconCircle: {
     width: 74,
     height: 74,
-    borderRadius: radii.pill,
-    backgroundColor: colors.accent,
+    borderRadius: 999,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: spacing.md,
+    marginBottom: 14,
   },
   celebrationTitle: {
-    color: colors.accent,
     fontSize: 14,
     fontWeight: "900",
     textTransform: "uppercase",
     letterSpacing: 1,
   },
   celebrationName: {
-    color: colors.text,
     fontSize: 28,
     fontWeight: "900",
-    marginTop: spacing.sm,
+    marginTop: 8,
     textAlign: "center",
   },
   celebrationText: {
-    color: colors.textMuted,
     fontWeight: "700",
-    marginTop: spacing.sm,
+    marginTop: 8,
     textAlign: "center",
   },
 });

@@ -8,7 +8,6 @@ import {
   FlatList,
   Modal,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
@@ -20,14 +19,19 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
+
 import { AnimatedPressable } from "../../components/AnimatedPressable";
 import { BrandHeader } from "../../components/BrandMark";
+import ThemedButton from "../../components/ThemedButton";
+import ThemedCard from "../../components/ThemedCard";
+import ThemedText from "../../components/ThemedText";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../hooks/useTheme";
 import { api } from "../../lib/api";
-import { colors, radii, shadows, spacing } from "../../lib/theme";
 
 export default function HabitsScreen() {
   const { token } = useAuth();
+  const { theme } = useTheme();
 
   const [habits, setHabits] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -43,7 +47,7 @@ export default function HabitsScreen() {
       setBalance(statsData.coin_balance);
 
       const data = await api.get("/habits", token);
-      setHabits(data);
+      setHabits(Array.isArray(data) ? data : []);
     } catch (error) {
       Alert.alert("Error", error.message);
     } finally {
@@ -148,16 +152,25 @@ export default function HabitsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
-        <Text style={styles.loadingText}>Loading habits...</Text>
+      <View
+        style={[styles.center, { backgroundColor: theme.colors.background }]}
+      >
+        <ActivityIndicator color={theme.colors.primary} />
+        <ThemedText muted style={styles.loadingText}>
+          Loading habits...
+        </ThemedText>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <StreakCelebration data={streakCelebration} />
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: theme.colors.background },
+      ]}
+    >
+      <StreakCelebration data={streakCelebration} theme={theme} />
 
       <FlatList
         data={habits}
@@ -169,58 +182,75 @@ export default function HabitsScreen() {
           <View>
             <BrandHeader eyebrow="Today" title="Your Habits" />
 
-            <View style={styles.balanceCard}>
-              <Text style={styles.balanceLabel}>Coins</Text>
-              <Text style={styles.balanceValue}>{balance}</Text>
-              <Text style={styles.balanceSub}>
+            <ThemedCard style={styles.balanceCard}>
+              <ThemedText muted style={styles.balanceLabel}>
+                Coins
+              </ThemedText>
+              <ThemedText style={styles.balanceValue}>{balance}</ThemedText>
+              <ThemedText muted style={styles.balanceSub}>
                 Streak bonuses start at 3 days.
-              </Text>
-            </View>
+              </ThemedText>
+            </ThemedCard>
 
-            <AnimatedPressable
+            <ThemedButton
               style={styles.addButton}
               onPress={() => router.push("/create-habit")}
             >
-              <Feather name="plus-circle" size={18} color={colors.textDark} />
-              <Text style={styles.addButtonText}>Add Habit</Text>
-            </AnimatedPressable>
+              Add Habit
+            </ThemedButton>
 
-            <RewardToast message={message} />
+            <RewardToast message={message} theme={theme} />
           </View>
         }
         ListEmptyComponent={
-          <View style={styles.emptyCard}>
-            <Feather name="target" size={34} color={colors.accent} />
-            <Text style={styles.emptyTitle}>No habits yet</Text>
-            <Text style={styles.emptyText}>
+          <ThemedCard style={styles.emptyCard}>
+            <Feather name="target" size={34} color={theme.colors.primary} />
+            <ThemedText variant="section" style={styles.emptyTitle}>
+              No habits yet
+            </ThemedText>
+            <ThemedText muted style={styles.emptyText}>
               Start building momentum today.
-            </Text>
-            <AnimatedPressable
-              style={styles.emptyButton}
-              onPress={() => router.push("/create-habit")}
-            >
-              <Text style={styles.emptyButtonText}>Create Habit</Text>
-            </AnimatedPressable>
-          </View>
+            </ThemedText>
+            <ThemedButton onPress={() => router.push("/create-habit")}>
+              Create Habit
+            </ThemedButton>
+          </ThemedCard>
         }
         renderItem={({ item, index }) => (
           <Swipeable
             renderLeftActions={() =>
               item.completed_today ? null : (
-                <View style={styles.completeAction}>
+                <View
+                  style={[
+                    styles.completeAction,
+                    { backgroundColor: theme.colors.success },
+                  ]}
+                >
                   <Feather
                     name="check-circle"
                     size={22}
-                    color={colors.textDark}
+                    color={theme.colors.primaryText}
                   />
-                  <Text style={styles.completeActionText}>Done</Text>
+                  <ThemedText
+                    style={[
+                      styles.completeActionText,
+                      { color: theme.colors.primaryText },
+                    ]}
+                  >
+                    Done
+                  </ThemedText>
                 </View>
               )
             }
             renderRightActions={() => (
-              <View style={styles.deleteAction}>
+              <View
+                style={[
+                  styles.deleteAction,
+                  { backgroundColor: theme.colors.danger },
+                ]}
+              >
                 <Feather name="trash-2" size={22} color="white" />
-                <Text style={styles.swipeText}>Delete</Text>
+                <ThemedText style={styles.swipeText}>Delete</ThemedText>
               </View>
             )}
             onSwipeableOpen={(direction) => {
@@ -229,7 +259,7 @@ export default function HabitsScreen() {
             }}
           >
             <AnimatedCard index={index}>
-              <View
+              <ThemedCard
                 style={[
                   styles.card,
                   item.completed_today && styles.completedCard,
@@ -239,7 +269,14 @@ export default function HabitsScreen() {
                   <View
                     style={[
                       styles.iconCircle,
-                      item.completed_today && styles.iconCircleDone,
+                      {
+                        backgroundColor: item.completed_today
+                          ? theme.colors.success
+                          : theme.colors.surfaceAlt,
+                        borderColor: item.completed_today
+                          ? theme.colors.success
+                          : theme.colors.border,
+                      },
                     ]}
                   >
                     <Feather
@@ -247,76 +284,85 @@ export default function HabitsScreen() {
                       size={22}
                       color={
                         item.completed_today
-                          ? colors.textDark
-                          : colors.accent
+                          ? theme.colors.primaryText
+                          : theme.colors.primary
                       }
                     />
                   </View>
 
                   <View style={styles.cardText}>
-                    <Text style={styles.name}>{item.name}</Text>
+                    <ThemedText style={styles.name}>{item.name}</ThemedText>
 
                     {!!item.description && (
-                      <Text style={styles.description}>
+                      <ThemedText muted style={styles.description}>
                         {item.description}
-                      </Text>
+                      </ThemedText>
                     )}
                   </View>
                 </View>
 
                 <View style={styles.metaRow}>
-                  <View style={styles.metaPill}>
-                    <Feather
-                      name="trending-up"
-                      size={14}
-                      color={getStreakColor(item.streak)}
-                    />
-                    <Text
-                      style={[
-                        styles.metaText,
-                        item.streak >= 3 && styles.streakMetaText,
-                      ]}
-                    >
-                      {item.streak} streak
-                    </Text>
-                  </View>
+                  <MetaPill
+                    theme={theme}
+                    icon={
+                      <Feather
+                        name="trending-up"
+                        size={14}
+                        color={getStreakColor(item.streak, theme)}
+                      />
+                    }
+                    text={`${item.streak} streak`}
+                    highlight={item.streak >= 3}
+                  />
 
-                  <View style={styles.metaPill}>
-                    <MaterialCommunityIcons
-                      name="gold"
-                      size={15}
-                      color={colors.textMuted}
-                    />
-                    <Text style={styles.metaText}>
-                      {item.coins_per_completion} coins
-                    </Text>
-                  </View>
+                  <MetaPill
+                    theme={theme}
+                    icon={
+                      <MaterialCommunityIcons
+                        name="circle-multiple"
+                        size={15}
+                        color={theme.colors.muted}
+                      />
+                    }
+                    text={`${item.coins_per_completion} coins`}
+                  />
 
-                  <View style={styles.metaPill}>
-                    <Feather
-                      name="award"
-                      size={14}
-                      color={colors.textMuted}
-                    />
-                    <Text style={styles.metaText}>
-                      {getNextBonusText(item.streak)}
-                    </Text>
-                  </View>
+                  <MetaPill
+                    theme={theme}
+                    icon={
+                      <Feather
+                        name="award"
+                        size={14}
+                        color={theme.colors.muted}
+                      />
+                    }
+                    text={getNextBonusText(item.streak)}
+                  />
                 </View>
 
-                <Text
+                <ThemedText
                   style={[
                     styles.status,
-                    item.completed_today && styles.statusDone,
+                    {
+                      color: item.completed_today
+                        ? theme.colors.success
+                        : theme.colors.primary,
+                    },
                   ]}
                 >
                   {item.completed_today
                     ? "Completed today"
                     : "Swipe to complete"}
-                </Text>
+                </ThemedText>
 
                 <AnimatedPressable
-                  style={styles.editButton}
+                  style={[
+                    styles.editButton,
+                    {
+                      backgroundColor: theme.colors.surfaceAlt,
+                      borderColor: theme.colors.border,
+                    },
+                  ]}
                   onPress={() =>
                     router.push({
                       pathname: "/edit-habit",
@@ -332,10 +378,10 @@ export default function HabitsScreen() {
                     })
                   }
                 >
-                  <Feather name="edit-3" size={16} color={colors.text} />
-                  <Text style={styles.editText}>Edit</Text>
+                  <Feather name="edit-3" size={16} color={theme.colors.text} />
+                  <ThemedText style={styles.editText}>Edit</ThemedText>
                 </AnimatedPressable>
-              </View>
+              </ThemedCard>
             </AnimatedCard>
           </Swipeable>
         )}
@@ -344,10 +390,35 @@ export default function HabitsScreen() {
   );
 }
 
-function getStreakColor(streak = 0) {
-  if (streak >= 7) return colors.accent;
-  if (streak >= 3) return colors.primaryBright;
-  return colors.textMuted;
+function MetaPill({ theme, icon, text, highlight = false }) {
+  return (
+    <View
+      style={[
+        styles.metaPill,
+        {
+          backgroundColor: theme.colors.surfaceAlt,
+          borderColor: theme.colors.border,
+        },
+      ]}
+    >
+      {icon}
+      <ThemedText
+        muted={!highlight}
+        style={[
+          styles.metaText,
+          highlight && { color: theme.colors.success },
+        ]}
+      >
+        {text}
+      </ThemedText>
+    </View>
+  );
+}
+
+function getStreakColor(streak = 0, theme) {
+  if (streak >= 7) return theme.colors.success;
+  if (streak >= 3) return theme.colors.primary;
+  return theme.colors.muted;
 }
 
 function getNextBonusText(streak = 0) {
@@ -375,7 +446,7 @@ function AnimatedCard({ children, index = 0 }) {
   return <Animated.View style={animatedStyle}>{children}</Animated.View>;
 }
 
-function RewardToast({ message }) {
+function RewardToast({ message, theme }) {
   const scale = useSharedValue(0.9);
   const opacity = useSharedValue(0);
 
@@ -397,13 +468,24 @@ function RewardToast({ message }) {
   if (!message) return null;
 
   return (
-    <Animated.View style={[styles.toast, animatedStyle]}>
-      <Text style={styles.toastText}>{message}</Text>
+    <Animated.View
+      style={[
+        styles.toast,
+        animatedStyle,
+        {
+          backgroundColor: theme.colors.surfaceAlt,
+          borderColor: theme.colors.success,
+        },
+      ]}
+    >
+      <ThemedText style={[styles.toastText, { color: theme.colors.success }]}>
+        {message}
+      </ThemedText>
     </Animated.View>
   );
 }
 
-function StreakCelebration({ data }) {
+function StreakCelebration({ data, theme }) {
   const scale = useSharedValue(0.55);
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(28);
@@ -430,19 +512,57 @@ function StreakCelebration({ data }) {
   return (
     <Modal visible transparent animationType="none">
       <View style={styles.celebrationOverlay}>
-        <Animated.View style={[styles.celebrationCard, animatedStyle]}>
-          <View style={styles.celebrationIconCircle}>
-            <Feather name="zap" size={38} color={colors.textDark} />
+        <Animated.View
+          style={[
+            styles.celebrationCard,
+            animatedStyle,
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.success,
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.celebrationIconCircle,
+              { backgroundColor: theme.colors.success },
+            ]}
+          >
+            <Feather name="zap" size={38} color={theme.colors.primaryText} />
           </View>
 
-          <Text style={styles.celebrationEyebrow}>Streak Bonus</Text>
-          <Text style={styles.celebrationTitle}>{data.streak} days strong</Text>
-          <Text style={styles.celebrationName}>{data.habitName}</Text>
+          <ThemedText
+            style={[styles.celebrationEyebrow, { color: theme.colors.success }]}
+          >
+            Streak Bonus
+          </ThemedText>
+          <ThemedText style={styles.celebrationTitle}>
+            {data.streak} days strong
+          </ThemedText>
+          <ThemedText muted style={styles.celebrationName}>
+            {data.habitName}
+          </ThemedText>
 
-          <View style={styles.bonusBreakdown}>
-            <Text style={styles.bonusLine}>Base coins: +{data.baseCoins}</Text>
-            <Text style={styles.bonusLine}>Bonus coins: +{data.bonus}</Text>
-            <Text style={styles.bonusTotal}>Total earned: +{data.total}</Text>
+          <View
+            style={[
+              styles.bonusBreakdown,
+              {
+                backgroundColor: theme.colors.surfaceAlt,
+                borderColor: theme.colors.border,
+              },
+            ]}
+          >
+            <ThemedText muted style={styles.bonusLine}>
+              Base coins: +{data.baseCoins}
+            </ThemedText>
+            <ThemedText muted style={styles.bonusLine}>
+              Bonus coins: +{data.bonus}
+            </ThemedText>
+            <ThemedText
+              style={[styles.bonusTotal, { color: theme.colors.success }]}
+            >
+              Total earned: +{data.total}
+            </ThemedText>
           </View>
         </Animated.View>
       </View>
@@ -453,9 +573,8 @@ function StreakCelebration({ data }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
+    paddingHorizontal: 20,
+    paddingTop: 20,
   },
   listContent: {
     paddingBottom: 120,
@@ -464,104 +583,56 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: colors.background,
   },
   loadingText: {
-    color: colors.textMuted,
     marginTop: 10,
   },
   balanceCard: {
-    marginTop: spacing.md,
-    backgroundColor: colors.primaryBright,
-    borderRadius: radii.lg,
-    padding: spacing.md,
-    ...shadows.glow,
+    marginTop: 14,
   },
   balanceLabel: {
-    color: "rgba(255,255,255,0.8)",
     fontWeight: "900",
     textTransform: "uppercase",
     fontSize: 12,
   },
   balanceValue: {
-    color: "white",
     fontSize: 32,
     fontWeight: "900",
     marginTop: 4,
   },
   balanceSub: {
-    color: "rgba(255,255,255,0.8)",
     marginTop: 4,
     fontWeight: "700",
   },
   addButton: {
-    marginTop: spacing.md,
-    backgroundColor: colors.accent,
-    padding: 14,
-    borderRadius: radii.lg,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: 8,
-  },
-  addButtonText: {
-    color: colors.textDark,
-    fontWeight: "900",
+    marginTop: 14,
+    marginBottom: 12,
   },
   toast: {
     marginTop: 12,
-    backgroundColor: "rgba(34, 197, 94, 0.18)",
-    borderColor: colors.accent,
     borderWidth: 1,
     padding: 12,
-    borderRadius: radii.lg,
+    borderRadius: 18,
     alignItems: "center",
   },
   toastText: {
-    color: colors.accent,
     fontWeight: "900",
     textAlign: "center",
   },
   emptyCard: {
-    marginTop: spacing.lg,
-    backgroundColor: colors.surface,
-    padding: spacing.lg,
-    borderRadius: radii.xl,
+    marginTop: 20,
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
   },
   emptyTitle: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: "900",
-    marginTop: spacing.sm,
+    marginTop: 10,
   },
   emptyText: {
-    color: colors.textMuted,
     marginTop: 6,
     marginBottom: 16,
     textAlign: "center",
   },
-  emptyButton: {
-    backgroundColor: colors.accent,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    borderRadius: radii.md,
-  },
-  emptyButtonText: {
-    color: colors.textDark,
-    fontWeight: "900",
-  },
   card: {
-    backgroundColor: colors.surface,
-    padding: spacing.md,
-    borderRadius: radii.lg,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
   },
   completedCard: {
     opacity: 0.58,
@@ -574,16 +645,10 @@ const styles = StyleSheet.create({
   iconCircle: {
     width: 46,
     height: 46,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surfaceElevated,
+    borderRadius: 999,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: colors.border,
-  },
-  iconCircleDone: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
   },
   cardText: {
     flex: 1,
@@ -591,10 +656,8 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 18,
     fontWeight: "900",
-    color: colors.text,
   },
   description: {
-    color: colors.textMuted,
     marginTop: 4,
     lineHeight: 20,
   },
@@ -605,63 +668,51 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   metaPill: {
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radii.pill,
+    borderRadius: 999,
     paddingVertical: 7,
     paddingHorizontal: 10,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    borderWidth: 1,
   },
   metaText: {
-    color: colors.textMuted,
     fontWeight: "800",
     fontSize: 12,
   },
-  streakMetaText: {
-    color: colors.accent,
-  },
   status: {
     marginTop: 10,
-    color: colors.primaryBright,
     fontWeight: "800",
-  },
-  statusDone: {
-    color: colors.accent,
   },
   editButton: {
     marginTop: 12,
-    backgroundColor: colors.surfaceElevated,
     padding: 12,
-    borderRadius: radii.md,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: 7,
+    borderWidth: 1,
   },
   editText: {
-    color: colors.text,
     fontWeight: "900",
   },
   completeAction: {
-    backgroundColor: colors.accent,
     justifyContent: "center",
     alignItems: "center",
     width: 105,
-    borderRadius: radii.lg,
+    borderRadius: 18,
     marginBottom: 12,
     gap: 4,
   },
   completeActionText: {
-    color: colors.textDark,
     fontWeight: "900",
   },
   deleteAction: {
-    backgroundColor: colors.danger || "#EF4444",
     justifyContent: "center",
     alignItems: "center",
     width: 105,
-    borderRadius: radii.lg,
+    borderRadius: 18,
     marginBottom: 12,
     gap: 4,
   },
@@ -669,69 +720,57 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "900",
   },
-
   celebrationOverlay: {
     flex: 1,
     backgroundColor: "rgba(15, 23, 42, 0.78)",
     justifyContent: "center",
     alignItems: "center",
-    padding: spacing.lg,
+    padding: 20,
   },
   celebrationCard: {
     width: "100%",
-    backgroundColor: colors.surface,
-    borderRadius: radii.xl,
-    padding: spacing.xl,
+    borderRadius: 24,
+    padding: 24,
     borderWidth: 1,
-    borderColor: colors.accent,
     alignItems: "center",
-    ...shadows.glow,
   },
   celebrationIconCircle: {
     width: 74,
     height: 74,
-    borderRadius: radii.pill,
-    backgroundColor: colors.accent,
+    borderRadius: 999,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: spacing.md,
+    marginBottom: 14,
   },
   celebrationEyebrow: {
-    color: colors.accent,
     fontSize: 14,
     fontWeight: "900",
     textTransform: "uppercase",
     letterSpacing: 1,
   },
   celebrationTitle: {
-    color: colors.text,
     fontSize: 30,
     fontWeight: "900",
-    marginTop: spacing.sm,
+    marginTop: 8,
     textAlign: "center",
   },
   celebrationName: {
-    color: colors.textMuted,
     fontWeight: "800",
-    marginTop: spacing.xs,
+    marginTop: 4,
     textAlign: "center",
   },
   bonusBreakdown: {
-    marginTop: spacing.lg,
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radii.lg,
-    padding: spacing.md,
+    marginTop: 20,
+    borderRadius: 18,
+    padding: 14,
     width: "100%",
     borderWidth: 1,
-    borderColor: colors.border,
   },
   bonusLine: {
-    color: colors.textMuted,
     fontWeight: "800",
     marginBottom: 6,
   },
   bonusTotal: {
-    color: colors.accent,
     fontWeight: "900",
     fontSize: 18,
     marginTop: 4,

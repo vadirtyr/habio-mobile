@@ -1,78 +1,112 @@
-import { Ionicons } from "@expo/vector-icons";
-import { Redirect, Tabs } from "expo-router";
-import { ActivityIndicator, View } from "react-native";
-import { useAuth } from "../../context/AuthContext";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Tabs } from "expo-router";
+import { useTheme } from "../../hooks/useTheme";
 
 export default function TabsLayout() {
-  const { token, authLoading } = useAuth();
+  const { theme } = useTheme();
 
-  // ⏳ Wait for auth to load
-  if (authLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator />
-      </View>
-    );
-  }
-
-  // 🔒 Block access if not logged in
-  if (!token) {
-    return <Redirect href="/login" />;
-  }
-
-  // ✅ Normal app if authenticated
   return (
     <Tabs
-      screenOptions={({ route }) => ({
+      screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "black",
-        tabBarInactiveTintColor: "gray",
+        sceneStyle: {
+          backgroundColor: theme.colors.background,
+        },
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.muted,
         tabBarStyle: {
-          height: 70,
+          backgroundColor: theme.colors.tabBar,
+          borderTopColor: theme.colors.border,
+          borderTopWidth: 1,
+          height: 72,
           paddingBottom: 10,
+          paddingTop: 8,
         },
         tabBarLabelStyle: {
-          fontWeight: "bold",
+          fontSize: 12,
+          fontWeight: "700",
         },
-        tabBarIcon: ({ color, size, focused }) => {
-          let iconName = "ellipse";
-
-          if (route.name === "habits") {
-            iconName = focused ? "flame" : "flame-outline";
-          }
-
-          if (route.name === "tasks") {
-            iconName = focused
-              ? "checkmark-circle"
-              : "checkmark-circle-outline";
-          }
-
-          if (route.name === "rewards") {
-            iconName = focused ? "gift" : "gift-outline";
-          }
-
-          if (route.name === "achievements") {
-            iconName = focused ? "trophy" : "trophy-outline";
-          }
-
-          if (route.name === "quests") {
-            iconName = focused ? "flag" : "flag-outline";
-          }
-
-          if (route.name === "dashboard") {
-            iconName = focused ? "home" : "home-outline";
-          }
-
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-      })}
+      }}
     >
-      <Tabs.Screen name="habits" options={{ title: "Habits" }} />
-      <Tabs.Screen name="tasks" options={{ title: "Tasks" }} />
-      <Tabs.Screen name="rewards" options={{ title: "Rewards" }} />
-      <Tabs.Screen name="achievements" options={{ title: "Awards" }} />
-      <Tabs.Screen name="quests" options={{ title: "Quests" }} />
-      <Tabs.Screen name="dashboard" options={{ title: "Home" }} />
+      <Tabs.Screen
+        name="dashboard"
+        options={{
+          title: "Home",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons
+              name="view-dashboard-outline"
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="habits"
+        options={{
+          title: "Habits",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="repeat" size={size} color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="tasks"
+        options={{
+          title: "Tasks",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons
+              name="checkbox-marked-circle-outline"
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="rewards"
+        options={{
+          title: "Rewards",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons
+              name="gift-outline"
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="quests"
+        options={{
+          title: "Quests",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons
+              name="map-marker-path"
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="achievements"
+        options={{
+          title: "Wins",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons
+              name="trophy-outline"
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

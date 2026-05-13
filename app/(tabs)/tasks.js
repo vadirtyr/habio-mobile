@@ -7,7 +7,6 @@ import {
   Alert,
   FlatList,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
@@ -19,14 +18,19 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
+
 import { AnimatedPressable } from "../../components/AnimatedPressable";
 import { BrandHeader } from "../../components/BrandMark";
+import ThemedButton from "../../components/ThemedButton";
+import ThemedCard from "../../components/ThemedCard";
+import ThemedText from "../../components/ThemedText";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../hooks/useTheme";
 import { api } from "../../lib/api";
-import { colors, radii, shadows, spacing } from "../../lib/theme";
 
 export default function TasksScreen() {
   const { token } = useAuth();
+  const { theme } = useTheme();
 
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -41,7 +45,7 @@ export default function TasksScreen() {
       setBalance(statsData.coin_balance);
 
       const data = await api.get("/tasks", token);
-      setTasks(data);
+      setTasks(Array.isArray(data) ? data : []);
     } catch (error) {
       Alert.alert("Error", error.message);
     } finally {
@@ -122,15 +126,21 @@ export default function TasksScreen() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
-        <Text style={styles.loadingText}>Loading tasks...</Text>
+      <View
+        style={[styles.center, { backgroundColor: theme.colors.background }]}
+      >
+        <ActivityIndicator color={theme.colors.primary} />
+        <ThemedText muted style={styles.loadingText}>
+          Loading tasks...
+        </ThemedText>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
       <FlatList
         data={tasks}
         keyExtractor={(item) => item.id}
@@ -141,35 +151,39 @@ export default function TasksScreen() {
           <View>
             <BrandHeader eyebrow="Plan" title="Your Tasks" />
 
-            <View style={styles.balanceCard}>
-              <Text style={styles.balanceLabel}>Coins</Text>
-              <Text style={styles.balanceValue}>{balance}</Text>
-            </View>
+            <ThemedCard style={styles.balanceCard}>
+              <ThemedText muted style={styles.balanceLabel}>
+                Coins
+              </ThemedText>
+              <ThemedText style={styles.balanceValue}>{balance}</ThemedText>
+            </ThemedCard>
 
-            <AnimatedPressable
+            <ThemedButton
               style={styles.addButton}
               onPress={() => router.push("/create-task")}
             >
-              <Feather name="plus-circle" size={18} color={colors.textDark} />
-              <Text style={styles.addButtonText}>Add Task</Text>
-            </AnimatedPressable>
+              Add Task
+            </ThemedButton>
 
-            <RewardToast message={message} />
+            <RewardToast message={message} theme={theme} />
           </View>
         }
         ListEmptyComponent={
-          <View style={styles.emptyCard}>
-            <Feather name="check-square" size={34} color={colors.accent} />
-            <Text style={styles.emptyTitle}>No tasks yet</Text>
-            <Text style={styles.emptyText}>Start planning your day.</Text>
+          <ThemedCard style={styles.emptyCard}>
+            <Feather name="check-square" size={34} color={theme.colors.primary} />
 
-            <AnimatedPressable
-              style={styles.emptyButton}
-              onPress={() => router.push("/create-task")}
-            >
-              <Text style={styles.emptyButtonText}>Create Task</Text>
-            </AnimatedPressable>
-          </View>
+            <ThemedText variant="section" style={styles.emptyTitle}>
+              No tasks yet
+            </ThemedText>
+
+            <ThemedText muted style={styles.emptyText}>
+              Start planning your day.
+            </ThemedText>
+
+            <ThemedButton onPress={() => router.push("/create-task")}>
+              Create Task
+            </ThemedButton>
+          </ThemedCard>
         }
         renderItem={({ item, index }) => {
           const isUrgent =
@@ -181,20 +195,37 @@ export default function TasksScreen() {
             <Swipeable
               renderLeftActions={() =>
                 item.completed ? null : (
-                  <View style={styles.completeAction}>
+                  <View
+                    style={[
+                      styles.completeAction,
+                      { backgroundColor: theme.colors.success },
+                    ]}
+                  >
                     <Feather
                       name="check-circle"
                       size={22}
-                      color={colors.textDark}
+                      color={theme.colors.primaryText}
                     />
-                    <Text style={styles.completeActionText}>Done</Text>
+                    <ThemedText
+                      style={[
+                        styles.completeActionText,
+                        { color: theme.colors.primaryText },
+                      ]}
+                    >
+                      Done
+                    </ThemedText>
                   </View>
                 )
               }
               renderRightActions={() => (
-                <View style={styles.deleteAction}>
+                <View
+                  style={[
+                    styles.deleteAction,
+                    { backgroundColor: theme.colors.danger },
+                  ]}
+                >
                   <Feather name="trash-2" size={22} color="white" />
-                  <Text style={styles.swipeText}>Delete</Text>
+                  <ThemedText style={styles.swipeText}>Delete</ThemedText>
                 </View>
               )}
               onSwipeableOpen={(direction) => {
@@ -203,19 +234,31 @@ export default function TasksScreen() {
               }}
             >
               <AnimatedCard index={index}>
-                <View
+                <ThemedCard
                   style={[
                     styles.card,
                     item.completed && styles.completedCard,
-                    isUrgent && styles.urgentCard,
+                    isUrgent && {
+                      borderColor: theme.colors.danger,
+                    },
                   ]}
                 >
                   <View style={styles.cardTop}>
                     <View
                       style={[
                         styles.iconCircle,
-                        item.completed && styles.iconCircleDone,
-                        isUrgent && styles.iconCircleUrgent,
+                        {
+                          backgroundColor: item.completed
+                            ? theme.colors.success
+                            : isUrgent
+                            ? theme.colors.surfaceAlt
+                            : theme.colors.surfaceAlt,
+                          borderColor: item.completed
+                            ? theme.colors.success
+                            : isUrgent
+                            ? theme.colors.danger
+                            : theme.colors.border,
+                        },
                       ]}
                     >
                       <Feather
@@ -229,63 +272,64 @@ export default function TasksScreen() {
                         size={22}
                         color={
                           item.completed
-                            ? colors.textDark
+                            ? theme.colors.primaryText
                             : isUrgent
-                            ? colors.danger || "#EF4444"
-                            : colors.primaryBright
+                            ? theme.colors.danger
+                            : theme.colors.primary
                         }
                       />
                     </View>
 
                     <View style={styles.cardText}>
-                      <Text style={styles.name}>{item.name}</Text>
+                      <ThemedText style={styles.name}>{item.name}</ThemedText>
 
                       {!!item.description && (
-                        <Text style={styles.description}>
+                        <ThemedText muted style={styles.description}>
                           {item.description}
-                        </Text>
+                        </ThemedText>
                       )}
                     </View>
                   </View>
 
                   <View style={styles.metaRow}>
-                    <View style={styles.metaPill}>
-                      <MaterialCommunityIcons
-                        name="gold"
-                        size={15}
-                        color={colors.textMuted}
-                      />
-                      <Text style={styles.metaText}>
-                        {item.coins_reward} coins
-                      </Text>
-                    </View>
+                    <MetaPill
+                      theme={theme}
+                      icon={
+                        <MaterialCommunityIcons
+                          name="circle-multiple"
+                          size={15}
+                          color={theme.colors.muted}
+                        />
+                      }
+                      text={`${item.coins_reward} coins`}
+                    />
 
-                    <View style={styles.metaPill}>
-                      <Feather
-                        name="calendar"
-                        size={14}
-                        color={
-                          isUrgent
-                            ? colors.danger || "#EF4444"
-                            : colors.textMuted
-                        }
-                      />
-                      <Text
-                        style={[
-                          styles.metaText,
-                          isUrgent && styles.urgentText,
-                        ]}
-                      >
-                        {item.due_date || "No due date"}
-                      </Text>
-                    </View>
+                    <MetaPill
+                      theme={theme}
+                      icon={
+                        <Feather
+                          name="calendar"
+                          size={14}
+                          color={
+                            isUrgent ? theme.colors.danger : theme.colors.muted
+                          }
+                        />
+                      }
+                      text={item.due_date || "No due date"}
+                      danger={isUrgent}
+                    />
                   </View>
 
-                  <Text
+                  <ThemedText
                     style={[
                       styles.status,
-                      item.completed && styles.statusDone,
-                      isUrgent && styles.statusUrgent,
+                      {
+                        color: item.completed
+                          ? theme.colors.success
+                          : isUrgent
+                          ? theme.colors.danger
+                          : theme.colors.primary,
+                      },
                     ]}
                   >
                     {item.completed
@@ -293,10 +337,16 @@ export default function TasksScreen() {
                       : isUrgent
                       ? "Past due"
                       : "Swipe to complete"}
-                  </Text>
+                  </ThemedText>
 
                   <AnimatedPressable
-                    style={styles.editButton}
+                    style={[
+                      styles.editButton,
+                      {
+                        backgroundColor: theme.colors.surfaceAlt,
+                        borderColor: theme.colors.border,
+                      },
+                    ]}
                     onPress={() =>
                       router.push({
                         pathname: "/edit-task",
@@ -312,15 +362,37 @@ export default function TasksScreen() {
                       })
                     }
                   >
-                    <Feather name="edit-3" size={16} color={colors.text} />
-                    <Text style={styles.editText}>Edit</Text>
+                    <Feather name="edit-3" size={16} color={theme.colors.text} />
+                    <ThemedText style={styles.editText}>Edit</ThemedText>
                   </AnimatedPressable>
-                </View>
+                </ThemedCard>
               </AnimatedCard>
             </Swipeable>
           );
         }}
       />
+    </View>
+  );
+}
+
+function MetaPill({ theme, icon, text, danger = false }) {
+  return (
+    <View
+      style={[
+        styles.metaPill,
+        {
+          backgroundColor: theme.colors.surfaceAlt,
+          borderColor: theme.colors.border,
+        },
+      ]}
+    >
+      {icon}
+      <ThemedText
+        muted={!danger}
+        style={[styles.metaText, danger && { color: theme.colors.danger }]}
+      >
+        {text}
+      </ThemedText>
     </View>
   );
 }
@@ -342,7 +414,7 @@ function AnimatedCard({ children, index = 0 }) {
   return <Animated.View style={animatedStyle}>{children}</Animated.View>;
 }
 
-function RewardToast({ message }) {
+function RewardToast({ message, theme }) {
   const scale = useSharedValue(0.9);
   const opacity = useSharedValue(0);
 
@@ -364,8 +436,19 @@ function RewardToast({ message }) {
   if (!message) return null;
 
   return (
-    <Animated.View style={[styles.toast, animatedStyle]}>
-      <Text style={styles.toastText}>{message}</Text>
+    <Animated.View
+      style={[
+        styles.toast,
+        animatedStyle,
+        {
+          backgroundColor: theme.colors.surfaceAlt,
+          borderColor: theme.colors.success,
+        },
+      ]}
+    >
+      <ThemedText style={[styles.toastText, { color: theme.colors.success }]}>
+        {message}
+      </ThemedText>
     </Animated.View>
   );
 }
@@ -373,9 +456,8 @@ function RewardToast({ message }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
+    paddingHorizontal: 20,
+    paddingTop: 20,
   },
   listContent: {
     paddingBottom: 120,
@@ -384,104 +466,54 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: colors.background,
   },
   loadingText: {
-    color: colors.textMuted,
     marginTop: 10,
   },
   balanceCard: {
-    marginTop: spacing.md,
-    backgroundColor: colors.primaryBright,
-    borderRadius: radii.lg,
-    padding: spacing.md,
-    ...shadows.glow,
+    marginTop: 14,
   },
   balanceLabel: {
-    color: "rgba(255,255,255,0.8)",
     fontWeight: "900",
     textTransform: "uppercase",
     fontSize: 12,
   },
   balanceValue: {
-    color: "white",
     fontSize: 32,
     fontWeight: "900",
     marginTop: 4,
   },
   addButton: {
-    marginTop: spacing.md,
-    backgroundColor: colors.accent,
-    padding: 14,
-    borderRadius: radii.lg,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: 8,
-  },
-  addButtonText: {
-    color: colors.textDark,
-    fontWeight: "900",
+    marginTop: 14,
+    marginBottom: 12,
   },
   toast: {
     marginTop: 12,
-    backgroundColor: "rgba(34, 197, 94, 0.18)",
-    borderColor: colors.accent,
     borderWidth: 1,
     padding: 12,
-    borderRadius: radii.lg,
+    borderRadius: 18,
     alignItems: "center",
   },
   toastText: {
-    color: colors.accent,
     fontWeight: "900",
   },
   emptyCard: {
-    marginTop: spacing.lg,
-    backgroundColor: colors.surface,
-    padding: spacing.lg,
-    borderRadius: radii.xl,
+    marginTop: 20,
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
   },
   emptyTitle: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: "900",
-    marginTop: spacing.sm,
+    marginTop: 10,
   },
   emptyText: {
-    color: colors.textMuted,
     marginTop: 6,
     marginBottom: 16,
     textAlign: "center",
   },
-  emptyButton: {
-    backgroundColor: colors.accent,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    borderRadius: radii.md,
-  },
-  emptyButtonText: {
-    color: colors.textDark,
-    fontWeight: "900",
-  },
   card: {
-    backgroundColor: colors.surface,
-    padding: spacing.md,
-    borderRadius: radii.lg,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
   },
   completedCard: {
     opacity: 0.58,
-  },
-  urgentCard: {
-    borderColor: colors.danger || "#EF4444",
   },
   cardTop: {
     flexDirection: "row",
@@ -491,20 +523,10 @@ const styles = StyleSheet.create({
   iconCircle: {
     width: 46,
     height: 46,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surfaceElevated,
+    borderRadius: 999,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: colors.border,
-  },
-  iconCircleDone: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
-  },
-  iconCircleUrgent: {
-    backgroundColor: "rgba(239, 68, 68, 0.16)",
-    borderColor: colors.danger || "#EF4444",
   },
   cardText: {
     flex: 1,
@@ -512,10 +534,8 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 18,
     fontWeight: "900",
-    color: colors.text,
   },
   description: {
-    color: colors.textMuted,
     marginTop: 4,
     lineHeight: 20,
   },
@@ -526,66 +546,51 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   metaPill: {
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radii.pill,
+    borderRadius: 999,
     paddingVertical: 7,
     paddingHorizontal: 10,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    borderWidth: 1,
   },
   metaText: {
-    color: colors.textMuted,
     fontWeight: "800",
     fontSize: 12,
   },
-  urgentText: {
-    color: colors.danger || "#EF4444",
-  },
   status: {
     marginTop: 10,
-    color: colors.primaryBright,
     fontWeight: "800",
-  },
-  statusDone: {
-    color: colors.accent,
-  },
-  statusUrgent: {
-    color: colors.danger || "#EF4444",
   },
   editButton: {
     marginTop: 12,
-    backgroundColor: colors.surfaceElevated,
     padding: 12,
-    borderRadius: radii.md,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: 7,
+    borderWidth: 1,
   },
   editText: {
-    color: colors.text,
     fontWeight: "900",
   },
   completeAction: {
-    backgroundColor: colors.accent,
     justifyContent: "center",
     alignItems: "center",
     width: 105,
-    borderRadius: radii.lg,
+    borderRadius: 18,
     marginBottom: 12,
     gap: 4,
   },
   completeActionText: {
-    color: colors.textDark,
     fontWeight: "900",
   },
   deleteAction: {
-    backgroundColor: colors.danger || "#EF4444",
     justifyContent: "center",
     alignItems: "center",
     width: 105,
-    borderRadius: radii.lg,
+    borderRadius: 18,
     marginBottom: 12,
     gap: 4,
   },

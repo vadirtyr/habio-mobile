@@ -1,21 +1,20 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Alert, Pressable, StyleSheet, View } from "react-native";
+
 import { BrandHeader } from "../components/BrandMark";
+import ThemedButton from "../components/ThemedButton";
+import ThemedCard from "../components/ThemedCard";
+import ThemedInput from "../components/ThemedInput";
+import ThemedScreen from "../components/ThemedScreen";
+import ThemedText from "../components/ThemedText";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
-import { colors, radii, shadows, spacing } from "../lib/theme";
 
 export default function CreateRewardScreen() {
   const { token } = useAuth();
+  const { theme } = useTheme();
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -61,149 +60,130 @@ export default function CreateRewardScreen() {
   }
 
   return (
-    <ScrollView
-      style={styles.page}
+    <ThemedScreen
       contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled"
     >
       <BrandHeader eyebrow="New Reward" title="Create Reward" />
 
-      <Text style={styles.subtitle}>
+      <ThemedText muted style={styles.subtitle}>
         Add something worth earning. Make your effort feel real.
-      </Text>
+      </ThemedText>
 
-      <View style={styles.card}>
-        <Text style={styles.label}>Reward name</Text>
-        <TextInput
-          style={styles.input}
+      <ThemedCard>
+        <ThemedText style={styles.label}>Reward name</ThemedText>
+        <ThemedInput
           placeholder="e.g. Movie night"
-          placeholderTextColor={colors.textMuted}
           value={name}
           onChangeText={setName}
+          style={styles.input}
         />
 
-        <Text style={styles.label}>Description</Text>
-        <TextInput
-          style={[styles.input, styles.textarea]}
+        <ThemedText style={styles.label}>Description</ThemedText>
+        <ThemedInput
           placeholder="Optional notes"
-          placeholderTextColor={colors.textMuted}
           value={description}
           onChangeText={setDescription}
           multiline
+          style={styles.input}
         />
 
-        <Text style={styles.label}>Coin cost</Text>
-        <TextInput
-          style={styles.input}
+        <ThemedText style={styles.label}>Coin cost</ThemedText>
+        <ThemedInput
           placeholder="e.g. 50"
-          placeholderTextColor={colors.textMuted}
           value={cost}
           onChangeText={setCost}
           keyboardType="numeric"
+          style={styles.input}
         />
 
-        <View style={styles.previewBox}>
-          <View style={styles.iconCircle}>
-            <Text style={styles.iconText}>🎁</Text>
+        <View
+          style={[
+            styles.previewBox,
+            {
+              backgroundColor: theme.colors.surfaceAlt,
+              borderColor: theme.colors.border,
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.iconCircle,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.success,
+              },
+            ]}
+          >
+            <ThemedText style={styles.iconText}>🎁</ThemedText>
           </View>
 
           <View style={styles.previewText}>
-            <Text style={styles.previewTitle}>
+            <ThemedText style={styles.previewTitle}>
               {name.trim() || "Your reward"}
-            </Text>
-            <Text style={styles.previewSubtitle}>
+            </ThemedText>
+            <ThemedText muted style={styles.previewSubtitle}>
               {cost ? `${cost} coins` : "Set a coin cost"}
-            </Text>
+            </ThemedText>
           </View>
         </View>
-      </View>
+      </ThemedCard>
 
-      <Pressable
+      <ThemedButton
         style={[styles.button, submitting && styles.buttonDisabled]}
         onPress={createReward}
         disabled={submitting}
       >
-        <Text style={styles.buttonText}>
-          {submitting ? "Creating..." : "Create Reward"}
-        </Text>
-      </Pressable>
+        {submitting ? "Creating..." : "Create Reward"}
+      </ThemedButton>
 
       <Pressable
         style={styles.cancelButton}
         onPress={() => router.replace("/(tabs)/rewards")}
       >
-        <Text style={styles.cancelText}>Cancel</Text>
+        <ThemedText muted style={styles.cancelText}>
+          Cancel
+        </ThemedText>
       </Pressable>
-    </ScrollView>
+    </ThemedScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  page: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   container: {
-    padding: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.xl,
+    padding: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
   },
   subtitle: {
-    color: colors.textMuted,
-    marginTop: spacing.sm,
-    marginBottom: spacing.lg,
+    marginTop: 8,
+    marginBottom: 20,
     lineHeight: 20,
-    fontWeight: "600",
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.xl,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.md,
-    ...shadows.card,
   },
   label: {
-    color: colors.text,
     fontWeight: "900",
     marginBottom: 8,
     marginTop: 4,
   },
   input: {
-    backgroundColor: colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 14,
-    borderRadius: radii.md,
-    marginBottom: spacing.md,
-    color: colors.text,
-    fontWeight: "700",
-  },
-  textarea: {
-    height: 96,
-    textAlignVertical: "top",
+    marginBottom: 14,
   },
   previewBox: {
-    marginTop: spacing.sm,
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radii.lg,
-    padding: spacing.md,
+    marginTop: 8,
+    borderRadius: 18,
+    padding: 14,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     borderWidth: 1,
-    borderColor: colors.border,
   },
   iconCircle: {
     width: 46,
     height: 46,
-    borderRadius: radii.pill,
-    backgroundColor: "rgba(34, 197, 94, 0.18)",
+    borderRadius: 999,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: colors.accent,
   },
   iconText: {
     fontSize: 22,
@@ -214,35 +194,22 @@ const styles = StyleSheet.create({
   previewTitle: {
     fontSize: 17,
     fontWeight: "900",
-    color: colors.text,
   },
   previewSubtitle: {
     marginTop: 3,
-    color: colors.textMuted,
     fontWeight: "700",
   },
   button: {
-    backgroundColor: colors.accent,
-    padding: 16,
-    borderRadius: radii.lg,
-    alignItems: "center",
-    marginTop: spacing.sm,
-    ...shadows.glow,
+    marginTop: 10,
   },
   buttonDisabled: {
     opacity: 0.65,
   },
-  buttonText: {
-    color: colors.textDark,
-    fontWeight: "900",
-    fontSize: 16,
-  },
   cancelButton: {
-    padding: spacing.md,
+    padding: 14,
     alignItems: "center",
   },
   cancelText: {
-    color: colors.textMuted,
     fontWeight: "800",
   },
 });

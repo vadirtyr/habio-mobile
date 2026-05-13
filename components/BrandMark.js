@@ -1,81 +1,120 @@
-import { StyleSheet, Text, View } from "react-native";
-import { colors, shadows } from "../lib/theme";
+import { Image, StyleSheet, Text, View } from "react-native";
+import { useTheme } from "../hooks/useTheme";
 
-export function BrandMark({ size = 44 }) {
-  return (
-    <View
-      style={[
-        styles.mark,
-        {
-          width: size,
-          height: size,
-          borderRadius: size * 0.28,
-        },
-      ]}
-    >
-      <Text style={[styles.h, { fontSize: size * 0.55 }]}>H</Text>
-      <View
-        style={[
-          styles.leaf,
-          {
-            width: size * 0.18,
-            height: size * 0.32,
-            right: size * 0.22,
-            top: size * 0.2,
-          },
-        ]}
-      />
-    </View>
-  );
-}
+export function BrandHeader({ eyebrow, title, subtitle }) {
+  const { theme } = useTheme();
 
-export function BrandHeader({ eyebrow, title }) {
   return (
-    <View style={styles.headerRow}>
-      <BrandMark size={42} />
-      <View>
-        <Text style={styles.eyebrow}>{eyebrow}</Text>
-        <Text style={styles.title}>{title}</Text>
+    <View style={styles.wrapper}>
+      <View style={styles.row}>
+        <View
+          style={[
+            styles.logoWrap,
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.border,
+              shadowColor: theme.colors.text,
+            },
+          ]}
+        >
+          <Image
+            source={require("../assets/images/icon.png")}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+        </View>
+
+        <View style={styles.textWrap}>
+          {!!eyebrow && (
+            <Text style={[styles.eyebrow, { color: theme.colors.primary }]}>
+              {eyebrow}
+            </Text>
+          )}
+
+          <Text style={[styles.title, { color: theme.colors.text }]}>
+            {title}
+          </Text>
+
+          {!!subtitle && (
+            <Text style={[styles.subtitle, { color: theme.colors.muted }]}>
+              {subtitle}
+            </Text>
+          )}
+        </View>
       </View>
     </View>
   );
 }
 
+export function BrandMark({ size = 56 }) {
+  return (
+    <Image
+      source={require("../assets/images/icon.png")}
+      style={{
+        width: size,
+        height: size,
+      }}
+      resizeMode="contain"
+    />
+  );
+}
+
 const styles = StyleSheet.create({
-  mark: {
-    backgroundColor: colors.primaryBright,
-    alignItems: "center",
-    justifyContent: "center",
-    ...shadows.glow,
+  wrapper: {
+    marginBottom: 10,
   },
-  h: {
-    color: colors.text,
-    fontWeight: "900",
-    letterSpacing: -1,
-  },
-  leaf: {
-    position: "absolute",
-    backgroundColor: colors.accent,
-    borderTopLeftRadius: 999,
-    borderBottomRightRadius: 999,
-    transform: [{ rotate: "35deg" }],
-  },
-  headerRow: {
+
+  row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 18,
   },
+
+  logoWrap: {
+    width: 96,
+    height: 96,
+    borderRadius: 28,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 6,
+  },
+
+  logo: {
+    width: 78,
+    height: 78,
+  },
+
+  textWrap: {
+    flex: 1,
+  },
+
   eyebrow: {
-    color: colors.accent,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "900",
     textTransform: "uppercase",
-    letterSpacing: 1,
+    letterSpacing: 1.2,
+    marginBottom: 6,
   },
+
   title: {
-    fontSize: 32,
+    fontSize: 38,
     fontWeight: "900",
-    color: colors.text,
-    marginTop: 2,
+    lineHeight: 42,
+    letterSpacing: -1.2,
+  },
+
+  subtitle: {
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: "600",
+    lineHeight: 23,
   },
 });
