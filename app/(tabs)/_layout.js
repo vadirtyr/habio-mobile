@@ -1,30 +1,29 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 import { useTheme } from "../../hooks/useTheme";
 
 export default function TabsLayout() {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        sceneStyle: {
-          backgroundColor: theme.colors.background,
-        },
         tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.muted,
+        tabBarInactiveTintColor: theme.colors.textMuted,
         tabBarStyle: {
-          backgroundColor: theme.colors.tabBar,
+          backgroundColor: theme.colors.surface,
           borderTopColor: theme.colors.border,
-          borderTopWidth: 1,
-          height: 72,
-          paddingBottom: 10,
+          height: 68 + insets.bottom,
+          paddingBottom: Math.max(insets.bottom, 10),
           paddingTop: 8,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: "700",
+          fontSize: 11,
+          fontWeight: "800",
         },
       }}
     >
@@ -33,11 +32,7 @@ export default function TabsLayout() {
         options={{
           title: "Home",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="view-dashboard-outline"
-              size={size}
-              color={color}
-            />
+            <MaterialCommunityIcons name="home-outline" color={color} size={size} />
           ),
         }}
       />
@@ -47,7 +42,7 @@ export default function TabsLayout() {
         options={{
           title: "Habits",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="repeat" size={size} color={color} />
+            <MaterialCommunityIcons name="repeat" color={color} size={size} />
           ),
         }}
       />
@@ -59,8 +54,8 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons
               name="checkbox-marked-circle-outline"
-              size={size}
               color={color}
+              size={size}
             />
           ),
         }}
@@ -71,42 +66,28 @@ export default function TabsLayout() {
         options={{
           title: "Rewards",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="gift-outline"
-              size={size}
-              color={color}
-            />
+            <MaterialCommunityIcons name="gift-outline" color={color} size={size} />
           ),
         }}
       />
 
       <Tabs.Screen
-        name="quests"
+        name="more"
         options={{
-          title: "Quests",
+          title: "More",
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons
-              name="map-marker-path"
-              size={size}
+              name="dots-horizontal-circle-outline"
               color={color}
+              size={size}
             />
           ),
         }}
       />
 
-      <Tabs.Screen
-        name="achievements"
-        options={{
-          title: "Wins",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="trophy-outline"
-              size={size}
-              color={color}
-            />
-          ),
-        }}
-      />
+      <Tabs.Screen name="quests" options={{ href: null }} />
+      <Tabs.Screen name="achievements" options={{ href: null }} />
+      <Tabs.Screen name="settings" options={{ href: null }} />
     </Tabs>
   );
 }

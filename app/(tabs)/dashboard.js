@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   RefreshControl,
@@ -19,8 +19,8 @@ import { useTheme } from "../../hooks/useTheme";
 import { api } from "../../lib/api";
 
 export default function DashboardScreen() {
-  const { token, logout } = useAuth();
-  const { theme, themeName, setThemeName } = useTheme();
+  const { token } = useAuth();
+  const { theme } = useTheme();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -33,19 +33,79 @@ export default function DashboardScreen() {
     total_tasks: 0,
   });
 
+  const [todayHabits, setTodayHabits] = useState([]);
+  const [todayTasks, setTodayTasks] = useState([]);
+
+  const [achievementSummary, setAchievementSummary] = useState({
+    earnedCount: 0,
+    total: 0,
+    nextUnlock: null,
+  });
+
+  const totalTodayItems = todayHabits.length + todayTasks.length;
+  const dailyGoal = Math.max(totalTodayItems, stats.completed_today, 1);
+  const todayPercent = Math.min(
+    100,
+    Math.round((stats.completed_today / dailyGoal) * 100)
+  );
+
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
+  }, []);
+
   async function loadDashboard() {
     if (!token) return;
 
     try {
-      const data = await api.get("/stats", token);
+      const [statsData, achievementData, habitsData, tasksData] =
+        await Promise.allSettled([
+          api.get("/stats", token),
+          api.get("/achievements", token),
+          api.get("/habits", token),
+          api.get("/tasks", token),
+        ]);
 
-      setStats({
-        coin_balance: data.coin_balance || 0,
-        completed_today: data.completed_today || 0,
-        streak_days: data.streak_days || 0,
-        total_habits: data.total_habits || 0,
-        total_tasks: data.total_tasks || 0,
-      });
+      if (statsData.status === "fulfilled") {
+        const data = statsData.value || {};
+
+        setStats({
+          coin_balance: data.coin_balance || 0,
+          completed_today: data.completed_today || 0,
+          streak_days: data.streak_days || data.current_max_streak || 0,
+          total_habits: data.total_habits || data.habits_count || 0,
+          total_tasks: data.total_tasks || data.tasks_total || 0,
+        });
+      }
+
+      if (achievementData.status === "fulfilled") {
+        const data = achievementData.value || {};
+
+        setAchievementSummary({
+          earnedCount: data.earned_count || 0,
+          total: data.total || 0,
+          nextUnlock: data.next_unlock || null,
+        });
+      }
+
+      if (habitsData.status === "fulfilled") {
+        const habits = normalizeList(habitsData.value)
+          .filter((item) => !item.completed_today)
+          .slice(0, 3);
+
+        setTodayHabits(habits);
+      }
+
+      if (tasksData.status === "fulfilled") {
+        const tasks = normalizeList(tasksData.value)
+          .filter((item) => !item.completed && !item.done)
+          .slice(0, 3);
+
+        setTodayTasks(tasks);
+      }
     } catch (error) {
       console.error(error);
     } finally {
@@ -94,169 +154,311 @@ export default function DashboardScreen() {
           />
         }
       >
-        <BrandHeader eyebrow="Overview" title="Dashboard" />
-
-        <ThemedText muted style={styles.subtitle}>
-          Track your progress, build streaks, and earn rewards.
-        </ThemedText>
+        <BrandHeader eyebrow="Today" title="Dashboard" />
 
         <ThemedCard style={styles.heroCard}>
+          <View
+            style={[
+              styles.heroGlow,
+              { backgroundColor: `${theme.colors.primary}18` },
+            ]}
+          />
+
           <View style={styles.heroTop}>
-            <View>
-              <ThemedText muted style={styles.heroLabel}>
-                Coin Balance
+            <View style={styles.heroCopy}>
+              <ThemedText muted style={styles.heroGreeting}>
+                {greeting}
               </ThemedText>
 
-              <ThemedText style={styles.heroBalance}>
-                {stats.coin_balance}
+              <ThemedText style={styles.heroTitle}>
+                Keep your streak alive.
+              </ThemedText>
+
+              <ThemedText muted style={styles.heroSubtitle}>
+                {stats.completed_today} completed today
               </ThemedText>
             </View>
 
             <View
               style={[
-                styles.coinIconWrap,
+                styles.streakBadge,
                 { backgroundColor: theme.colors.surfaceAlt },
               ]}
             >
               <MaterialCommunityIcons
-                name="circle-multiple"
-                size={34}
+                name="fire"
+                size={28}
+                color={theme.colors.primary}
+              />
+
+              <ThemedText style={styles.streakNumber}>
+                {stats.streak_days}
+              </ThemedText>
+
+              <ThemedText muted style={styles.streakLabel}>
+                days
+              </ThemedText>
+            </View>
+          </View>
+
+          <View
+            style={[
+              styles.progressOuter,
+              { backgroundColor: theme.colors.surfaceAlt },
+            ]}
+          >
+            <View
+              style={[
+                styles.progressInner,
+                {
+                  width: `${todayPercent}%`,
+                  backgroundColor: theme.colors.primary,
+                },
+              ]}
+            />
+          </View>
+
+          <View style={styles.progressFooter}>
+            <ThemedText muted style={styles.progressText}>
+              Daily progress
+            </ThemedText>
+
+            <ThemedText style={styles.progressPercent}>
+              {todayPercent}%
+            </ThemedText>
+          </View>
+        </ThemedCard>
+
+        <View style={styles.sectionHeader}>
+          <ThemedText variant="section">Today Focus</ThemedText>
+        </View>
+
+        <ThemedCard style={styles.todayCard}>
+          {totalTodayItems > 0 ? (
+            <>
+              <ThemedText style={styles.todayTitle}>
+                You have {totalTodayItems} item
+                {totalTodayItems === 1 ? "" : "s"} to move forward.
+              </ThemedText>
+
+              <View style={styles.previewList}>
+                {todayHabits.map((habit) => (
+                  <PreviewItem
+                    key={`habit-${habit.id || habit._id || habit.name}`}
+                    icon="repeat"
+                    label={habit.name || habit.title || "Habit"}
+                    theme={theme}
+                  />
+                ))}
+
+                {todayTasks.map((task) => (
+                  <PreviewItem
+                    key={`task-${
+                      task.id || task._id || task.name || task.title
+                    }`}
+                    icon="checkbox-marked-circle-outline"
+                    label={task.title || task.name || "Task"}
+                    theme={theme}
+                  />
+                ))}
+              </View>
+
+              <View style={styles.todayActions}>
+                <ThemedButton
+                  style={styles.todayButton}
+                  onPress={() => router.push("/habits")}
+                >
+                  Go to Habits
+                </ThemedButton>
+
+                <ThemedButton
+                  variant="secondary"
+                  style={styles.todayButton}
+                  onPress={() => router.push("/tasks")}
+                >
+                  Go to Tasks
+                </ThemedButton>
+              </View>
+            </>
+          ) : (
+            <View style={styles.emptyToday}>
+              <MaterialCommunityIcons
+                name="check-decagram-outline"
+                size={38}
+                color={theme.colors.primary}
+              />
+
+              <ThemedText style={styles.emptyTitle}>
+                You are clear for now.
+              </ThemedText>
+
+              <ThemedText muted style={styles.emptyCopy}>
+                Add a habit or task to keep building momentum.
+              </ThemedText>
+
+              <View style={styles.emptyActions}>
+                <ThemedButton
+                  style={styles.emptyButton}
+                  onPress={() => router.push("/create-habit")}
+                >
+                  Add Habit
+                </ThemedButton>
+
+                <ThemedButton
+                  variant="secondary"
+                  style={styles.emptyButton}
+                  onPress={() => router.push("/create-task")}
+                >
+                  Add Task
+                </ThemedButton>
+              </View>
+            </View>
+          )}
+        </ThemedCard>
+
+        <View style={styles.statsGrid}>
+          <StatCard
+            label="Coins"
+            value={stats.coin_balance}
+            icon="circle-multiple"
+            theme={theme}
+          />
+
+          <StatCard
+            label="Streak"
+            value={stats.streak_days}
+            icon="fire"
+            theme={theme}
+          />
+
+          <StatCard
+            label="Habits"
+            value={stats.total_habits}
+            icon="repeat"
+            theme={theme}
+          />
+
+          <StatCard
+            label="Tasks"
+            value={stats.total_tasks}
+            icon="clipboard-check-outline"
+            theme={theme}
+          />
+        </View>
+
+        <View style={styles.sectionHeader}>
+          <ThemedText variant="section">Achievements</ThemedText>
+        </View>
+
+        <ThemedCard style={styles.achievementCard}>
+          <View style={styles.achievementTop}>
+            <View>
+              <ThemedText muted style={styles.achievementLabel}>
+                Earned
+              </ThemedText>
+
+              <ThemedText style={styles.achievementValue}>
+                {achievementSummary.earnedCount} / {achievementSummary.total}
+              </ThemedText>
+            </View>
+
+            <View
+              style={[
+                styles.achievementIconWrap,
+                {
+                  backgroundColor: theme.colors.surfaceAlt,
+                  borderColor: theme.colors.border,
+                },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="trophy-outline"
+                size={30}
                 color={theme.colors.primary}
               />
             </View>
           </View>
 
-          <View style={styles.heroStats}>
-            <MiniStat
-              label="Today"
-              value={stats.completed_today}
-              icon="check-circle-outline"
-              theme={theme}
-            />
+          {achievementSummary.nextUnlock ? (
+            <View style={styles.nextUnlockBox}>
+              <View style={styles.nextUnlockHeader}>
+                <ThemedText style={styles.nextUnlockName}>
+                  {achievementSummary.nextUnlock.name}
+                </ThemedText>
 
-            <MiniStat
-              label="Streak"
-              value={stats.streak_days}
-              icon="fire"
-              theme={theme}
-            />
+                <ThemedText muted style={styles.nextUnlockPercent}>
+                  {achievementSummary.nextUnlock.percent || 0}%
+                </ThemedText>
+              </View>
 
-            <MiniStat
-              label="Habits"
-              value={stats.total_habits}
-              icon="repeat"
-              theme={theme}
-            />
-          </View>
+              <View
+                style={[
+                  styles.nextUnlockProgressOuter,
+                  { backgroundColor: theme.colors.surfaceAlt },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.nextUnlockProgressInner,
+                    {
+                      width: `${achievementSummary.nextUnlock.percent || 0}%`,
+                      backgroundColor: theme.colors.primary,
+                    },
+                  ]}
+                />
+              </View>
+            </View>
+          ) : (
+            <ThemedText muted style={styles.completeText}>
+              All achievements unlocked. Beast mode.
+            </ThemedText>
+          )}
         </ThemedCard>
 
-        <View style={styles.sectionHeader}>
-          <ThemedText variant="section">Quick Actions</ThemedText>
-        </View>
-
-        <View style={styles.actionGrid}>
-          <ActionButton
-            theme={theme}
-            icon="plus-circle-outline"
-            label="New Habit"
-            onPress={() => router.push("/create-habit")}
-          />
-
-          <ActionButton
-            theme={theme}
-            icon="clipboard-plus-outline"
-            label="New Task"
-            onPress={() => router.push("/create-task")}
-          />
-
-          <ActionButton
-            theme={theme}
-            icon="gift-outline"
-            label="New Reward"
-            onPress={() => router.push("/create-reward")}
-          />
-
-          <ActionButton
-            theme={theme}
-            icon="palette-outline"
-            label="Theme Store"
-            onPress={() => router.push("/theme-store")}
-          />
-        </View>
-
-        <View style={styles.sectionHeader}>
-          <ThemedText variant="section">Theme Preview</ThemedText>
-        </View>
-
-        <ThemedCard>
-          <ThemedText muted style={styles.themeLabel}>
-            Current Theme
+        <ThemedCard style={styles.focusCard}>
+          <ThemedText style={styles.focusTitle}>
+            Keep building momentum.
           </ThemedText>
 
-          <ThemedText style={styles.themeName}>
-            {themeName.charAt(0).toUpperCase() + themeName.slice(1)}
+          <ThemedText muted style={styles.focusCopy}>
+            Add a new habit or task and continue your streak.
           </ThemedText>
 
-          <View style={styles.themeButtons}>
-            <ThemePill
-              label="Light"
-              active={themeName === "light"}
-              onPress={() => setThemeName("light")}
-              theme={theme}
-            />
+          <View style={styles.focusActions}>
+            <ThemedButton
+              style={styles.focusButton}
+              onPress={() => router.push("/create-habit")}
+            >
+              New Habit
+            </ThemedButton>
 
-            <ThemePill
-              label="Dark"
-              active={themeName === "dark"}
-              onPress={() => setThemeName("dark")}
-              theme={theme}
-            />
-
-            <ThemePill
-              label="Nature"
-              active={themeName === "nature"}
-              onPress={() => setThemeName("nature")}
-              theme={theme}
-            />
-
-            <ThemePill
-              label="Focus"
-              active={themeName === "focus"}
-              onPress={() => setThemeName("focus")}
-              theme={theme}
-            />
+            <ThemedButton
+              variant="secondary"
+              style={styles.focusButton}
+              onPress={() => router.push("/create-task")}
+            >
+              New Task
+            </ThemedButton>
           </View>
         </ThemedCard>
-
-        <View style={styles.sectionHeader}>
-          <ThemedText variant="section">Account</ThemedText>
-        </View>
-
-        <ThemedButton
-          variant="secondary"
-          style={styles.fullButton}
-          onPress={() => router.push("/onboarding")}
-        >
-          Restart Onboarding
-        </ThemedButton>
-
-        <ThemedButton
-          variant="secondary"
-          style={styles.logoutButton}
-          onPress={logout}
-        >
-          Log Out
-        </ThemedButton>
       </ScrollView>
     </ThemedScreen>
   );
 }
 
-function MiniStat({ label, value, icon, theme }) {
+function normalizeList(data) {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.items)) return data.items;
+  if (Array.isArray(data?.habits)) return data.habits;
+  if (Array.isArray(data?.tasks)) return data.tasks;
+  return [];
+}
+
+function PreviewItem({ icon, label, theme }) {
   return (
     <View
       style={[
-        styles.miniStat,
+        styles.previewItem,
         {
           backgroundColor: theme.colors.surfaceAlt,
           borderColor: theme.colors.border,
@@ -265,51 +467,36 @@ function MiniStat({ label, value, icon, theme }) {
     >
       <MaterialCommunityIcons
         name={icon}
-        size={18}
+        size={19}
         color={theme.colors.primary}
       />
 
-      <ThemedText style={styles.miniStatValue}>{value}</ThemedText>
-
-      <ThemedText muted style={styles.miniStatLabel}>
+      <ThemedText numberOfLines={1} style={styles.previewLabel}>
         {label}
       </ThemedText>
     </View>
   );
 }
 
-function ActionButton({ icon, label, onPress, theme }) {
+function StatCard({ label, value, icon, theme }) {
   return (
-    <ThemedButton
-      variant="secondary"
-      style={styles.actionButton}
-      onPress={onPress}
-    >
-      <MaterialCommunityIcons
-        name={icon}
-        size={22}
-        color={theme.colors.primary}
-      />
+    <ThemedCard style={styles.statCard}>
+      <View
+        style={[styles.statIcon, { backgroundColor: theme.colors.surfaceAlt }]}
+      >
+        <MaterialCommunityIcons
+          name={icon}
+          size={22}
+          color={theme.colors.primary}
+        />
+      </View>
 
-      <ThemedText style={styles.actionLabel}>{label}</ThemedText>
-    </ThemedButton>
-  );
-}
+      <ThemedText style={styles.statValue}>{value}</ThemedText>
 
-function ThemePill({ label, active, onPress, theme }) {
-  return (
-    <ThemedButton
-      variant={active ? "primary" : "secondary"}
-      style={[
-        styles.themePill,
-        !active && {
-          borderColor: theme.colors.border,
-        },
-      ]}
-      onPress={onPress}
-    >
-      {label}
-    </ThemedButton>
+      <ThemedText muted style={styles.statLabel}>
+        {label}
+      </ThemedText>
+    </ThemedCard>
   );
 }
 
@@ -325,120 +512,288 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  subtitle: {
-    marginTop: 8,
-    lineHeight: 20,
-  },
-
   heroCard: {
     marginTop: 18,
+    overflow: "hidden",
+  },
+
+  heroGlow: {
+    position: "absolute",
+    width: 220,
+    height: 220,
+    borderRadius: 999,
+    top: -120,
+    right: -80,
   },
 
   heroTop: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    gap: 18,
   },
 
-  heroLabel: {
+  heroCopy: {
+    flex: 1,
+  },
+
+  heroGreeting: {
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "800",
     textTransform: "uppercase",
   },
 
-  heroBalance: {
-    fontSize: 44,
+  heroTitle: {
+    fontSize: 30,
     fontWeight: "900",
-    marginTop: 4,
+    lineHeight: 36,
+    marginTop: 6,
   },
 
-  coinIconWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 999,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  heroStats: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 18,
-  },
-
-  miniStat: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 18,
-    paddingVertical: 14,
-    paddingHorizontal: 10,
-    alignItems: "center",
-  },
-
-  miniStatValue: {
-    fontSize: 20,
-    fontWeight: "900",
-    marginTop: 4,
-  },
-
-  miniStatLabel: {
-    marginTop: 2,
-    fontSize: 12,
+  heroSubtitle: {
+    marginTop: 8,
+    fontSize: 15,
     fontWeight: "700",
+  },
+
+  streakBadge: {
+    width: 88,
+    minHeight: 102,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+  },
+
+  streakNumber: {
+    fontSize: 28,
+    fontWeight: "900",
+    marginTop: 4,
+  },
+
+  streakLabel: {
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+
+  progressOuter: {
+    height: 12,
+    borderRadius: 999,
+    overflow: "hidden",
+    marginTop: 22,
+  },
+
+  progressInner: {
+    height: "100%",
+    borderRadius: 999,
+  },
+
+  progressFooter: {
+    marginTop: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  progressText: {
+    fontWeight: "700",
+  },
+
+  progressPercent: {
+    fontWeight: "900",
   },
 
   sectionHeader: {
-    marginTop: 26,
+    marginTop: 28,
     marginBottom: 12,
   },
 
-  actionGrid: {
+  todayCard: {
+    paddingBottom: 18,
+  },
+
+  todayTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    lineHeight: 24,
+  },
+
+  previewList: {
+    marginTop: 16,
+    gap: 10,
+  },
+
+  previewItem: {
+    borderWidth: 1,
+    borderRadius: 18,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  previewLabel: {
+    flex: 1,
+    fontWeight: "800",
+  },
+
+  todayActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 18,
+  },
+
+  todayButton: {
+    flex: 1,
+  },
+
+  emptyToday: {
+    alignItems: "center",
+    paddingVertical: 10,
+  },
+
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: "900",
+    marginTop: 10,
+  },
+
+  emptyCopy: {
+    marginTop: 6,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+
+  emptyActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 18,
+  },
+
+  emptyButton: {
+    minWidth: 120,
+  },
+
+  statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
+    marginTop: 18,
   },
 
-  actionButton: {
+  statCard: {
     width: "47%",
+  },
+
+  statIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 18,
-    gap: 8,
   },
 
-  actionLabel: {
+  statValue: {
+    fontSize: 28,
+    fontWeight: "900",
+    marginTop: 12,
+  },
+
+  statLabel: {
+    marginTop: 2,
     fontWeight: "800",
-    textAlign: "center",
   },
 
-  themeLabel: {
+  achievementCard: {
+    marginTop: 0,
+  },
+
+  achievementTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  achievementLabel: {
     fontSize: 12,
-    fontWeight: "800",
+    fontWeight: "900",
     textTransform: "uppercase",
   },
 
-  themeName: {
-    fontSize: 24,
+  achievementValue: {
+    fontSize: 32,
     fontWeight: "900",
     marginTop: 4,
   },
 
-  themeButtons: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
+  achievementIconWrap: {
+    width: 62,
+    height: 62,
+    borderRadius: 999,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+  },
+
+  nextUnlockBox: {
     marginTop: 16,
   },
 
-  themePill: {
-    minWidth: 90,
+  nextUnlockHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
 
-  fullButton: {
-    marginBottom: 12,
+  nextUnlockName: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "900",
   },
 
-  logoutButton: {
-    marginBottom: 40,
+  nextUnlockPercent: {
+    fontWeight: "900",
+  },
+
+  nextUnlockProgressOuter: {
+    height: 10,
+    borderRadius: 999,
+    overflow: "hidden",
+    marginTop: 10,
+  },
+
+  nextUnlockProgressInner: {
+    height: "100%",
+    borderRadius: 999,
+  },
+
+  completeText: {
+    marginTop: 14,
+    fontWeight: "700",
+  },
+
+  focusCard: {
+    marginTop: 28,
+  },
+
+  focusTitle: {
+    fontSize: 20,
+    fontWeight: "900",
+  },
+
+  focusCopy: {
+    marginTop: 8,
+    lineHeight: 20,
+  },
+
+  focusActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 18,
+  },
+
+  focusButton: {
+    flex: 1,
   },
 });

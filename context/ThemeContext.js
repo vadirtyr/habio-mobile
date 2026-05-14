@@ -1,5 +1,6 @@
 import * as SecureStore from "expo-secure-store";
 import React, { createContext, useEffect, useMemo, useState } from "react";
+
 import { api } from "../lib/api";
 import { DEFAULT_THEME, themes } from "../lib/theme/themes";
 import { useAuth } from "./AuthContext";
@@ -14,6 +15,7 @@ export function ThemeProvider({ children }) {
 
   const [themeName, setThemeNameState] = useState(DEFAULT_THEME);
   const [ownedThemes, setOwnedThemes] = useState(DEFAULT_OWNED_THEMES);
+  const [unlockedThemesNow, setUnlockedThemesNow] = useState([]);
   const [ready, setReady] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
@@ -53,8 +55,13 @@ export function ThemeProvider({ children }) {
             ? data.selected_theme
             : DEFAULT_THEME;
 
+        const backendUnlockedNow = Array.isArray(data.unlocked_now)
+          ? data.unlocked_now
+          : [];
+
         setOwnedThemes(backendOwned);
         setThemeNameState(backendSelected);
+        setUnlockedThemesNow(backendUnlockedNow);
 
         await SecureStore.setItemAsync(THEME_KEY, backendSelected);
       } catch (error) {
@@ -119,6 +126,10 @@ export function ThemeProvider({ children }) {
     return data;
   };
 
+  const clearUnlockedThemesNow = () => {
+    setUnlockedThemesNow([]);
+  };
+
   const theme = themes[themeName] || themes[DEFAULT_THEME];
 
   const value = useMemo(
@@ -129,11 +140,13 @@ export function ThemeProvider({ children }) {
       theme,
       themes,
       ownedThemes,
+      unlockedThemesNow,
+      clearUnlockedThemesNow,
       setThemeName,
       purchaseTheme,
       isDark: themeName === "dark",
     }),
-    [ready, syncing, themeName, ownedThemes]
+    [ready, syncing, themeName, ownedThemes, unlockedThemesNow]
   );
 
   return (

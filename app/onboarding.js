@@ -1,41 +1,47 @@
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { useState } from "react";
-import {
-    Dimensions,
-    Pressable,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    View,
-} from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import { BrandHeader } from "../components/BrandMark";
-import { colors, radii, shadows, spacing } from "../lib/theme";
-
-const { width } = Dimensions.get("window");
+import ThemedButton from "../components/ThemedButton";
+import ThemedCard from "../components/ThemedCard";
+import ThemedScreen from "../components/ThemedScreen";
+import ThemedText from "../components/ThemedText";
+import { useTheme } from "../hooks/useTheme";
 
 const slides = [
   {
-    title: "Build Better Days",
+    eyebrow: "Welcome",
+    title: "Build better days.",
     description:
-      "Habio helps you turn small daily actions into real progress.",
+      "Habio helps you turn small daily actions into visible progress.",
+    icon: "sunrise",
   },
   {
-    title: "Start With A Few Habits",
+    eyebrow: "Momentum",
+    title: "Start with a few habits.",
     description:
-      "Next, you’ll pick a category and choose one or more suggested habits to get started quickly.",
+      "Pick starter habits from guided categories so you can begin without overthinking it.",
+    icon: "repeat",
   },
   {
-    title: "Earn Rewards",
+    eyebrow: "Rewards",
+    title: "Earn your wins.",
     description:
-      "Complete habits and tasks to earn coins, keep streaks alive, and unlock rewards.",
+      "Complete habits and tasks, earn coins, keep streaks alive, and unlock rewards.",
+    icon: "gift-outline",
   },
 ];
 
 export default function OnboardingScreen() {
+  const { theme, themeName, themes } = useTheme();
   const [index, setIndex] = useState(0);
 
+  const activeTheme = themes[themeName];
+  const slide = slides[index];
   const isLastSlide = index === slides.length - 1;
 
   async function finishOnboarding() {
@@ -49,115 +55,274 @@ export default function OnboardingScreen() {
       return;
     }
 
-    setIndex((prev) => prev + 1);
+    setIndex((current) => current + 1);
+  }
+
+  function previousSlide() {
+    if (index === 0) return;
+    setIndex((current) => current - 1);
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <BrandHeader />
+    <ThemedScreen>
+      <View style={styles.container}>
+        <BrandHeader eyebrow="Welcome to" title="Habio" />
 
-        <View style={styles.card}>
-          <Text style={styles.title}>{slides[index].title}</Text>
+        <ThemedCard style={styles.heroCard}>
+          <LinearGradient
+            colors={
+              activeTheme?.gradient || [
+                theme.colors.background,
+                theme.colors.primary,
+              ]
+            }
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.gradient}
+          >
+            <View style={styles.gradientTop}>
+              <View style={styles.iconCircle}>
+                {slide.icon === "gift-outline" ? (
+                  <MaterialCommunityIcons
+                    name="gift-outline"
+                    size={34}
+                    color="#FFFFFF"
+                  />
+                ) : (
+                  <Feather name={slide.icon} size={34} color="#FFFFFF" />
+                )}
+              </View>
 
-          <Text style={styles.description}>
-            {slides[index].description}
-          </Text>
+              <ThemedText style={styles.eyebrow}>{slide.eyebrow}</ThemedText>
+            </View>
 
-          <View style={styles.dots}>
-            {slides.map((_, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.dot,
-                  i === index && styles.activeDot,
-                ]}
+            <View>
+              <ThemedText style={styles.title}>{slide.title}</ThemedText>
+
+              <ThemedText style={styles.description}>
+                {slide.description}
+              </ThemedText>
+            </View>
+          </LinearGradient>
+
+          <View style={styles.cardBody}>
+            <View style={styles.progressRow}>
+              {slides.map((_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.dot,
+                    {
+                      backgroundColor:
+                        i === index
+                          ? theme.colors.primary
+                          : theme.colors.surfaceAlt,
+                      borderColor: theme.colors.border,
+                    },
+                    i === index && styles.activeDot,
+                  ]}
+                />
+              ))}
+            </View>
+
+            <View style={styles.featureGrid}>
+              <FeaturePill
+                icon="check-circle"
+                label="Track"
+                theme={theme}
               />
-            ))}
-          </View>
 
-          <Pressable style={styles.primaryButton} onPress={nextSlide}>
-            <Text style={styles.primaryButtonText}>
+              <FeaturePill
+                icon="zap"
+                label="Streaks"
+                theme={theme}
+              />
+
+              <FeaturePill
+                icon="award"
+                label="Rewards"
+                theme={theme}
+              />
+            </View>
+
+            <ThemedButton style={styles.primaryButton} onPress={nextSlide}>
               {isLastSlide ? "Choose Starter Habits" : "Continue"}
-            </Text>
-          </Pressable>
+            </ThemedButton>
 
-          {!isLastSlide && (
-            <Pressable onPress={finishOnboarding}>
-              <Text style={styles.skipText}>Skip to habit setup</Text>
-            </Pressable>
-          )}
-        </View>
+            <View style={styles.bottomActions}>
+              <Pressable
+                onPress={previousSlide}
+                disabled={index === 0}
+                style={styles.secondaryAction}
+              >
+                <ThemedText
+                  muted
+                  style={[
+                    styles.secondaryText,
+                    index === 0 && styles.disabledText,
+                  ]}
+                >
+                  Back
+                </ThemedText>
+              </Pressable>
+
+              {!isLastSlide && (
+                <Pressable onPress={finishOnboarding}>
+                  <ThemedText muted style={styles.secondaryText}>
+                    Skip setup
+                  </ThemedText>
+                </Pressable>
+              )}
+            </View>
+          </View>
+        </ThemedCard>
       </View>
-    </SafeAreaView>
+    </ThemedScreen>
+  );
+}
+
+function FeaturePill({ icon, label, theme }) {
+  return (
+    <View
+      style={[
+        styles.featurePill,
+        {
+          backgroundColor: theme.colors.surfaceAlt,
+          borderColor: theme.colors.border,
+        },
+      ]}
+    >
+      <Feather name={icon} size={16} color={theme.colors.primary} />
+      <ThemedText style={styles.featureText}>{label}</ThemedText>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: {
-    flex: 1,
+    padding: 20,
     justifyContent: "center",
-    padding: spacing.lg,
   },
-  card: {
-    width: width - spacing.lg * 2,
-    alignSelf: "center",
-    backgroundColor: colors.surface,
-    borderRadius: radii.xl,
-    padding: spacing.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginTop: spacing.xl,
-    ...shadows.card,
+
+  heroCard: {
+    marginTop: 24,
+    padding: 0,
+    overflow: "hidden",
   },
-  title: {
-    color: colors.text,
-    fontSize: 28,
+
+  gradient: {
+    minHeight: 330,
+    padding: 24,
+    justifyContent: "space-between",
+  },
+
+  gradientTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  iconCircle: {
+    width: 76,
+    height: 76,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  eyebrow: {
+    color: "rgba(255,255,255,0.82)",
+    fontSize: 13,
     fontWeight: "900",
-    marginBottom: spacing.md,
+    textTransform: "uppercase",
+    letterSpacing: 1,
   },
+
+  title: {
+    color: "#FFFFFF",
+    fontSize: 38,
+    fontWeight: "900",
+    lineHeight: 44,
+    textShadowColor: "rgba(0,0,0,0.22)",
+    textShadowRadius: 8,
+  },
+
   description: {
-    color: colors.textMuted,
+    color: "rgba(255,255,255,0.92)",
     fontSize: 16,
     lineHeight: 24,
-    marginBottom: spacing.xl,
-    fontWeight: "500",
+    fontWeight: "700",
+    marginTop: 14,
+    textShadowColor: "rgba(0,0,0,0.18)",
+    textShadowRadius: 6,
   },
-  dots: {
+
+  cardBody: {
+    padding: 20,
+  },
+
+  progressRow: {
     flexDirection: "row",
     justifyContent: "center",
-    marginBottom: spacing.xl,
+    gap: 8,
   },
+
   dot: {
     width: 10,
     height: 10,
     borderRadius: 999,
-    backgroundColor: colors.border,
-    marginHorizontal: 4,
+    borderWidth: 1,
   },
+
   activeDot: {
-    backgroundColor: colors.accent,
+    width: 26,
   },
-  primaryButton: {
-    backgroundColor: colors.accent,
-    paddingVertical: 16,
-    borderRadius: radii.lg,
+
+  featureGrid: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 20,
+  },
+
+  featurePill: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
     alignItems: "center",
-    ...shadows.glow,
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
   },
-  primaryButtonText: {
-    color: colors.textDark,
+
+  featureText: {
+    fontSize: 12,
     fontWeight: "900",
-    fontSize: 16,
   },
-  skipText: {
-    color: colors.textMuted,
-    textAlign: "center",
-    marginTop: spacing.md,
-    fontWeight: "700",
+
+  primaryButton: {
+    marginTop: 22,
+  },
+
+  bottomActions: {
+    marginTop: 18,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  secondaryAction: {
+    minWidth: 70,
+  },
+
+  secondaryText: {
+    fontWeight: "800",
+  },
+
+  disabledText: {
+    opacity: 0.35,
   },
 });
