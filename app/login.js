@@ -8,14 +8,15 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 
-import { BrandHeader } from "../components/BrandMark";
+import { AppButton } from "../components/AppButton";
+import { AppCard } from "../components/AppCard";
+import { AppInput } from "../components/AppInput";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../lib/api";
-import { colors, radii, shadows, spacing } from "../lib/theme";
+import { colors, spacing, typography } from "../lib/theme";
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -65,51 +66,54 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={styles.screen}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <View style={styles.content}>
-        <BrandHeader />
-
-        <Text style={styles.subtitle}>Build habits. Earn rewards.</Text>
-
-        <View style={styles.card}>
-          <Text style={styles.label}>Email</Text>
-
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
-            placeholder="you@example.com"
-            placeholderTextColor={colors.textMuted}
-          />
-
-          <Text style={styles.label}>Password</Text>
-
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            placeholder="Password"
-            placeholderTextColor={colors.textMuted}
-          />
-
-          <Pressable
-            style={[styles.button, submitting && styles.buttonDisabled]}
-            onPress={handleLogin}
-            disabled={submitting}
-          >
-            <Text style={styles.buttonText}>
-              {submitting ? "Logging in..." : "Log In"}
-            </Text>
-          </Pressable>
+        <View style={styles.brandBlock}>
+          <Text style={styles.eyebrow}>Welcome back</Text>
+          <Text style={styles.title}>OurOrbit</Text>
+          <Text style={styles.subtitle}>
+            Small actions shape your orbit.
+          </Text>
         </View>
 
-        <Pressable onPress={() => router.push("/register")}>
+        <AppCard>
+          <View style={styles.section}>
+            <Text style={styles.label}>Email</Text>
+
+            <AppInput
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              placeholder="you@example.com"
+            />
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.label}>Password</Text>
+
+            <AppInput
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              placeholder="Password"
+            />
+          </View>
+
+          <AppButton
+            title={submitting ? "Logging in..." : "Log In"}
+            onPress={handleLogin}
+            disabled={submitting}
+          />
+        </AppCard>
+
+        <Pressable
+          style={styles.registerButton}
+          onPress={() => router.push("/register")}
+        >
           <Text style={styles.registerText}>
             Don&apos;t have an account? Create one
           </Text>
@@ -120,68 +124,57 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
     backgroundColor: colors.background,
   },
+
   content: {
     flex: 1,
     justifyContent: "center",
-    padding: spacing.lg,
+    padding: spacing.xl,
   },
+
+  brandBlock: {
+    marginBottom: spacing.xl,
+  },
+
+  eyebrow: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+
+  title: {
+    ...typography.h1,
+    color: colors.text,
+    marginTop: spacing.xs,
+  },
+
   subtitle: {
-    color: colors.textMuted,
+    ...typography.body,
+    color: colors.textSecondary,
     marginTop: spacing.sm,
+  },
+
+  section: {
     marginBottom: spacing.lg,
-    fontSize: 16,
-    fontWeight: "600",
-    lineHeight: 22,
   },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.xl,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.md,
-    ...shadows.card,
-  },
+
   label: {
+    ...typography.bodyBold,
     color: colors.text,
-    fontWeight: "800",
-    marginBottom: 8,
-    marginTop: 4,
+    marginBottom: spacing.sm,
   },
-  input: {
-    backgroundColor: colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    padding: 14,
-    marginBottom: spacing.md,
-    color: colors.text,
-    fontWeight: "600",
-  },
-  button: {
-    backgroundColor: colors.accent,
-    paddingVertical: 16,
-    borderRadius: radii.lg,
+
+  registerButton: {
     alignItems: "center",
-    marginTop: spacing.sm,
-    ...shadows.glow,
+    paddingVertical: spacing.lg,
   },
-  buttonDisabled: {
-    opacity: 0.65,
-  },
-  buttonText: {
-    color: colors.textDark,
-    fontWeight: "900",
-    fontSize: 16,
-  },
+
   registerText: {
-    textAlign: "center",
-    color: colors.accent,
-    fontWeight: "700",
-    marginTop: spacing.sm,
+    ...typography.bodyBold,
+    color: colors.cyan,
   },
 });

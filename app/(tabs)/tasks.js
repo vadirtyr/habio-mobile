@@ -3,50 +3,56 @@ import * as Haptics from "expo-haptics";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   Modal,
   StyleSheet,
-  View,
+  Text,
+  View
 } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withDelay,
-  withSequence,
-  withSpring,
   withTiming,
 } from "react-native-reanimated";
 
 import { AnimatedPressable } from "../../components/AnimatedPressable";
-import { BrandHeader } from "../../components/BrandMark";
-import ThemedButton from "../../components/ThemedButton";
-import ThemedCard from "../../components/ThemedCard";
-import ThemedText from "../../components/ThemedText";
+import { AppButton } from "../../components/AppButton";
+import { AppCard } from "../../components/AppCard";
+import { EmptyState } from "../../components/EmptyState";
+import { LevelUpModal } from "../../components/LevelUpModal";
+import { OrbitProgressBar } from "../../components/OrbitProgressBar";
+import { ScreenHeader } from "../../components/ScreenHeader";
+import { SectionTitle } from "../../components/SectionTitle";
+import { SkeletonCard } from "../../components/SkeletonCard";
+import { XPGainToast } from "../../components/XPGainToast";
 import { useAuth } from "../../context/AuthContext";
-import { useTheme } from "../../hooks/useTheme";
 import { api } from "../../lib/api";
+import { colors, radii, spacing, typography } from "../../lib/theme";
 
 export default function TasksScreen() {
   const { token } = useAuth();
-  const { theme } = useTheme();
 
   const [tasks, setTasks] = useState([]);
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState(null);
   const [completionCelebration, setCompletionCelebration] = useState(null);
-
+  const [levelUp, setLevelUp] = useState(null);
+  const [xpToast, setXpToast] = useState(0);
   const completedToday = useMemo(
     () => tasks.filter((task) => task.completed).length,
     [tasks]
   );
 
   const openTasks = Math.max(tasks.length - completedToday, 0);
+
   const progressPercent =
-    tasks.length === 0 ? 0 : Math.round((completedToday / tasks.length) * 100);
+    tasks.length === 0
+      ? 0
+      : Math.round((completedToday / tasks.length) * 100);
 
   async function fetchTasks() {
     if (!token) return;
@@ -78,13 +84,25 @@ export default function TasksScreen() {
 
     try {
       const data = await api.post(`/tasks/${taskId}/complete`, {}, token);
+      if (data.leveled_up) {
+         setLevelUp({
+          oldLevel: data.old_level,
+          newLevel: data.new_level,
+        });
+      }
+      setXpToast(data.xp_earned || 0);
 
+      setTimeout(() => {
+        setXpToast(0);
+        }, 900);
       await Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Success
       );
 
       setBalance(data.new_balance);
-      setMessage(`+${data.coins_earned} coins`);
+      setMessage(
+  `+${data.coins_earned} coins • +${data.xp_earned || 0} XP`
+);
 
       setCompletionCelebration({
         taskName: task.name,
@@ -177,146 +195,128 @@ export default function TasksScreen() {
   );
 
   if (loading) {
-    return (
-      <View
-        style={[styles.center, { backgroundColor: theme.colors.background }]}
-      >
-        <ActivityIndicator color={theme.colors.primary} />
-        <ThemedText muted style={styles.loadingText}>
-          Loading tasks...
-        </ThemedText>
-      </View>
-    );
-  }
+  return (
+    <View style={styles.container}>
+      <ScreenHeader
+        title="Tasks"
+        subtitle="Loading today’s progress..."
+      />
+
+      <SkeletonCard lines={2} />
+      <SkeletonCard />
+      <SkeletonCard />
+      <SkeletonCard compact />
+    </View>
+  );
+}
 
   return (
-    <View
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-    >
-      <TaskCompletionCelebration data={completionCelebration} theme={theme} />
-
+    <View style={styles.container}>
+      <TaskCompletionCelebration data={completionCelebration} />
+      <LevelUpModal
+        visible={!!levelUp}
+        oldLevel={levelUp?.oldLevel}
+         newLevel={levelUp?.newLevel}
+        onClose={() => setLevelUp(null)}
+        />
+        <XPGainToast xp={xpToast} />
       <FlatList
         data={tasks}
         keyExtractor={(item) => item.id}
         refreshing={loading}
         onRefresh={fetchTasks}
         contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View>
-            <BrandHeader eyebrow="Execution" title="Tasks" />
+            <ScreenHeader
+              title="Tasks"
+              subtitle="Turn momentum into progress."
+            />
 
-            <ThemedCard style={styles.summaryCard}>
-              <View
-                style={[
-                  styles.summaryGlow,
-                  { backgroundColor: `${theme.colors.primary}18` },
-                ]}
-              />
+            <AppCard style={styles.summaryCard}>
+              <View style={styles.summaryGlowBlue} />
+              <View style={styles.summaryGlowCoral} />
 
               <View style={styles.summaryTop}>
                 <View style={styles.summaryCopy}>
-                  <ThemedText muted style={styles.summaryLabel}>
-                    Today
-                  </ThemedText>
+                  <Text style={styles.summaryLabel}>Today</Text>
 
-                  <ThemedText style={styles.summaryTitle}>
+                  <Text style={styles.summaryTitle}>
                     {completedToday} of {tasks.length} complete
-                  </ThemedText>
+                  </Text>
 
-                  <ThemedText muted style={styles.summarySubtitle}>
+                  <Text style={styles.summarySubtitle}>
                     {openTasks > 0
-                      ? `${openTasks} task${openTasks === 1 ? "" : "s"} left to finish`
+                      ? `${openTasks} task${
+                          openTasks === 1 ? "" : "s"
+                        } left to finish`
                       : tasks.length > 0
                       ? "All tasks complete. Nice work."
                       : "Add a task to start earning coins."}
-                  </ThemedText>
+                  </Text>
                 </View>
 
-                <View
-                  style={[
-                    styles.coinBadge,
-                    { backgroundColor: theme.colors.surfaceAlt },
-                  ]}
-                >
+                <View style={styles.coinBadge}>
                   <MaterialCommunityIcons
                     name="circle-multiple"
                     size={24}
-                    color={theme.colors.primary}
+                    color={colors.gold}
                   />
-                  <ThemedText style={styles.coinValue}>{balance}</ThemedText>
+                  <Text style={styles.coinValue}>{balance}</Text>
                 </View>
               </View>
 
-              <View
-                style={[
-                  styles.progressOuter,
-                  { backgroundColor: theme.colors.surfaceAlt },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.progressInner,
-                    {
-                      width: `${progressPercent}%`,
-                      backgroundColor: theme.colors.primary,
-                    },
-                  ]}
-                />
-              </View>
+              <OrbitProgressBar
+                percent={progressPercent}
+                style={styles.progressBar}
+              />
 
               <View style={styles.summaryActions}>
-                <ThemedButton
+                <AppButton
+                  title="Add Task"
                   style={styles.summaryButton}
                   onPress={() => router.push("/create-task")}
-                >
-                  Add Task
-                </ThemedButton>
+                />
               </View>
-            </ThemedCard>
+            </AppCard>
 
-            <RewardToast message={message} theme={theme} />
+            <RewardToast message={message} />
 
-            {tasks.length > 0 && (
-              <View style={styles.sectionHeader}>
-                <ThemedText variant="section">Today’s Tasks</ThemedText>
-                <ThemedText muted style={styles.sectionHint}>
-                  Swipe right to complete or reopen. Swipe left to delete.
-                </ThemedText>
-              </View>
-            )}
+            {tasks.length > 0 ? (
+              <SectionTitle
+                title="Today’s Tasks"
+                action={<Text style={styles.sectionHint}>Swipe to manage</Text>}
+              />
+            ) : null}
           </View>
         }
         ListEmptyComponent={
-          <ThemedCard style={styles.emptyCard}>
-            <Feather name="check-square" size={34} color={theme.colors.primary} />
+          <AppCard style={styles.emptyCard}>
+            <EmptyState
+              title="No tasks yet"
+              description="Add one small task and turn it into a quick win."
+              icon={<Feather name="check-square" size={38} color={colors.blue} />}
+            />
 
-            <ThemedText variant="section" style={styles.emptyTitle}>
-              No tasks yet
-            </ThemedText>
-
-            <ThemedText muted style={styles.emptyText}>
-              Add one small task and turn it into a quick win.
-            </ThemedText>
-
-            <ThemedButton onPress={() => router.push("/create-task")}>
-              Create Task
-            </ThemedButton>
-          </ThemedCard>
+            <AppButton
+              title="Create Task"
+              onPress={() => router.push("/create-task")}
+            />
+          </AppCard>
         }
         renderItem={({ item, index }) => (
           <Swipeable
             renderLeftActions={() =>
               item.completed ? (
                 <SwipeAction
-                  theme={theme}
-                  color={theme.colors.primary}
+                  color={colors.blue}
                   icon="rotate-ccw"
                   label="Reopen"
                 />
               ) : (
                 <SwipeAction
-                  theme={theme}
-                  color={theme.colors.success}
+                  color={colors.success}
                   icon="check-circle"
                   label="Done"
                 />
@@ -324,8 +324,7 @@ export default function TasksScreen() {
             }
             renderRightActions={() => (
               <SwipeAction
-                theme={theme}
-                color={theme.colors.danger}
+                color={colors.danger}
                 icon="trash-2"
                 label="Delete"
                 white
@@ -344,7 +343,6 @@ export default function TasksScreen() {
             <AnimatedCard index={index}>
               <TaskCard
                 item={item}
-                theme={theme}
                 onToggle={() =>
                   item.completed ? uncompleteTask(item.id) : completeTask(item.id)
                 }
@@ -371,13 +369,13 @@ export default function TasksScreen() {
   );
 }
 
-function TaskCard({ item, theme, onToggle, onEdit }) {
+function TaskCard({ item, onToggle, onEdit }) {
   return (
-    <ThemedCard
+    <AppCard
       style={[
         styles.card,
         item.completed && styles.completedCard,
-        item.completed && { borderColor: theme.colors.success },
+        item.completed && { borderColor: colors.success },
       ]}
     >
       <View style={styles.cardTop}>
@@ -385,12 +383,8 @@ function TaskCard({ item, theme, onToggle, onEdit }) {
           style={[
             styles.checkCircle,
             {
-              backgroundColor: item.completed
-                ? theme.colors.success
-                : theme.colors.surfaceAlt,
-              borderColor: item.completed
-                ? theme.colors.success
-                : theme.colors.border,
+              backgroundColor: item.completed ? colors.success : colors.surfaceAlt,
+              borderColor: item.completed ? colors.success : colors.border,
             },
           ]}
           onPress={onToggle}
@@ -398,140 +392,115 @@ function TaskCard({ item, theme, onToggle, onEdit }) {
           <Feather
             name={item.completed ? "check" : "square"}
             size={22}
-            color={
-              item.completed
-                ? theme.colors.primaryText
-                : theme.colors.textMuted
-            }
+            color={item.completed ? colors.white : colors.textMuted}
           />
         </AnimatedPressable>
 
         <View style={styles.cardCopy}>
           <View style={styles.nameRow}>
-            <ThemedText
-              style={[styles.name, item.completed && styles.completedText]}
-            >
+            <Text style={[styles.name, item.completed && styles.completedText]}>
               {item.name}
-            </ThemedText>
+            </Text>
 
-            <AnimatedPressable
-              style={[
-                styles.iconButton,
-                {
-                  backgroundColor: theme.colors.surfaceAlt,
-                  borderColor: theme.colors.border,
-                },
-              ]}
-              onPress={onEdit}
-            >
-              <Feather name="edit-3" size={15} color={theme.colors.text} />
+            <AnimatedPressable style={styles.iconButton} onPress={onEdit}>
+              <Feather name="edit-3" size={15} color={colors.text} />
             </AnimatedPressable>
           </View>
 
           {!!item.description && (
-            <ThemedText muted style={styles.description}>
-              {item.description}
-            </ThemedText>
+            <Text style={styles.description}>{item.description}</Text>
           )}
         </View>
       </View>
 
       <View style={styles.cardFooter}>
-        <CompactPill
-          theme={theme}
-          icon="circle"
-          text={`${item.coins_reward || 0} coins`}
-        />
+        <CompactPill icon="circle" text={`${item.coins_reward || 0} coins`} />
 
         <CompactPill
-          theme={theme}
           icon="calendar"
           text={formatDueDate(item.due_date)}
           highlight={isDueSoon(item.due_date) && !item.completed}
-          color={theme.colors.warning || theme.colors.primary}
+          color={colors.warning}
         />
 
         <CompactPill
-          theme={theme}
           icon={item.completed ? "check-circle" : "clock"}
           text={item.completed ? "Complete" : "Open"}
           highlight={item.completed}
-          color={item.completed ? theme.colors.success : theme.colors.primary}
+          color={item.completed ? colors.success : colors.blue}
         />
 
         {item.recurrence && item.recurrence !== "none" && (
-          <CompactPill theme={theme} icon="repeat" text={item.recurrence} />
+          <CompactPill icon="repeat" text={item.recurrence} />
         )}
       </View>
 
       <View style={styles.statusRow}>
-        <ThemedText
+        <Text
           style={[
             styles.status,
             {
-              color: item.completed
-                ? theme.colors.success
-                : theme.colors.textMuted,
+              color: item.completed ? colors.success : colors.textMuted,
             },
           ]}
         >
           {item.completed ? "Completed" : "Tap or swipe to complete"}
-        </ThemedText>
+        </Text>
 
-        <ThemedText muted style={styles.coinText}>
-          +{item.coins_reward || 0}
-        </ThemedText>
+        <Text style={styles.coinText}>+{item.coins_reward || 0}</Text>
       </View>
-    </ThemedCard>
+    </AppCard>
   );
 }
 
-function CompactPill({
-  theme,
-  icon,
-  text,
-  color = null,
-  highlight = false,
-}) {
-  const pillColor = color || theme.colors.textMuted;
+function CompactPill({ icon, text, color = null, highlight = false }) {
+  const pillColor = color || colors.textMuted;
 
   return (
     <View
       style={[
         styles.compactPill,
         {
-          backgroundColor: theme.colors.surfaceAlt,
-          borderColor: highlight ? pillColor : theme.colors.border,
+          backgroundColor: highlight ? `${pillColor}12` : colors.surfaceAlt,
+          borderColor: highlight ? pillColor : colors.border,
         },
       ]}
     >
       <Feather name={icon} size={13} color={pillColor} />
-      <ThemedText
-        muted={!highlight}
-        style={[styles.compactPillText, highlight && { color: pillColor }]}
+
+      <Text
+        style={[
+          styles.compactPillText,
+          {
+            color: highlight ? pillColor : colors.textSecondary,
+          },
+        ]}
       >
         {text}
-      </ThemedText>
+      </Text>
     </View>
   );
 }
 
-function SwipeAction({ theme, color, icon, label, white = false }) {
+function SwipeAction({ color, icon, label, white = false }) {
   return (
     <View style={[styles.swipeAction, { backgroundColor: color }]}>
       <Feather
         name={icon}
         size={22}
-        color={white ? "white" : theme.colors.primaryText}
+        color={white ? colors.white : colors.primary}
       />
-      <ThemedText
+
+      <Text
         style={[
           styles.swipeText,
-          { color: white ? "white" : theme.colors.primaryText },
+          {
+            color: white ? colors.white : colors.primary,
+          },
         ]}
       >
         {label}
-      </ThemedText>
+      </Text>
     </View>
   );
 }
@@ -548,7 +517,10 @@ function isDueSoon(value) {
   if (Number.isNaN(due.getTime())) return false;
 
   const today = new Date();
-  const diffMs = due.setHours(0, 0, 0, 0) - today.setHours(0, 0, 0, 0);
+
+  const diffMs =
+    due.setHours(0, 0, 0, 0) - today.setHours(0, 0, 0, 0);
+
   const diffDays = Math.round(diffMs / 86400000);
 
   return diffDays <= 1;
@@ -571,133 +543,50 @@ function AnimatedCard({ children, index = 0 }) {
   return <Animated.View style={animatedStyle}>{children}</Animated.View>;
 }
 
-function RewardToast({ message, theme }) {
-  const scale = useSharedValue(0.9);
-  const opacity = useSharedValue(0);
-
-  useEffect(() => {
-    if (message) {
-      opacity.value = withTiming(1, { duration: 180 });
-      scale.value = withSequence(withSpring(1.08), withSpring(1));
-    } else {
-      opacity.value = withTiming(0, { duration: 150 });
-      scale.value = withTiming(0.9, { duration: 150 });
-    }
-  }, [message]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ scale: scale.value }],
-  }));
-
+function RewardToast({ message }) {
   if (!message) return null;
 
   return (
-    <Animated.View
-      style={[
-        styles.toast,
-        animatedStyle,
-        {
-          backgroundColor: theme.colors.surfaceAlt,
-          borderColor: theme.colors.success,
-        },
-      ]}
-    >
-      <ThemedText style={[styles.toastText, { color: theme.colors.success }]}>
-        {message}
-      </ThemedText>
-    </Animated.View>
+    <View style={styles.toast}>
+      <Text style={styles.toastText}>{message}</Text>
+    </View>
   );
 }
 
-function TaskCompletionCelebration({ data, theme }) {
-  const scale = useSharedValue(0.55);
-  const opacity = useSharedValue(0);
-  const translateY = useSharedValue(28);
-
-  useEffect(() => {
-    if (data) {
-      opacity.value = withTiming(1, { duration: 160 });
-      translateY.value = withSpring(0);
-      scale.value = withSequence(withSpring(1.12), withSpring(1));
-    } else {
-      opacity.value = withTiming(0, { duration: 160 });
-      translateY.value = withTiming(28, { duration: 160 });
-      scale.value = withTiming(0.55, { duration: 160 });
-    }
-  }, [data]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: translateY.value }, { scale: scale.value }],
-  }));
-
+function TaskCompletionCelebration({ data }) {
   if (!data) return null;
 
   return (
-    <Modal visible transparent animationType="none">
+    <Modal visible transparent animationType="fade">
       <View style={styles.celebrationOverlay}>
-        <Animated.View
-          style={[
-            styles.celebrationCard,
-            animatedStyle,
-            {
-              backgroundColor: theme.colors.surface,
-              borderColor: theme.colors.success,
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.celebrationIconCircle,
-              { backgroundColor: theme.colors.success },
-            ]}
-          >
-            <Feather name="check" size={38} color={theme.colors.primaryText} />
+        <View style={styles.celebrationCard}>
+          <View style={styles.celebrationIconCircle}>
+            <Feather name="check" size={38} color={colors.white} />
           </View>
 
-          <ThemedText
-            style={[styles.celebrationEyebrow, { color: theme.colors.success }]}
-          >
-            Task Complete
-          </ThemedText>
+          <Text style={styles.celebrationEyebrow}>Task Complete</Text>
 
-          <ThemedText style={styles.celebrationTitle}>
-            +{data.coins} coins
-          </ThemedText>
+          <Text style={styles.celebrationTitle}>+{data.coins} coins</Text>
 
-          <ThemedText muted style={styles.celebrationName}>
-            {data.taskName}
-          </ThemedText>
+          <Text style={styles.celebrationName}>{data.taskName}</Text>
 
-          <View
-            style={[
-              styles.bonusBreakdown,
-              {
-                backgroundColor: theme.colors.surfaceAlt,
-                borderColor: theme.colors.border,
-              },
-            ]}
-          >
-            <ThemedText muted style={styles.bonusLine}>
+          <View style={styles.bonusBreakdown}>
+            <Text style={styles.bonusLine}>
               New balance: {data.newBalance} coins
-            </ThemedText>
+            </Text>
 
-            {data.nextTaskCreated && (
-              <ThemedText muted style={styles.bonusLine}>
-                Recurring task created
-              </ThemedText>
-            )}
+            {data.nextTaskCreated ? (
+              <Text style={styles.bonusLine}>Recurring task created</Text>
+            ) : null}
 
-            {data.newAchievements?.length > 0 && (
-              <ThemedText
-                style={[styles.bonusTotal, { color: theme.colors.warning }]}
-              >
+            {data.newAchievements?.length > 0 ? (
+              <Text style={styles.bonusTotal}>
                 Achievement progress unlocked
-              </ThemedText>
-            )}
+              </Text>
+            ) : null}
+            
           </View>
-        </Animated.View>
+        </View>
       </View>
     </Modal>
   );
@@ -706,8 +595,9 @@ function TaskCompletionCelebration({ data, theme }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xl,
   },
 
   listContent: {
@@ -718,30 +608,43 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: colors.background,
   },
 
   loadingText: {
-    marginTop: 10,
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
   },
 
   summaryCard: {
-    marginTop: 16,
     overflow: "hidden",
   },
 
-  summaryGlow: {
+  summaryGlowBlue: {
     position: "absolute",
     width: 220,
     height: 220,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     top: -130,
     right: -90,
+    backgroundColor: `${colors.blue}16`,
+  },
+
+  summaryGlowCoral: {
+    position: "absolute",
+    width: 160,
+    height: 160,
+    borderRadius: radii.pill,
+    bottom: -100,
+    left: -70,
+    backgroundColor: `${colors.coral}10`,
   },
 
   summaryTop: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 14,
+    gap: spacing.lg,
   },
 
   summaryCopy: {
@@ -749,52 +652,48 @@ const styles = StyleSheet.create({
   },
 
   summaryLabel: {
-    fontSize: 12,
-    fontWeight: "900",
+    ...typography.caption,
+    color: colors.textSecondary,
     textTransform: "uppercase",
+    letterSpacing: 0.8,
   },
 
   summaryTitle: {
-    fontSize: 26,
-    fontWeight: "900",
-    marginTop: 4,
+    ...typography.h2,
+    color: colors.text,
+    marginTop: spacing.xs,
   },
 
   summarySubtitle: {
-    marginTop: 6,
-    fontWeight: "700",
-    lineHeight: 20,
+    ...typography.bodyBold,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
   },
 
   coinBadge: {
     minWidth: 78,
     minHeight: 78,
-    borderRadius: 24,
+    borderRadius: radii.lg,
     alignItems: "center",
     justifyContent: "center",
-    padding: 12,
+    padding: spacing.md,
+    backgroundColor: `${colors.gold}18`,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
 
   coinValue: {
-    marginTop: 4,
-    fontSize: 20,
-    fontWeight: "900",
+    ...typography.h3,
+    color: colors.text,
+    marginTop: spacing.xs,
   },
 
-  progressOuter: {
-    height: 11,
-    borderRadius: 999,
-    overflow: "hidden",
-    marginTop: 20,
-  },
-
-  progressInner: {
-    height: "100%",
-    borderRadius: 999,
+  progressBar: {
+    marginTop: spacing.xl,
   },
 
   summaryActions: {
-    marginTop: 18,
+    marginTop: spacing.lg,
   },
 
   summaryButton: {
@@ -802,48 +701,18 @@ const styles = StyleSheet.create({
     minWidth: 132,
   },
 
-  toast: {
-    marginTop: 12,
-    borderWidth: 1,
-    padding: 12,
-    borderRadius: 18,
-    alignItems: "center",
-  },
-
-  toastText: {
-    fontWeight: "900",
-    textAlign: "center",
-  },
-
-  sectionHeader: {
-    marginTop: 28,
-    marginBottom: 12,
-  },
-
   sectionHint: {
-    marginTop: 4,
-    fontSize: 13,
-    lineHeight: 18,
+    ...typography.caption,
+    color: colors.textMuted,
   },
 
   emptyCard: {
-    marginTop: 20,
+    marginTop: spacing.xl,
     alignItems: "center",
   },
 
-  emptyTitle: {
-    marginTop: 10,
-  },
-
-  emptyText: {
-    marginTop: 6,
-    marginBottom: 16,
-    textAlign: "center",
-    lineHeight: 20,
-  },
-
   card: {
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
 
   completedCard: {
@@ -852,14 +721,14 @@ const styles = StyleSheet.create({
 
   cardTop: {
     flexDirection: "row",
-    gap: 12,
+    gap: spacing.md,
     alignItems: "flex-start",
   },
 
   checkCircle: {
     width: 46,
     height: 46,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
@@ -872,47 +741,51 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: spacing.sm,
   },
 
   name: {
     flex: 1,
-    fontSize: 18,
-    fontWeight: "900",
+    ...typography.h3,
+    color: colors.text,
   },
 
   completedText: {
     textDecorationLine: "line-through",
+    color: colors.textMuted,
   },
 
   iconButton: {
     width: 36,
     height: 36,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
     alignItems: "center",
     justifyContent: "center",
   },
 
   description: {
-    marginTop: 4,
-    lineHeight: 20,
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
   },
 
   cardFooter: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    marginTop: 14,
+    gap: spacing.sm,
+    marginTop: spacing.lg,
   },
 
   compactPill: {
-    borderRadius: 999,
+    borderRadius: radii.pill,
     paddingVertical: 7,
-    paddingHorizontal: 10,
+    paddingHorizontal: spacing.md,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: spacing.sm,
     borderWidth: 1,
   },
 
@@ -923,96 +796,120 @@ const styles = StyleSheet.create({
   },
 
   statusRow: {
-    marginTop: 12,
+    marginTop: spacing.md,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
+    gap: spacing.md,
   },
 
   status: {
     flex: 1,
-    fontWeight: "800",
+    ...typography.caption,
   },
 
   coinText: {
-    fontWeight: "800",
+    ...typography.caption,
+    color: colors.textSecondary,
   },
 
   swipeAction: {
     justifyContent: "center",
     alignItems: "center",
     width: 96,
-    borderRadius: 18,
-    marginBottom: 12,
-    gap: 4,
+    borderRadius: radii.md,
+    marginBottom: spacing.md,
+    gap: spacing.xs,
   },
 
   swipeText: {
     fontWeight: "900",
   },
 
+  toast: {
+    marginTop: spacing.md,
+    borderWidth: 1,
+    padding: spacing.md,
+    borderRadius: radii.md,
+    alignItems: "center",
+    backgroundColor: `${colors.success}12`,
+    borderColor: colors.success,
+  },
+
+  toastText: {
+    ...typography.bodyBold,
+    color: colors.success,
+    textAlign: "center",
+  },
+
   celebrationOverlay: {
     flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.78)",
+    backgroundColor: "rgba(15, 23, 42, 0.72)",
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
+    padding: spacing.xl,
   },
 
   celebrationCard: {
     width: "100%",
-    borderRadius: 24,
-    padding: 24,
+    borderRadius: radii.xl,
+    padding: spacing.xl,
     borderWidth: 1,
+    borderColor: colors.success,
+    backgroundColor: colors.surface,
     alignItems: "center",
   },
 
   celebrationIconCircle: {
     width: 74,
     height: 74,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 14,
+    marginBottom: spacing.lg,
+    backgroundColor: colors.success,
   },
 
   celebrationEyebrow: {
-    fontSize: 14,
-    fontWeight: "900",
+    ...typography.caption,
+    color: colors.success,
     textTransform: "uppercase",
     letterSpacing: 1,
   },
 
   celebrationTitle: {
-    fontSize: 30,
-    fontWeight: "900",
-    marginTop: 8,
+    ...typography.h1,
+    color: colors.text,
+    marginTop: spacing.sm,
     textAlign: "center",
   },
 
   celebrationName: {
-    fontWeight: "800",
-    marginTop: 4,
+    ...typography.bodyBold,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
     textAlign: "center",
   },
 
   bonusBreakdown: {
-    marginTop: 20,
-    borderRadius: 18,
-    padding: 14,
+    marginTop: spacing.xl,
+    borderRadius: radii.md,
+    padding: spacing.lg,
     width: "100%",
     borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
   },
 
   bonusLine: {
-    fontWeight: "800",
-    marginBottom: 6,
+    ...typography.bodyBold,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
   },
 
   bonusTotal: {
-    fontWeight: "900",
-    fontSize: 16,
-    marginTop: 4,
+    ...typography.h3,
+    color: colors.warning,
+    marginTop: spacing.xs,
   },
 });

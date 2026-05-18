@@ -2,37 +2,45 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   RefreshControl,
   ScrollView,
   StyleSheet,
-  View,
+  Text,
+  View
 } from "react-native";
 
-import { BrandHeader } from "../../components/BrandMark";
-import ThemedButton from "../../components/ThemedButton";
-import ThemedCard from "../../components/ThemedCard";
-import ThemedScreen from "../../components/ThemedScreen";
-import ThemedText from "../../components/ThemedText";
+import { AppButton } from "../../components/AppButton";
+import { AppCard } from "../../components/AppCard";
+import { EmptyState } from "../../components/EmptyState";
+import { OrbitProgressBar } from "../../components/OrbitProgressBar";
+import { ScreenHeader } from "../../components/ScreenHeader";
+import { SectionTitle } from "../../components/SectionTitle";
+import { SkeletonCard } from "../../components/SkeletonCard";
+import { StatPill } from "../../components/StatPill";
 import { useAuth } from "../../context/AuthContext";
-import { useTheme } from "../../hooks/useTheme";
 import { api } from "../../lib/api";
+import { colors, radii, spacing, typography } from "../../lib/theme";
 
 export default function DashboardScreen() {
   const { token } = useAuth();
-  const { theme } = useTheme();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
   const [stats, setStats] = useState({
     coin_balance: 0,
     completed_today: 0,
     streak_days: 0,
     total_habits: 0,
     total_tasks: 0,
-  });
-
+    xp: 0,
+    level_data: {
+    level: 1,
+    current_xp: 0,
+    progress: 0,
+    needed: 100,
+    percent: 0,
+    },
+});
   const [todayHabits, setTodayHabits] = useState([]);
   const [todayTasks, setTodayTasks] = useState([]);
 
@@ -44,6 +52,7 @@ export default function DashboardScreen() {
 
   const totalTodayItems = todayHabits.length + todayTasks.length;
   const dailyGoal = Math.max(totalTodayItems, stats.completed_today, 1);
+
   const todayPercent = Math.min(
     100,
     Math.round((stats.completed_today / dailyGoal) * 100)
@@ -78,7 +87,15 @@ export default function DashboardScreen() {
           streak_days: data.streak_days || data.current_max_streak || 0,
           total_habits: data.total_habits || data.habits_count || 0,
           total_tasks: data.total_tasks || data.tasks_total || 0,
-        });
+          xp: data.xp || 0,
+          level_data: data.level_data || {
+          level: 1,
+          current_xp: 0,
+          progress: 0,
+          needed: 100,
+          percent: 0,
+        },
+      });
       }
 
       if (achievementData.status === "fulfilled") {
@@ -107,7 +124,7 @@ export default function DashboardScreen() {
         setTodayTasks(tasks);
       }
     } catch (error) {
-      console.error(error);
+      console.error("Dashboard load failed:", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -130,116 +147,112 @@ export default function DashboardScreen() {
   }
 
   if (loading) {
-    return (
-      <View
-        style={[
-          styles.loadingContainer,
-          { backgroundColor: theme.colors.background },
-        ]}
-      >
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-      </View>
-    );
-  }
+  return (
+    <View style={styles.container}>
+      <ScreenHeader
+        title="Dashboard"
+        subtitle="Preparing your orbit..."
+      />
+
+      <SkeletonCard lines={2} />
+      <SkeletonCard />
+      <SkeletonCard />
+      <SkeletonCard compact />
+    </View>
+  );
+}
 
   return (
-    <ThemedScreen>
+    <View style={styles.screen}>
       <ScrollView
         contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor={theme.colors.primary}
+            tintColor={colors.primary}
           />
         }
       >
-        <BrandHeader eyebrow="Today" title="Dashboard" />
+        <ScreenHeader title="Dashboard" subtitle="Build better days." />
 
-        <ThemedCard style={styles.heroCard}>
-          <View
-            style={[
-              styles.heroGlow,
-              { backgroundColor: `${theme.colors.primary}18` },
-            ]}
-          />
+        <AppCard style={styles.heroCard}>
+          <View style={styles.heroGlowCyan} />
+          <View style={styles.heroGlowCoral} />
 
           <View style={styles.heroTop}>
             <View style={styles.heroCopy}>
-              <ThemedText muted style={styles.heroGreeting}>
-                {greeting}
-              </ThemedText>
+              <Text style={styles.heroGreeting}>{greeting}</Text>
 
-              <ThemedText style={styles.heroTitle}>
-                Keep your streak alive.
-              </ThemedText>
+              <Text style={styles.heroTitle}>Your orbit is in motion.</Text>
 
-              <ThemedText muted style={styles.heroSubtitle}>
+              <Text style={styles.heroSubtitle}>
                 {stats.completed_today} completed today
-              </ThemedText>
+              </Text>
             </View>
 
-            <View
-              style={[
-                styles.streakBadge,
-                { backgroundColor: theme.colors.surfaceAlt },
-              ]}
-            >
+            <View style={styles.streakBadge}>
               <MaterialCommunityIcons
                 name="fire"
                 size={28}
-                color={theme.colors.primary}
+                color={colors.coral}
               />
 
-              <ThemedText style={styles.streakNumber}>
-                {stats.streak_days}
-              </ThemedText>
-
-              <ThemedText muted style={styles.streakLabel}>
-                days
-              </ThemedText>
+              <Text style={styles.streakNumber}>{stats.streak_days}</Text>
+              <Text style={styles.streakLabel}>days</Text>
             </View>
           </View>
 
-          <View
-            style={[
-              styles.progressOuter,
-              { backgroundColor: theme.colors.surfaceAlt },
-            ]}
-          >
-            <View
-              style={[
-                styles.progressInner,
-                {
-                  width: `${todayPercent}%`,
-                  backgroundColor: theme.colors.primary,
-                },
-              ]}
-            />
-          </View>
+          <OrbitProgressBar percent={todayPercent} style={styles.progressBar} />
 
           <View style={styles.progressFooter}>
-            <ThemedText muted style={styles.progressText}>
-              Daily progress
-            </ThemedText>
-
-            <ThemedText style={styles.progressPercent}>
-              {todayPercent}%
-            </ThemedText>
+            <Text style={styles.progressText}>Daily progress</Text>
+            <Text style={styles.progressPercent}>{todayPercent}%</Text>
           </View>
-        </ThemedCard>
+        </AppCard>
+         <AppCard style={styles.levelCard}>
+  <View style={styles.levelTop}>
+    <View>
+      <Text style={styles.levelEyebrow}>Orbit Level</Text>
+      <Text style={styles.levelTitle}>
+        Level {stats.level_data.level}
+      </Text>
+    </View>
 
-        <View style={styles.sectionHeader}>
-          <ThemedText variant="section">Today Focus</ThemedText>
-        </View>
+    <View style={styles.levelBadge}>
+      <MaterialCommunityIcons
+        name="orbit"
+        size={30}
+        color={colors.cyan}
+      />
+    </View>
+  </View>
 
-        <ThemedCard style={styles.todayCard}>
+  <OrbitProgressBar
+    percent={stats.level_data.percent || 0}
+    style={styles.progressBar}
+  />
+
+  <View style={styles.progressFooter}>
+    <Text style={styles.progressText}>
+      {stats.level_data.progress || 0} / {stats.level_data.needed || 100} XP
+    </Text>
+
+    <Text style={styles.progressPercent}>
+      {stats.level_data.percent || 0}%
+    </Text>
+  </View>
+</AppCard> 
+        <SectionTitle title="Today Focus" />
+
+        <AppCard>
           {totalTodayItems > 0 ? (
             <>
-              <ThemedText style={styles.todayTitle}>
+              <Text style={styles.todayTitle}>
                 You have {totalTodayItems} item
                 {totalTodayItems === 1 ? "" : "s"} to move forward.
-              </ThemedText>
+              </Text>
 
               <View style={styles.previewList}>
                 {todayHabits.map((habit) => (
@@ -247,7 +260,7 @@ export default function DashboardScreen() {
                     key={`habit-${habit.id || habit._id || habit.name}`}
                     icon="repeat"
                     label={habit.name || habit.title || "Habit"}
-                    theme={theme}
+                    accent="cyan"
                   />
                 ))}
 
@@ -258,123 +271,107 @@ export default function DashboardScreen() {
                     }`}
                     icon="checkbox-marked-circle-outline"
                     label={task.title || task.name || "Task"}
-                    theme={theme}
+                    accent="coral"
                   />
                 ))}
               </View>
 
-              <View style={styles.todayActions}>
-                <ThemedButton
-                  style={styles.todayButton}
+              <View style={styles.actionRow}>
+                <AppButton
+                  title="Go to Habits"
+                  style={styles.actionButton}
                   onPress={() => router.push("/habits")}
-                >
-                  Go to Habits
-                </ThemedButton>
+                />
 
-                <ThemedButton
+                <AppButton
+                  title="Go to Tasks"
                   variant="secondary"
-                  style={styles.todayButton}
+                  style={styles.actionButton}
                   onPress={() => router.push("/tasks")}
-                >
-                  Go to Tasks
-                </ThemedButton>
+                />
               </View>
             </>
           ) : (
-            <View style={styles.emptyToday}>
-              <MaterialCommunityIcons
-                name="check-decagram-outline"
-                size={38}
-                color={theme.colors.primary}
+            <>
+              <EmptyState
+                title="Your orbit is clear."
+                description="Add a habit or task to keep your momentum moving."
+                icon={
+                  <MaterialCommunityIcons
+                    name="check-decagram-outline"
+                    size={42}
+                    color={colors.cyan}
+                  />
+                }
               />
 
-              <ThemedText style={styles.emptyTitle}>
-                You are clear for now.
-              </ThemedText>
-
-              <ThemedText muted style={styles.emptyCopy}>
-                Add a habit or task to keep building momentum.
-              </ThemedText>
-
-              <View style={styles.emptyActions}>
-                <ThemedButton
-                  style={styles.emptyButton}
+              <View style={styles.actionRow}>
+                <AppButton
+                  title="Add Habit"
+                  style={styles.actionButton}
                   onPress={() => router.push("/create-habit")}
-                >
-                  Add Habit
-                </ThemedButton>
+                />
 
-                <ThemedButton
+                <AppButton
+                  title="Add Task"
                   variant="secondary"
-                  style={styles.emptyButton}
+                  style={styles.actionButton}
                   onPress={() => router.push("/create-task")}
-                >
-                  Add Task
-                </ThemedButton>
+                />
               </View>
-            </View>
+            </>
           )}
-        </ThemedCard>
+        </AppCard>
+
+        <SectionTitle title="Progress Snapshot" />
 
         <View style={styles.statsGrid}>
-          <StatCard
+          <StatPill
             label="Coins"
             value={stats.coin_balance}
             icon="circle-multiple"
-            theme={theme}
+            accent="gold"
           />
 
-          <StatCard
+          <StatPill
             label="Streak"
             value={stats.streak_days}
             icon="fire"
-            theme={theme}
+            accent="coral"
           />
 
-          <StatCard
+          <StatPill
             label="Habits"
             value={stats.total_habits}
             icon="repeat"
-            theme={theme}
+            accent="cyan"
           />
 
-          <StatCard
+          <StatPill
             label="Tasks"
             value={stats.total_tasks}
             icon="clipboard-check-outline"
-            theme={theme}
+            accent="blue"
           />
         </View>
 
-        <View style={styles.sectionHeader}>
-          <ThemedText variant="section">Achievements</ThemedText>
-        </View>
+        <SectionTitle title="Achievements" />
 
-        <ThemedCard style={styles.achievementCard}>
+        <AppCard>
           <View style={styles.achievementTop}>
             <View>
-              <ThemedText muted style={styles.achievementLabel}>
-                Earned
-              </ThemedText>
+              <Text style={styles.achievementLabel}>Earned</Text>
 
-              <ThemedText style={styles.achievementValue}>
+              <Text style={styles.achievementValue}>
                 {achievementSummary.earnedCount} / {achievementSummary.total}
-              </ThemedText>
+              </Text>
             </View>
 
-            <View
-              style={[
-                styles.achievementIconWrap,
-                {
-                  backgroundColor: theme.colors.surfaceAlt,
-                  borderColor: theme.colors.border,
-                },
-              ]}
-            >
+            <View style={styles.achievementIconWrap}>
               <MaterialCommunityIcons
                 name="trophy-outline"
                 size={30}
-                color={theme.colors.primary}
+                color={colors.gold}
               />
             </View>
           </View>
@@ -382,67 +379,50 @@ export default function DashboardScreen() {
           {achievementSummary.nextUnlock ? (
             <View style={styles.nextUnlockBox}>
               <View style={styles.nextUnlockHeader}>
-                <ThemedText style={styles.nextUnlockName}>
+                <Text style={styles.nextUnlockName}>
                   {achievementSummary.nextUnlock.name}
-                </ThemedText>
+                </Text>
 
-                <ThemedText muted style={styles.nextUnlockPercent}>
+                <Text style={styles.nextUnlockPercent}>
                   {achievementSummary.nextUnlock.percent || 0}%
-                </ThemedText>
+                </Text>
               </View>
 
-              <View
-                style={[
-                  styles.nextUnlockProgressOuter,
-                  { backgroundColor: theme.colors.surfaceAlt },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.nextUnlockProgressInner,
-                    {
-                      width: `${achievementSummary.nextUnlock.percent || 0}%`,
-                      backgroundColor: theme.colors.primary,
-                    },
-                  ]}
-                />
-              </View>
+              <OrbitProgressBar
+                percent={achievementSummary.nextUnlock.percent || 0}
+              />
             </View>
           ) : (
-            <ThemedText muted style={styles.completeText}>
+            <Text style={styles.completeText}>
               All achievements unlocked. Beast mode.
-            </ThemedText>
+            </Text>
           )}
-        </ThemedCard>
+        </AppCard>
 
-        <ThemedCard style={styles.focusCard}>
-          <ThemedText style={styles.focusTitle}>
-            Keep building momentum.
-          </ThemedText>
+        <AppCard style={styles.focusCard}>
+          <Text style={styles.focusTitle}>Keep building momentum.</Text>
 
-          <ThemedText muted style={styles.focusCopy}>
+          <Text style={styles.focusCopy}>
             Add a new habit or task and continue your streak.
-          </ThemedText>
+          </Text>
 
-          <View style={styles.focusActions}>
-            <ThemedButton
-              style={styles.focusButton}
+          <View style={styles.actionRow}>
+            <AppButton
+              title="New Habit"
+              style={styles.actionButton}
               onPress={() => router.push("/create-habit")}
-            >
-              New Habit
-            </ThemedButton>
+            />
 
-            <ThemedButton
+            <AppButton
+              title="New Task"
               variant="secondary"
-              style={styles.focusButton}
+              style={styles.actionButton}
               onPress={() => router.push("/create-task")}
-            >
-              New Task
-            </ThemedButton>
+            />
           </View>
-        </ThemedCard>
+        </AppCard>
       </ScrollView>
-    </ThemedScreen>
+    </View>
   );
 }
 
@@ -454,55 +434,37 @@ function normalizeList(data) {
   return [];
 }
 
-function PreviewItem({ icon, label, theme }) {
-  return (
-    <View
-      style={[
-        styles.previewItem,
-        {
-          backgroundColor: theme.colors.surfaceAlt,
-          borderColor: theme.colors.border,
-        },
-      ]}
-    >
-      <MaterialCommunityIcons
-        name={icon}
-        size={19}
-        color={theme.colors.primary}
-      />
+function PreviewItem({ icon, label, accent = "cyan" }) {
+  const accentColor = colors[accent] || colors.cyan;
 
-      <ThemedText numberOfLines={1} style={styles.previewLabel}>
+  return (
+    <View style={styles.previewItem}>
+      <View
+        style={[
+          styles.previewIcon,
+          {
+            backgroundColor: `${accentColor}18`,
+          },
+        ]}
+      >
+        <MaterialCommunityIcons name={icon} size={19} color={accentColor} />
+      </View>
+
+      <Text numberOfLines={1} style={styles.previewLabel}>
         {label}
-      </ThemedText>
+      </Text>
     </View>
   );
 }
 
-function StatCard({ label, value, icon, theme }) {
-  return (
-    <ThemedCard style={styles.statCard}>
-      <View
-        style={[styles.statIcon, { backgroundColor: theme.colors.surfaceAlt }]}
-      >
-        <MaterialCommunityIcons
-          name={icon}
-          size={22}
-          color={theme.colors.primary}
-        />
-      </View>
-
-      <ThemedText style={styles.statValue}>{value}</ThemedText>
-
-      <ThemedText muted style={styles.statLabel}>
-        {label}
-      </ThemedText>
-    </ThemedCard>
-  );
-}
-
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+
   container: {
-    padding: 20,
+    padding: spacing.xl,
     paddingBottom: 120,
   },
 
@@ -510,26 +472,37 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: colors.background,
   },
 
   heroCard: {
-    marginTop: 18,
     overflow: "hidden",
   },
 
-  heroGlow: {
+  heroGlowCyan: {
     position: "absolute",
     width: 220,
     height: 220,
-    borderRadius: 999,
-    top: -120,
+    borderRadius: radii.pill,
+    top: -130,
     right: -80,
+    backgroundColor: `${colors.cyan}18`,
+  },
+
+  heroGlowCoral: {
+    position: "absolute",
+    width: 160,
+    height: 160,
+    borderRadius: radii.pill,
+    bottom: -100,
+    left: -70,
+    backgroundColor: `${colors.coral}12`,
   },
 
   heroTop: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 18,
+    gap: spacing.lg,
   },
 
   heroCopy: {
@@ -537,176 +510,119 @@ const styles = StyleSheet.create({
   },
 
   heroGreeting: {
-    fontSize: 13,
-    fontWeight: "800",
+    ...typography.caption,
+    color: colors.textSecondary,
     textTransform: "uppercase",
+    letterSpacing: 0.8,
   },
 
   heroTitle: {
-    fontSize: 30,
-    fontWeight: "900",
-    lineHeight: 36,
-    marginTop: 6,
+    ...typography.h1,
+    color: colors.text,
+    marginTop: spacing.sm,
   },
 
   heroSubtitle: {
-    marginTop: 8,
-    fontSize: 15,
-    fontWeight: "700",
+    ...typography.bodyBold,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
   },
 
   streakBadge: {
     width: 88,
     minHeight: 102,
-    borderRadius: 28,
+    borderRadius: radii.xl,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 12,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
 
   streakNumber: {
-    fontSize: 28,
-    fontWeight: "900",
-    marginTop: 4,
+    ...typography.h2,
+    color: colors.text,
+    marginTop: spacing.xs,
   },
 
   streakLabel: {
-    fontSize: 12,
-    fontWeight: "800",
+    ...typography.caption,
+    color: colors.textSecondary,
     textTransform: "uppercase",
   },
 
-  progressOuter: {
-    height: 12,
-    borderRadius: 999,
-    overflow: "hidden",
-    marginTop: 22,
-  },
-
-  progressInner: {
-    height: "100%",
-    borderRadius: 999,
+  progressBar: {
+    marginTop: spacing.xl,
   },
 
   progressFooter: {
-    marginTop: 10,
+    marginTop: spacing.sm,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
 
   progressText: {
-    fontWeight: "700",
+    ...typography.caption,
+    color: colors.textSecondary,
   },
 
   progressPercent: {
-    fontWeight: "900",
-  },
-
-  sectionHeader: {
-    marginTop: 28,
-    marginBottom: 12,
-  },
-
-  todayCard: {
-    paddingBottom: 18,
+    ...typography.bodyBold,
+    color: colors.text,
   },
 
   todayTitle: {
-    fontSize: 18,
-    fontWeight: "900",
-    lineHeight: 24,
+    ...typography.h3,
+    color: colors.text,
   },
 
   previewList: {
-    marginTop: 16,
-    gap: 10,
+    marginTop: spacing.lg,
+    gap: spacing.sm,
   },
 
   previewItem: {
     borderWidth: 1,
-    borderRadius: 18,
-    paddingVertical: 13,
-    paddingHorizontal: 14,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: spacing.md,
+    backgroundColor: colors.surfaceAlt,
+  },
+
+  previewIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: radii.pill,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   previewLabel: {
     flex: 1,
-    fontWeight: "800",
+    ...typography.bodyBold,
+    color: colors.text,
   },
 
-  todayActions: {
+  actionRow: {
     flexDirection: "row",
-    gap: 12,
-    marginTop: 18,
+    gap: spacing.md,
+    marginTop: spacing.lg,
   },
 
-  todayButton: {
+  actionButton: {
     flex: 1,
-  },
-
-  emptyToday: {
-    alignItems: "center",
-    paddingVertical: 10,
-  },
-
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: "900",
-    marginTop: 10,
-  },
-
-  emptyCopy: {
-    marginTop: 6,
-    textAlign: "center",
-    lineHeight: 20,
-  },
-
-  emptyActions: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 18,
-  },
-
-  emptyButton: {
-    minWidth: 120,
   },
 
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
-    marginTop: 18,
-  },
-
-  statCard: {
-    width: "47%",
-  },
-
-  statIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 999,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  statValue: {
-    fontSize: 28,
-    fontWeight: "900",
-    marginTop: 12,
-  },
-
-  statLabel: {
-    marginTop: 2,
-    fontWeight: "800",
-  },
-
-  achievementCard: {
-    marginTop: 0,
+    gap: spacing.md,
   },
 
   achievementTop: {
@@ -716,28 +632,31 @@ const styles = StyleSheet.create({
   },
 
   achievementLabel: {
-    fontSize: 12,
-    fontWeight: "900",
+    ...typography.caption,
+    color: colors.textSecondary,
     textTransform: "uppercase",
+    letterSpacing: 0.8,
   },
 
   achievementValue: {
-    fontSize: 32,
-    fontWeight: "900",
-    marginTop: 4,
+    ...typography.h1,
+    color: colors.text,
+    marginTop: spacing.xs,
   },
 
   achievementIconWrap: {
     width: 62,
     height: 62,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: `${colors.gold}18`,
   },
 
   nextUnlockBox: {
-    marginTop: 16,
+    marginTop: spacing.lg,
   },
 
   nextUnlockHeader: {
@@ -748,52 +667,68 @@ const styles = StyleSheet.create({
 
   nextUnlockName: {
     flex: 1,
-    fontSize: 16,
-    fontWeight: "900",
+    ...typography.bodyBold,
+    color: colors.text,
   },
 
   nextUnlockPercent: {
-    fontWeight: "900",
-  },
-
-  nextUnlockProgressOuter: {
-    height: 10,
-    borderRadius: 999,
-    overflow: "hidden",
-    marginTop: 10,
-  },
-
-  nextUnlockProgressInner: {
-    height: "100%",
-    borderRadius: 999,
+    ...typography.bodyBold,
+    color: colors.textSecondary,
   },
 
   completeText: {
-    marginTop: 14,
-    fontWeight: "700",
+    ...typography.bodyBold,
+    color: colors.textSecondary,
+    marginTop: spacing.lg,
   },
 
   focusCard: {
-    marginTop: 28,
+    marginTop: spacing.xl,
   },
 
   focusTitle: {
-    fontSize: 20,
-    fontWeight: "900",
+    ...typography.h3,
+    color: colors.text,
   },
 
   focusCopy: {
-    marginTop: 8,
-    lineHeight: 20,
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
   },
+  levelCard: {
+  marginTop: spacing.xl,
+  overflow: "hidden",
+},
 
-  focusActions: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 18,
-  },
+levelTop: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: spacing.lg,
+},
 
-  focusButton: {
-    flex: 1,
-  },
+levelEyebrow: {
+  ...typography.caption,
+  color: colors.textSecondary,
+  textTransform: "uppercase",
+  letterSpacing: 0.8,
+},
+
+levelTitle: {
+  ...typography.h2,
+  color: colors.text,
+  marginTop: spacing.xs,
+},
+
+levelBadge: {
+  width: 64,
+  height: 64,
+  borderRadius: radii.pill,
+  alignItems: "center",
+  justifyContent: "center",
+  backgroundColor: `${colors.cyan}14`,
+  borderWidth: 1,
+  borderColor: colors.border,
+},
 });

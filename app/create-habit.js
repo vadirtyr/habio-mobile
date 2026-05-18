@@ -1,368 +1,691 @@
-import { router, useLocalSearchParams } from "expo-router";
-import * as SecureStore from "expo-secure-store";
-import { useState } from "react";
-import { Alert, Pressable, StyleSheet, View } from "react-native";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
+import { useMemo, useState } from "react";
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
-import { BrandHeader } from "../components/BrandMark";
-import ThemedButton from "../components/ThemedButton";
-import ThemedCard from "../components/ThemedCard";
-import ThemedInput from "../components/ThemedInput";
-import ThemedScreen from "../components/ThemedScreen";
-import ThemedText from "../components/ThemedText";
-import { useAuth } from "../context/AuthContext";
-import { useTheme } from "../hooks/useTheme";
+import { AnimatedPressable } from "../components/AnimatedPressable";
+import { AppButton } from "../components/AppButton";
+import { AppCard } from "../components/AppCard";
+import { ScreenHeader } from "../components/ScreenHeader";
 import { api } from "../lib/api";
-import { shadows } from "../lib/theme/shadows";
 
-const COIN_OPTIONS = [
-  { label: "Low", value: 5, description: "Small/easy effort" },
-  { label: "Medium", value: 10, description: "Normal effort" },
-  { label: "High", value: 20, description: "Hard effort" },
-  { label: "Life Changing", value: 50, description: "Major effort" },
+import {
+  colors,
+  radii,
+  shadows,
+  spacing,
+  typography,
+} from "../lib/theme";
+
+const habitCategories = [
+  {
+    key: "health",
+    label: "Health",
+    icon: "heart",
+    gradient: ["#123524", "#22C55E"],
+    description:
+      "Energy, hydration, sleep, recovery",
+    habits: [
+      "Drink water",
+      "Take vitamins",
+      "Stretch for 5 minutes",
+      "Walk for 10 minutes",
+      "Sleep by 10:30 PM",
+    ],
+  },
+
+  {
+    key: "fitness",
+    label: "Fitness",
+    icon: "activity",
+    gradient: ["#10213F", "#3B82F6"],
+    description:
+      "Movement and physical momentum",
+    habits: [
+      "Do 10 pushups",
+      "Go for a walk",
+      "Complete a workout",
+      "Stretch after waking up",
+      "Track calories",
+    ],
+  },
+
+  {
+    key: "mind",
+    label: "Mind",
+    icon: "book-open",
+    gradient: ["#24163A", "#8B5CF6"],
+    description:
+      "Mental clarity and reflection",
+    habits: [
+      "Read for 10 minutes",
+      "Journal one sentence",
+      "Meditate for 5 minutes",
+      "Practice gratitude",
+      "No phone for 30 minutes",
+    ],
+  },
+
+  {
+    key: "productivity",
+    label: "Focus",
+    icon: "target",
+    gradient: ["#3A220F", "#F97316"],
+    description:
+      "Execution and forward momentum",
+    habits: [
+      "Plan tomorrow",
+      "Clear inbox",
+      "Work on top priority",
+      "Review goals",
+      "Tidy workspace",
+    ],
+  },
 ];
 
-function getDifficultyForCoins(coins) {
-  if (coins === 5) return "easy";
-  if (coins === 10) return "medium";
-  return "hard";
-}
+export default function ChooseHabitScreen() {
+  const [selectedCategoryKey, setSelectedCategoryKey] =
+    useState("health");
 
-export default function CreateHabitScreen() {
-  const { token } = useAuth();
-  const { theme } = useTheme();
-  const params = useLocalSearchParams();
+  const [selectedHabits, setSelectedHabits] =
+    useState([]);
 
-  const isFirstHabit = params.firstHabit === "true";
-  const suggestedName = typeof params.name === "string" ? params.name : "";
-  const category = typeof params.category === "string" ? params.category : "";
+  const [submitting, setSubmitting] =
+    useState(false);
 
-  const [name, setName] = useState(suggestedName);
-  const [description, setDescription] = useState("");
-  const [selectedCoins, setSelectedCoins] = useState(10);
-  const [submitting, setSubmitting] = useState(false);
+  const selectedCategory = useMemo(
+    () =>
+      habitCategories.find(
+        (category) =>
+          category.key ===
+          selectedCategoryKey
+      ) || habitCategories[0],
 
-  async function createHabit() {
-    if (!token) return;
+    [selectedCategoryKey]
+  );
 
-    if (!name.trim()) {
-      Alert.alert("Missing name", "Enter a habit name.");
+  function toggleHabit(habitName) {
+    setSelectedHabits((current) => {
+      if (current.includes(habitName)) {
+        return current.filter(
+          (habit) => habit !== habitName
+        );
+      }
+
+      return [...current, habitName];
+    });
+  }
+
+  async function createSelectedHabits() {
+    if (selectedHabits.length === 0) {
+      Alert.alert(
+        "Choose at least one habit",
+        "Pick one or more habits to begin building momentum."
+      );
+
       return;
     }
 
     if (submitting) return;
+
     setSubmitting(true);
 
     try {
-      await api.post(
-        "/habits",
-        {
-          name: name.trim(),
-          description: description.trim(),
-          frequency: "daily",
-          difficulty: getDifficultyForCoins(selectedCoins),
-          custom_coins: selectedCoins,
-          icon: "flame",
-          category: category || null,
-        },
-        token
+      await Promise.all(
+        selectedHabits.map((habitName) =>
+          api.post("/habits", {
+            name: habitName,
+            frequency: "daily",
+            coins_per_completion: 5,
+          })
+        )
       );
 
-      if (isFirstHabit) {
-        await SecureStore.setItemAsync("hasCreatedFirstHabit", "true");
-        router.replace("/(tabs)/dashboard");
-      } else {
-        router.replace("/(tabs)/habits");
-      }
+      router.replace("/(tabs)/dashboard");
     } catch (error) {
-      Alert.alert("Error", error.message);
+      Alert.alert(
+        "Could not create habits",
+        error?.message ||
+          "Please try again."
+      );
     } finally {
       setSubmitting(false);
     }
   }
 
-  function handleCancel() {
-    if (isFirstHabit) {
-      router.replace("/choose-habit");
-    } else {
-      router.replace("/(tabs)/habits");
-    }
+  function skipHabitSetup() {
+    router.replace("/(tabs)/dashboard");
   }
 
   return (
-    <ThemedScreen
+    <ScrollView
+      style={styles.screen}
       contentContainerStyle={styles.container}
-      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
     >
-      <BrandHeader
-        eyebrow={isFirstHabit ? "Start Here" : "New Habit"}
-        title={isFirstHabit ? "Create Your First Habit" : "Create Habit"}
+      <ScreenHeader
+        title="Build Your Orbit"
+        subtitle="Choose a few habits that feel realistic and sustainable."
       />
 
-      <ThemedText muted style={styles.subtitle}>
-        {isFirstHabit
-          ? "Start simple. You can use this suggestion or customize it before creating your first habit."
-          : "Build a repeatable action and earn coins every time you complete it."}
-      </ThemedText>
+      <LinearGradient
+        colors={selectedCategory.gradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.hero}
+      >
+        <View style={styles.heroGlow} />
 
-      {category ? (
-        <View
-          style={[
-            styles.categoryPill,
-            {
-              backgroundColor: theme.colors.surfaceAlt,
-              borderColor: theme.colors.success,
-            },
-          ]}
-        >
-          <ThemedText
-            style={[styles.categoryText, { color: theme.colors.success }]}
-          >
-            {category}
-          </ThemedText>
+        <View style={styles.heroTop}>
+          <View style={styles.heroIcon}>
+            <Feather
+              name={selectedCategory.icon}
+              size={34}
+              color="#FFFFFF"
+            />
+          </View>
+
+          <View style={styles.heroBadge}>
+            <Text style={styles.heroBadgeText}>
+              {selectedHabits.length} selected
+            </Text>
+          </View>
         </View>
-      ) : null}
 
-      <ThemedCard>
-        <ThemedText style={styles.label}>Habit name</ThemedText>
+        <View>
+          <Text style={styles.heroTitle}>
+            {selectedCategory.label}
+          </Text>
 
-        <ThemedInput
-          placeholder="e.g. Drink water"
-          value={name}
-          onChangeText={setName}
-          style={styles.input}
-        />
+          <Text style={styles.heroDescription}>
+            {selectedCategory.description}
+          </Text>
+        </View>
 
-        <ThemedText style={styles.label}>Description</ThemedText>
+        <View style={styles.heroFooter}>
+          <Feather
+            name="orbit"
+            size={15}
+            color="rgba(255,255,255,0.85)"
+          />
 
-        <ThemedInput
-          placeholder="Optional notes"
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          style={styles.input}
-        />
+          <Text style={styles.heroHint}>
+            Small actions shape your orbit.
+          </Text>
+        </View>
+      </LinearGradient>
 
-        <ThemedText style={styles.label}>Coin value</ThemedText>
+      <View style={styles.categoryGrid}>
+        {habitCategories.map((category) => {
+          const selected =
+            category.key ===
+            selectedCategoryKey;
 
-        <View style={styles.coinGrid}>
-          {COIN_OPTIONS.map((option) => {
-            const active = selectedCoins === option.value;
+          return (
+            <AnimatedPressable
+              key={category.key}
+              style={[
+                styles.categoryCard,
+                selected &&
+                  styles.categoryCardActive,
+              ]}
+              onPress={() =>
+                setSelectedCategoryKey(
+                  category.key
+                )
+              }
+            >
+              <LinearGradient
+                colors={category.gradient}
+                style={styles.categoryGradient}
+              >
+                <Feather
+                  name={category.icon}
+                  size={22}
+                  color="#FFFFFF"
+                />
+
+                <Text
+                  style={styles.categoryText}
+                >
+                  {category.label}
+                </Text>
+              </LinearGradient>
+            </AnimatedPressable>
+          );
+        })}
+      </View>
+
+      <AppCard style={styles.habitCard}>
+        <View style={styles.sectionHeader}>
+          <View>
+            <Text style={styles.sectionTitle}>
+              Suggested habits
+            </Text>
+
+            <Text style={styles.sectionHint}>
+              Start with a few small wins.
+            </Text>
+          </View>
+
+          <View style={styles.sectionBadge}>
+            <MaterialCommunityIcons
+              name="lightning-bolt-outline"
+              size={15}
+              color={colors.gold}
+            />
+
+            <Text style={styles.sectionBadgeText}>
+              Momentum
+            </Text>
+          </View>
+        </View>
+
+        {selectedCategory.habits.map(
+          (habitName) => {
+            const selected =
+              selectedHabits.includes(
+                habitName
+              );
 
             return (
-              <Pressable
-                key={option.value}
-                onPress={() => setSelectedCoins(option.value)}
+              <AnimatedPressable
+                key={habitName}
                 style={[
-                  styles.coinOption,
-                  {
-                    backgroundColor: active
-                      ? theme.colors.primary
-                      : theme.colors.surfaceAlt,
-                    borderColor: active
-                      ? theme.colors.primary
-                      : theme.colors.border,
-                  },
-                  active && {
-                    shadowColor: theme.colors.primary,
-                    ...shadows.medium,
-                  },
+                  styles.habitRow,
+                  selected &&
+                    styles.habitRowSelected,
                 ]}
+                onPress={() =>
+                  toggleHabit(habitName)
+                }
               >
-                <ThemedText
+                <View
                   style={[
-                    styles.coinLabel,
-                    {
-                      color: active
-                        ? theme.colors.primaryText
-                        : theme.colors.text,
-                    },
+                    styles.checkCircle,
+                    selected &&
+                      styles.checkCircleSelected,
                   ]}
                 >
-                  {option.label}
-                </ThemedText>
+                  {selected && (
+                    <Feather
+                      name="check"
+                      size={15}
+                      color={colors.white}
+                    />
+                  )}
+                </View>
 
-                <ThemedText
-                  style={[
-                    styles.coinValue,
-                    {
-                      color: active
-                        ? theme.colors.primaryText
-                        : theme.colors.muted,
-                    },
-                  ]}
-                >
-                  {option.value} coins
-                </ThemedText>
+                <View style={styles.habitCopy}>
+                  <Text
+                    style={styles.habitText}
+                  >
+                    {habitName}
+                  </Text>
 
-                <ThemedText
-                  style={[
-                    styles.coinDescription,
-                    {
-                      color: active
-                        ? theme.colors.primaryText
-                        : theme.colors.muted,
-                    },
-                  ]}
-                >
-                  {option.description}
-                </ThemedText>
-              </Pressable>
+                  <Text
+                    style={
+                      styles.habitSubtext
+                    }
+                  >
+                    Build consistency and
+                    strengthen momentum.
+                  </Text>
+                </View>
+
+                <Feather
+                  name={
+                    selected
+                      ? "check-circle"
+                      : "plus-circle"
+                  }
+                  size={22}
+                  color={
+                    selected
+                      ? colors.cyan
+                      : colors.textMuted
+                  }
+                />
+              </AnimatedPressable>
             );
-          })}
-        </View>
+          }
+        )}
+      </AppCard>
 
-        <View
-          style={[
-            styles.previewBox,
-            {
-              backgroundColor: theme.colors.surfaceAlt,
-              borderColor: theme.colors.border,
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.iconCircle,
-              {
-                backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.success,
-              },
-            ]}
-          >
-            <ThemedText style={styles.iconText}>🔥</ThemedText>
+      {selectedHabits.length > 0 && (
+        <AppCard style={styles.selectedCard}>
+          <View style={styles.selectedHeader}>
+            <Text style={styles.selectedTitle}>
+              Your orbit
+            </Text>
+
+            <Text style={styles.selectedCount}>
+              {selectedHabits.length}
+            </Text>
           </View>
 
-          <View style={styles.previewText}>
-            <ThemedText style={styles.previewTitle}>
-              {name.trim() || "Your habit"}
-            </ThemedText>
+          <View style={styles.selectedPills}>
+            {selectedHabits.map(
+              (habitName) => (
+                <AnimatedPressable
+                  key={habitName}
+                  style={styles.selectedPill}
+                  onPress={() =>
+                    toggleHabit(habitName)
+                  }
+                >
+                  <Text
+                    style={
+                      styles.selectedPillText
+                    }
+                  >
+                    {habitName}
+                  </Text>
 
-            <ThemedText muted style={styles.previewSubtitle}>
-              Daily • {getDifficultyForCoins(selectedCoins)} • {selectedCoins}{" "}
-              coins
-            </ThemedText>
+                  <Feather
+                    name="x"
+                    size={13}
+                    color={colors.cyan}
+                  />
+                </AnimatedPressable>
+              )
+            )}
           </View>
-        </View>
-      </ThemedCard>
+        </AppCard>
+      )}
 
-      <ThemedButton
-        onPress={createHabit}
-        disabled={submitting}
-        style={[styles.button, submitting && styles.buttonDisabled]}
-      >
-        {submitting ? "Creating..." : "Create Habit"}
-      </ThemedButton>
+      <AppButton
+        style={styles.primaryButton}
+        onPress={createSelectedHabits}
+        disabled={
+          submitting ||
+          selectedHabits.length === 0
+        }
+        title={
+          submitting
+            ? "Building your orbit..."
+            : `Start with ${selectedHabits.length} habit${
+                selectedHabits.length === 1
+                  ? ""
+                  : "s"
+              }`
+        }
+      />
 
-      <Pressable style={styles.cancelButton} onPress={handleCancel}>
-        <ThemedText muted style={styles.cancelText}>
-          {isFirstHabit ? "Choose a different habit" : "Cancel"}
-        </ThemedText>
-      </Pressable>
-    </ThemedScreen>
+      <AppButton
+        variant="secondary"
+        style={styles.skipButton}
+        onPress={skipHabitSetup}
+        title="Skip for now"
+      />
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+
   container: {
-    padding: 20,
-    paddingTop: 20,
-    paddingBottom: 40,
+    padding: spacing.xl,
+    paddingBottom: 120,
   },
-  subtitle: {
-    marginTop: 8,
-    marginBottom: 14,
-    lineHeight: 20,
+
+  hero: {
+    overflow: "hidden",
+    marginTop: spacing.lg,
+    borderRadius: radii.xxl,
+    padding: spacing.xl,
+    minHeight: 260,
+    justifyContent: "space-between",
   },
-  categoryPill: {
-    alignSelf: "flex-start",
-    borderWidth: 1,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    marginBottom: 20,
+
+  heroGlow: {
+    position: "absolute",
+    width: 240,
+    height: 240,
+    borderRadius: radii.pill,
+    backgroundColor:
+      "rgba(255,255,255,0.08)",
+    top: -120,
+    right: -80,
   },
-  categoryText: {
+
+  heroTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+
+  heroIcon: {
+    width: 78,
+    height: 78,
+    borderRadius: radii.pill,
+    backgroundColor:
+      "rgba(255,255,255,0.16)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  heroBadge: {
+    backgroundColor:
+      "rgba(255,255,255,0.16)",
+    borderRadius: radii.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+
+  heroBadgeText: {
+    color: "#FFFFFF",
     fontWeight: "900",
-    textTransform: "capitalize",
+    fontSize: 12,
   },
-  label: {
+
+  heroTitle: {
+    color: "#FFFFFF",
+    fontSize: 40,
     fontWeight: "900",
-    marginBottom: 8,
-    marginTop: 4,
   },
-  input: {
-    marginBottom: 14,
+
+  heroDescription: {
+    color: "rgba(255,255,255,0.92)",
+    marginTop: spacing.md,
+    lineHeight: 24,
+    fontWeight: "700",
+    fontSize: 16,
   },
-  coinGrid: {
+
+  heroFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+
+  heroHint: {
+    color: "rgba(255,255,255,0.82)",
+    fontWeight: "700",
+  },
+
+  categoryGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 14,
+    gap: spacing.md,
+    marginTop: spacing.xl,
   },
-  coinOption: {
+
+  categoryCard: {
     width: "47%",
-    borderWidth: 1,
-    borderRadius: 18,
-    padding: 12,
+    borderRadius: radii.xl,
+    overflow: "hidden",
   },
-  coinLabel: {
-    fontSize: 15,
-    fontWeight: "900",
+
+  categoryCardActive: {
+    ...shadows.soft,
+    transform: [{ scale: 1.02 }],
   },
-  coinValue: {
-    fontSize: 13,
-    fontWeight: "800",
-    marginTop: 4,
-  },
-  coinDescription: {
-    fontSize: 12,
-    fontWeight: "600",
-    marginTop: 4,
-    lineHeight: 16,
-  },
-  previewBox: {
-    marginTop: 8,
-    borderRadius: 18,
-    padding: 14,
+
+  categoryGradient: {
+    padding: spacing.lg,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    borderWidth: 1,
+    gap: spacing.md,
   },
-  iconCircle: {
-    width: 46,
-    height: 46,
-    borderRadius: 999,
-    justifyContent: "center",
+
+  categoryText: {
+    color: "#FFFFFF",
+    fontWeight: "900",
+    fontSize: 16,
+  },
+
+  habitCard: {
+    marginTop: spacing.xl,
+  },
+
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
+    marginBottom: spacing.md,
+    gap: spacing.md,
+  },
+
+  sectionTitle: {
+    ...typography.h3,
+    color: colors.text,
+  },
+
+  sectionHint: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+
+  sectionBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
     borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radii.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  iconText: {
-    fontSize: 22,
-  },
-  previewText: {
-    flex: 1,
-  },
-  previewTitle: {
-    fontSize: 17,
+
+  sectionBadgeText: {
+    ...typography.caption,
+    color: colors.textSecondary,
     fontWeight: "900",
   },
-  previewSubtitle: {
-    marginTop: 3,
-    fontWeight: "700",
-    textTransform: "capitalize",
+
+  habitRow: {
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    padding: spacing.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: spacing.md,
+    gap: spacing.md,
   },
-  button: {
-    marginTop: 8,
+
+  habitRowSelected: {
+    borderColor: colors.cyan,
+    backgroundColor: `${colors.cyan}12`,
   },
-  buttonDisabled: {
-    opacity: 0.65,
+
+  checkCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: radii.pill,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  cancelButton: {
-    padding: 14,
+
+  checkCircleSelected: {
+    backgroundColor: colors.cyan,
+    borderColor: colors.cyan,
+  },
+
+  habitCopy: {
+    flex: 1,
+  },
+
+  habitText: {
+    ...typography.bodyBold,
+    color: colors.text,
+  },
+
+  habitSubtext: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+    lineHeight: 18,
+  },
+
+  selectedCard: {
+    marginTop: spacing.xl,
+  },
+
+  selectedHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
   },
-  cancelText: {
-    fontWeight: "800",
+
+  selectedTitle: {
+    ...typography.h3,
+    color: colors.text,
+  },
+
+  selectedCount: {
+    fontSize: 28,
+    fontWeight: "900",
+    color: colors.cyan,
+  },
+
+  selectedPills: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+
+  selectedPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.cyan,
+    backgroundColor: `${colors.cyan}12`,
+    borderRadius: radii.pill,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+
+  selectedPillText: {
+    ...typography.caption,
+    color: colors.cyan,
+    fontWeight: "900",
+  },
+
+  primaryButton: {
+    marginTop: spacing.xl,
+  },
+
+  skipButton: {
+    marginTop: spacing.md,
   },
 });

@@ -1,20 +1,25 @@
+import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Alert, Pressable, StyleSheet, View } from "react-native";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
-import { BrandHeader } from "../components/BrandMark";
-import ThemedButton from "../components/ThemedButton";
-import ThemedCard from "../components/ThemedCard";
-import ThemedInput from "../components/ThemedInput";
-import ThemedScreen from "../components/ThemedScreen";
-import ThemedText from "../components/ThemedText";
+import { AppButton } from "../components/AppButton";
+import { AppCard } from "../components/AppCard";
+import { AppInput } from "../components/AppInput";
+import { ScreenHeader } from "../components/ScreenHeader";
 import { useAuth } from "../context/AuthContext";
-import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
+import { colors, radii, spacing, typography } from "../lib/theme";
 
 export default function CreateRewardScreen() {
   const { token } = useAuth();
-  const { theme } = useTheme();
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -37,6 +42,7 @@ export default function CreateRewardScreen() {
     }
 
     if (submitting) return;
+
     setSubmitting(true);
 
     try {
@@ -60,156 +66,189 @@ export default function CreateRewardScreen() {
   }
 
   return (
-    <ThemedScreen
+    <ScrollView
+      style={styles.screen}
       contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
     >
-      <BrandHeader eyebrow="New Reward" title="Create Reward" />
+      <ScreenHeader
+        title="Create Reward"
+        subtitle="Add something worth earning."
+      />
 
-      <ThemedText muted style={styles.subtitle}>
-        Add something worth earning. Make your effort feel real.
-      </ThemedText>
+      <AppCard>
+        <View style={styles.section}>
+          <Text style={styles.label}>Reward name</Text>
+          <AppInput
+            placeholder="e.g. Movie night"
+            value={name}
+            onChangeText={setName}
+          />
+        </View>
 
-      <ThemedCard>
-        <ThemedText style={styles.label}>Reward name</ThemedText>
-        <ThemedInput
-          placeholder="e.g. Movie night"
-          value={name}
-          onChangeText={setName}
-          style={styles.input}
-        />
+        <View style={styles.section}>
+          <Text style={styles.label}>Description</Text>
+          <AppInput
+            placeholder="Optional notes"
+            value={description}
+            onChangeText={setDescription}
+            multiline
+          />
+        </View>
 
-        <ThemedText style={styles.label}>Description</ThemedText>
-        <ThemedInput
-          placeholder="Optional notes"
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          style={styles.input}
-        />
+        <View style={styles.section}>
+          <Text style={styles.label}>Coin cost</Text>
+          <AppInput
+            placeholder="e.g. 50"
+            value={cost}
+            onChangeText={setCost}
+            keyboardType="numeric"
+          />
+        </View>
 
-        <ThemedText style={styles.label}>Coin cost</ThemedText>
-        <ThemedInput
-          placeholder="e.g. 50"
-          value={cost}
-          onChangeText={setCost}
-          keyboardType="numeric"
-          style={styles.input}
-        />
+        <View style={styles.previewBox}>
+          <View style={styles.previewGlow} />
 
-        <View
-          style={[
-            styles.previewBox,
-            {
-              backgroundColor: theme.colors.surfaceAlt,
-              borderColor: theme.colors.border,
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.iconCircle,
-              {
-                backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.success,
-              },
-            ]}
-          >
-            <ThemedText style={styles.iconText}>🎁</ThemedText>
+          <View style={styles.previewTop}>
+            <View style={styles.iconCircle}>
+              <Text style={styles.iconText}>🎁</Text>
+            </View>
+
+            <View style={styles.previewText}>
+              <Text style={styles.previewTitle}>
+                {name.trim() || "Your reward"}
+              </Text>
+
+              <Text style={styles.previewSubtitle}>
+                {cost ? `${cost} coins` : "Set a coin cost"}
+              </Text>
+            </View>
           </View>
 
-          <View style={styles.previewText}>
-            <ThemedText style={styles.previewTitle}>
-              {name.trim() || "Your reward"}
-            </ThemedText>
-            <ThemedText muted style={styles.previewSubtitle}>
-              {cost ? `${cost} coins` : "Set a coin cost"}
-            </ThemedText>
+          <View style={styles.previewFooter}>
+            <Feather name="gift" size={16} color={colors.gold} />
+            <Text style={styles.previewHint}>Make progress feel real.</Text>
           </View>
         </View>
-      </ThemedCard>
+      </AppCard>
 
-      <ThemedButton
-        style={[styles.button, submitting && styles.buttonDisabled]}
+      <AppButton
+        title={submitting ? "Creating..." : "Create Reward"}
         onPress={createReward}
         disabled={submitting}
-      >
-        {submitting ? "Creating..." : "Create Reward"}
-      </ThemedButton>
+        style={styles.button}
+      />
 
       <Pressable
         style={styles.cancelButton}
         onPress={() => router.replace("/(tabs)/rewards")}
       >
-        <ThemedText muted style={styles.cancelText}>
-          Cancel
-        </ThemedText>
+        <Text style={styles.cancelText}>Cancel</Text>
       </Pressable>
-    </ThemedScreen>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+
   container: {
-    padding: 20,
-    paddingTop: 20,
-    paddingBottom: 40,
+    padding: spacing.xl,
+    paddingBottom: 80,
   },
-  subtitle: {
-    marginTop: 8,
-    marginBottom: 20,
-    lineHeight: 20,
+
+  section: {
+    marginBottom: spacing.xl,
   },
+
   label: {
-    fontWeight: "900",
-    marginBottom: 8,
-    marginTop: 4,
+    ...typography.bodyBold,
+    color: colors.text,
+    marginBottom: spacing.sm,
   },
-  input: {
-    marginBottom: 14,
-  },
+
   previewBox: {
-    marginTop: 8,
-    borderRadius: 18,
-    padding: 14,
+    overflow: "hidden",
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    padding: spacing.lg,
+  },
+
+  previewGlow: {
+    position: "absolute",
+    width: 180,
+    height: 180,
+    borderRadius: radii.pill,
+    top: -100,
+    right: -80,
+    backgroundColor: `${colors.gold}16`,
+  },
+
+  previewTop: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    borderWidth: 1,
+    gap: spacing.md,
   },
+
   iconCircle: {
-    width: 46,
-    height: 46,
-    borderRadius: 999,
+    width: 56,
+    height: 56,
+    borderRadius: radii.pill,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: colors.surface,
     borderWidth: 1,
+    borderColor: colors.border,
   },
+
   iconText: {
-    fontSize: 22,
+    fontSize: 28,
   },
+
   previewText: {
     flex: 1,
   },
+
   previewTitle: {
-    fontSize: 17,
-    fontWeight: "900",
+    ...typography.h3,
+    color: colors.text,
   },
+
   previewSubtitle: {
-    marginTop: 3,
-    fontWeight: "700",
+    ...typography.bodyBold,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
   },
-  button: {
-    marginTop: 10,
-  },
-  buttonDisabled: {
-    opacity: 0.65,
-  },
-  cancelButton: {
-    padding: 14,
+
+  previewFooter: {
+    flexDirection: "row",
     alignItems: "center",
+    gap: spacing.sm,
+    marginTop: spacing.lg,
   },
+
+  previewHint: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+
+  button: {
+    marginTop: spacing.xl,
+  },
+
+  cancelButton: {
+    alignItems: "center",
+    paddingVertical: spacing.lg,
+  },
+
   cancelText: {
-    fontWeight: "800",
+    ...typography.bodyBold,
+    color: colors.textMuted,
   },
 });

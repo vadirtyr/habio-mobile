@@ -1,157 +1,134 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { BrandHeader } from "../../components/BrandMark";
-import ThemedButton from "../../components/ThemedButton";
-import ThemedCard from "../../components/ThemedCard";
-import ThemedScreen from "../../components/ThemedScreen";
-import ThemedText from "../../components/ThemedText";
-import { useTheme } from "../../hooks/useTheme";
+import { AppCard } from "../../components/AppCard";
+import { ScreenHeader } from "../../components/ScreenHeader";
+import { SectionTitle } from "../../components/SectionTitle";
+import { colors, radii, spacing, typography } from "../../lib/theme";
 
 export default function MoreScreen() {
-  const { theme } = useTheme();
-
   return (
-    <ThemedScreen>
-      <ScrollView contentContainerStyle={styles.container}>
-        <BrandHeader eyebrow="Explore" title="More" />
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.container}
+      showsVerticalScrollIndicator={false}
+    >
+      <ScreenHeader
+        title="More"
+        subtitle="Manage progress, preferences, and your orbit."
+      />
 
-        <ThemedText muted style={styles.subtitle}>
-          Manage your progress, achievements, quests, and preferences.
-        </ThemedText>
+      <SectionTitle title="Progress" />
 
-        <View style={styles.section}>
-          <ThemedText variant="section">Progress</ThemedText>
+      <AppCard>
+        <MoreRow
+          icon="map-marker-path"
+          label="Quests"
+          description="Take on guided challenges."
+          onPress={() => router.push("/quests")}
+        />
 
-          <ThemedCard style={styles.card}>
-            <MoreRow
-              icon="map-marker-path"
-              label="Quests"
-              description="Take on guided challenges."
-              theme={theme}
-              onPress={() => router.push("/quests")}
-            />
+        <MoreRow
+          icon="trophy-outline"
+          label="Achievements"
+          description="View the milestones you’ve unlocked."
+          onPress={() => router.push("/achievements")}
+          last
+        />
+      </AppCard>
 
-            <MoreRow
-              icon="trophy-outline"
-              label="Achievements"
-              description="View milestones you have unlocked."
-              theme={theme}
-              onPress={() => router.push("/achievements")}
-            />
-          </ThemedCard>
-        </View>
+      <SectionTitle title="App" />
 
-        <View style={styles.section}>
-          <ThemedText variant="section">App</ThemedText>
+      <AppCard>
+        <MoreRow
+          icon="cog-outline"
+          label="Settings"
+          description="Onboarding, privacy, and account options."
+          onPress={() => router.push("/settings")}
+        />
 
-          <ThemedCard style={styles.card}>
-            <MoreRow
-              icon="cog-outline"
-              label="Settings"
-              description="Themes, onboarding, privacy, and account options."
-              theme={theme}
-              onPress={() => router.push("/settings")}
-            />
-
-            <MoreRow
-              icon="palette-outline"
-              label="Theme Store"
-              description="Browse and switch Habio themes."
-              theme={theme}
-              onPress={() => router.push("/theme-store")}
-            />
-          </ThemedCard>
-        </View>
-      </ScrollView>
-    </ThemedScreen>
+        <MoreRow
+          icon="palette-outline"
+          label="Theme Store"
+          description="Browse and switch OurOrbit themes."
+          onPress={() => router.push("/theme-store")}
+          last
+        />
+      </AppCard>
+    </ScrollView>
   );
 }
 
-function MoreRow({ icon, label, description, onPress, theme }) {
+function MoreRow({ icon, label, description, onPress, last = false }) {
   return (
-    <ThemedButton
-      variant="ghost"
-      style={[
-        styles.rowButton,
-        {
-          borderBottomColor: theme.colors.border,
-        },
-      ]}
+    <Pressable
       onPress={onPress}
+      style={({ pressed }) => [
+        styles.row,
+        !last && styles.rowBorder,
+        pressed && styles.rowPressed,
+      ]}
     >
       <View style={styles.rowLeft}>
-        <View
-          style={[
-            styles.iconWrap,
-            { backgroundColor: theme.colors.surfaceAlt },
-          ]}
-        >
-          <MaterialCommunityIcons
-            name={icon}
-            size={22}
-            color={theme.colors.primary}
-          />
+        <View style={styles.iconWrap}>
+          <MaterialCommunityIcons name={icon} size={22} color={colors.cyan} />
         </View>
 
         <View style={styles.rowCopy}>
-          <ThemedText style={styles.rowLabel}>{label}</ThemedText>
-          <ThemedText muted style={styles.rowDescription}>
-            {description}
-          </ThemedText>
+          <Text style={styles.rowLabel}>{label}</Text>
+          <Text style={styles.rowDescription}>{description}</Text>
         </View>
       </View>
 
       <MaterialCommunityIcons
         name="chevron-right"
         size={22}
-        color={theme.colors.textMuted}
+        color={colors.textMuted}
       />
-    </ThemedButton>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+
   container: {
-    padding: 20,
+    padding: spacing.xl,
     paddingBottom: 120,
   },
 
-  subtitle: {
-    marginTop: 8,
-    lineHeight: 20,
-  },
-
-  section: {
-    marginTop: 28,
-  },
-
-  card: {
-    marginTop: 12,
-  },
-
-  rowButton: {
-    paddingVertical: 16,
-    paddingHorizontal: 0,
-    borderBottomWidth: 1,
-    borderRadius: 0,
+  row: {
+    paddingVertical: spacing.lg,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+
+  rowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+  },
+
+  rowPressed: {
+    opacity: 0.72,
   },
 
   rowLeft: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    gap: spacing.md,
   },
 
   iconWrap: {
     width: 44,
     height: 44,
-    borderRadius: 999,
+    borderRadius: radii.pill,
+    backgroundColor: `${colors.cyan}12`,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -161,13 +138,14 @@ const styles = StyleSheet.create({
   },
 
   rowLabel: {
-    fontSize: 16,
-    fontWeight: "900",
+    ...typography.bodyBold,
+    color: colors.text,
   },
 
   rowDescription: {
-    marginTop: 3,
-    fontSize: 13,
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
     lineHeight: 18,
   },
 });

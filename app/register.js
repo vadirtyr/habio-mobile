@@ -7,13 +7,14 @@ import {
     Pressable,
     StyleSheet,
     Text,
-    TextInput,
     View,
 } from "react-native";
 
-import { BrandHeader } from "../components/BrandMark";
+import { AppButton } from "../components/AppButton";
+import { AppCard } from "../components/AppCard";
+import { AppInput } from "../components/AppInput";
 import { api } from "../lib/api";
-import { colors, radii, shadows, spacing } from "../lib/theme";
+import { colors, spacing, typography } from "../lib/theme";
 
 export default function RegisterScreen() {
   const [email, setEmail] = useState("");
@@ -67,64 +68,65 @@ export default function RegisterScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={styles.screen}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <View style={styles.content}>
-        <BrandHeader />
-
-        <Text style={styles.subtitle}>
-          Create your Habio account and start building better days.
-        </Text>
-
-        <View style={styles.card}>
-          <Text style={styles.label}>Email</Text>
-
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
-            placeholder="you@example.com"
-            placeholderTextColor={colors.textMuted}
-          />
-
-          <Text style={styles.label}>Password</Text>
-
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            placeholder="At least 6 characters"
-            placeholderTextColor={colors.textMuted}
-          />
-
-          <Text style={styles.label}>Confirm password</Text>
-
-          <TextInput
-            style={styles.input}
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            secureTextEntry
-            placeholder="Re-enter password"
-            placeholderTextColor={colors.textMuted}
-          />
-
-          <Pressable
-            style={[styles.button, submitting && styles.buttonDisabled]}
-            onPress={handleRegister}
-            disabled={submitting}
-          >
-            <Text style={styles.buttonText}>
-              {submitting ? "Creating account..." : "Create Account"}
-            </Text>
-          </Pressable>
+        <View style={styles.brandBlock}>
+          <Text style={styles.eyebrow}>Create your account</Text>
+          <Text style={styles.title}>Join OurOrbit</Text>
+          <Text style={styles.subtitle}>
+            Start building better days with small actions that compound.
+          </Text>
         </View>
 
-        <Pressable onPress={() => router.replace("/login")}>
+        <AppCard>
+          <View style={styles.section}>
+            <Text style={styles.label}>Email</Text>
+
+            <AppInput
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              placeholder="you@example.com"
+            />
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.label}>Password</Text>
+
+            <AppInput
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              placeholder="At least 6 characters"
+            />
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.label}>Confirm password</Text>
+
+            <AppInput
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+              placeholder="Re-enter password"
+            />
+          </View>
+
+          <AppButton
+            title={submitting ? "Creating account..." : "Create Account"}
+            onPress={handleRegister}
+            disabled={submitting}
+          />
+        </AppCard>
+
+        <Pressable
+          style={styles.loginButton}
+          onPress={() => router.replace("/login")}
+        >
           <Text style={styles.loginText}>Already have an account? Log in</Text>
         </Pressable>
       </View>
@@ -133,68 +135,57 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
     backgroundColor: colors.background,
   },
+
   content: {
     flex: 1,
     justifyContent: "center",
-    padding: spacing.lg,
+    padding: spacing.xl,
   },
+
+  brandBlock: {
+    marginBottom: spacing.xl,
+  },
+
+  eyebrow: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+
+  title: {
+    ...typography.h1,
+    color: colors.text,
+    marginTop: spacing.xs,
+  },
+
   subtitle: {
-    color: colors.textMuted,
+    ...typography.body,
+    color: colors.textSecondary,
     marginTop: spacing.sm,
+  },
+
+  section: {
     marginBottom: spacing.lg,
-    fontSize: 16,
-    fontWeight: "600",
-    lineHeight: 22,
   },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.xl,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.md,
-    ...shadows.card,
-  },
+
   label: {
+    ...typography.bodyBold,
     color: colors.text,
-    fontWeight: "800",
-    marginBottom: 8,
-    marginTop: 4,
+    marginBottom: spacing.sm,
   },
-  input: {
-    backgroundColor: colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    padding: 14,
-    marginBottom: spacing.md,
-    color: colors.text,
-    fontWeight: "600",
-  },
-  button: {
-    backgroundColor: colors.accent,
-    paddingVertical: 16,
-    borderRadius: radii.lg,
+
+  loginButton: {
     alignItems: "center",
-    marginTop: spacing.sm,
-    ...shadows.glow,
+    paddingVertical: spacing.lg,
   },
-  buttonDisabled: {
-    opacity: 0.65,
-  },
-  buttonText: {
-    color: colors.textDark,
-    fontWeight: "900",
-    fontSize: 16,
-  },
+
   loginText: {
-    textAlign: "center",
-    color: colors.accent,
-    fontWeight: "700",
-    marginTop: spacing.sm,
+    ...typography.bodyBold,
+    color: colors.cyan,
   },
 });

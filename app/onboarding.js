@@ -3,29 +3,28 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { BrandHeader } from "../components/BrandMark";
-import ThemedButton from "../components/ThemedButton";
-import ThemedCard from "../components/ThemedCard";
-import ThemedScreen from "../components/ThemedScreen";
-import ThemedText from "../components/ThemedText";
-import { useTheme } from "../hooks/useTheme";
+import { AppButton } from "../components/AppButton";
+import { AppCard } from "../components/AppCard";
+import { colors, radii, spacing, typography } from "../lib/theme";
 
 const slides = [
   {
     eyebrow: "Welcome",
-    title: "Build better days.",
+    title: "Small actions shape your orbit.",
     description:
-      "Habio helps you turn small daily actions into visible progress.",
+      "OurOrbit helps you turn simple daily actions into visible momentum.",
     icon: "sunrise",
+    gradient: ["#14213D", "#25C3D8"],
   },
   {
     eyebrow: "Momentum",
-    title: "Start with a few habits.",
+    title: "Build routines that keep moving.",
     description:
-      "Pick starter habits from guided categories so you can begin without overthinking it.",
+      "Start with realistic habits, complete daily wins, and keep your progress in motion.",
     icon: "repeat",
+    gradient: ["#10213F", "#3B82F6"],
   },
   {
     eyebrow: "Rewards",
@@ -33,14 +32,13 @@ const slides = [
     description:
       "Complete habits and tasks, earn coins, keep streaks alive, and unlock rewards.",
     icon: "gift-outline",
+    gradient: ["#3A220F", "#FF7A6B"],
   },
 ];
 
 export default function OnboardingScreen() {
-  const { theme, themeName, themes } = useTheme();
   const [index, setIndex] = useState(0);
 
-  const activeTheme = themes[themeName];
   const slide = slides[index];
   const isLastSlide = index === slides.length - 1;
 
@@ -64,44 +62,43 @@ export default function OnboardingScreen() {
   }
 
   return (
-    <ThemedScreen>
+    <View style={styles.screen}>
       <View style={styles.container}>
-        <BrandHeader eyebrow="Welcome to" title="Habio" />
+        <View style={styles.brandBlock}>
+          <Text style={styles.eyebrow}>Welcome to</Text>
+          <Text style={styles.brandTitle}>OurOrbit</Text>
+          <Text style={styles.brandSubtitle}>Build better days.</Text>
+        </View>
 
-        <ThemedCard style={styles.heroCard}>
+        <AppCard padded={false} style={styles.heroCard}>
           <LinearGradient
-            colors={
-              activeTheme?.gradient || [
-                theme.colors.background,
-                theme.colors.primary,
-              ]
-            }
+            colors={slide.gradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.gradient}
           >
+            <View style={styles.orbitGlowLarge} />
+            <View style={styles.orbitGlowSmall} />
+
             <View style={styles.gradientTop}>
               <View style={styles.iconCircle}>
                 {slide.icon === "gift-outline" ? (
                   <MaterialCommunityIcons
                     name="gift-outline"
                     size={34}
-                    color="#FFFFFF"
+                    color={colors.white}
                   />
                 ) : (
-                  <Feather name={slide.icon} size={34} color="#FFFFFF" />
+                  <Feather name={slide.icon} size={34} color={colors.white} />
                 )}
               </View>
 
-              <ThemedText style={styles.eyebrow}>{slide.eyebrow}</ThemedText>
+              <Text style={styles.slideEyebrow}>{slide.eyebrow}</Text>
             </View>
 
             <View>
-              <ThemedText style={styles.title}>{slide.title}</ThemedText>
-
-              <ThemedText style={styles.description}>
-                {slide.description}
-              </ThemedText>
+              <Text style={styles.title}>{slide.title}</Text>
+              <Text style={styles.description}>{slide.description}</Text>
             </View>
           </LinearGradient>
 
@@ -112,42 +109,23 @@ export default function OnboardingScreen() {
                   key={i}
                   style={[
                     styles.dot,
-                    {
-                      backgroundColor:
-                        i === index
-                          ? theme.colors.primary
-                          : theme.colors.surfaceAlt,
-                      borderColor: theme.colors.border,
-                    },
-                    i === index && styles.activeDot,
+                    i === index ? styles.activeDot : styles.inactiveDot,
                   ]}
                 />
               ))}
             </View>
 
             <View style={styles.featureGrid}>
-              <FeaturePill
-                icon="check-circle"
-                label="Track"
-                theme={theme}
-              />
-
-              <FeaturePill
-                icon="zap"
-                label="Streaks"
-                theme={theme}
-              />
-
-              <FeaturePill
-                icon="award"
-                label="Rewards"
-                theme={theme}
-              />
+              <FeaturePill icon="check-circle" label="Track" />
+              <FeaturePill icon="zap" label="Streaks" />
+              <FeaturePill icon="award" label="Rewards" />
             </View>
 
-            <ThemedButton style={styles.primaryButton} onPress={nextSlide}>
-              {isLastSlide ? "Choose Starter Habits" : "Continue"}
-            </ThemedButton>
+            <AppButton
+              style={styles.primaryButton}
+              onPress={nextSlide}
+              title={isLastSlide ? "Choose Starter Habits" : "Continue"}
+            />
 
             <View style={styles.bottomActions}>
               <Pressable
@@ -155,66 +133,104 @@ export default function OnboardingScreen() {
                 disabled={index === 0}
                 style={styles.secondaryAction}
               >
-                <ThemedText
-                  muted
+                <Text
                   style={[
                     styles.secondaryText,
                     index === 0 && styles.disabledText,
                   ]}
                 >
                   Back
-                </ThemedText>
+                </Text>
               </Pressable>
 
-              {!isLastSlide && (
+              {!isLastSlide ? (
                 <Pressable onPress={finishOnboarding}>
-                  <ThemedText muted style={styles.secondaryText}>
-                    Skip setup
-                  </ThemedText>
+                  <Text style={styles.secondaryText}>Skip setup</Text>
                 </Pressable>
+              ) : (
+                <View style={styles.secondaryAction} />
               )}
             </View>
           </View>
-        </ThemedCard>
+        </AppCard>
       </View>
-    </ThemedScreen>
+    </View>
   );
 }
 
-function FeaturePill({ icon, label, theme }) {
+function FeaturePill({ icon, label }) {
   return (
-    <View
-      style={[
-        styles.featurePill,
-        {
-          backgroundColor: theme.colors.surfaceAlt,
-          borderColor: theme.colors.border,
-        },
-      ]}
-    >
-      <Feather name={icon} size={16} color={theme.colors.primary} />
-      <ThemedText style={styles.featureText}>{label}</ThemedText>
+    <View style={styles.featurePill}>
+      <Feather name={icon} size={16} color={colors.cyan} />
+      <Text style={styles.featureText}>{label}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+
   container: {
     flex: 1,
-    padding: 20,
+    padding: spacing.xl,
     justifyContent: "center",
   },
 
+  brandBlock: {
+    marginBottom: spacing.xl,
+  },
+
+  eyebrow: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+
+  brandTitle: {
+    ...typography.h1,
+    color: colors.text,
+    marginTop: spacing.xs,
+  },
+
+  brandSubtitle: {
+    ...typography.bodyBold,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+
   heroCard: {
-    marginTop: 24,
-    padding: 0,
     overflow: "hidden",
   },
 
   gradient: {
-    minHeight: 330,
-    padding: 24,
+    minHeight: 350,
+    padding: spacing.xl,
     justifyContent: "space-between",
+    overflow: "hidden",
+  },
+
+  orbitGlowLarge: {
+    position: "absolute",
+    width: 260,
+    height: 260,
+    borderRadius: radii.pill,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    top: -130,
+    right: -100,
+  },
+
+  orbitGlowSmall: {
+    position: "absolute",
+    width: 160,
+    height: 160,
+    borderRadius: radii.pill,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    bottom: -90,
+    left: -70,
   },
 
   gradientTop: {
@@ -226,13 +242,13 @@ const styles = StyleSheet.create({
   iconCircle: {
     width: 76,
     height: 76,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     backgroundColor: "rgba(255,255,255,0.16)",
     alignItems: "center",
     justifyContent: "center",
   },
 
-  eyebrow: {
+  slideEyebrow: {
     color: "rgba(255,255,255,0.82)",
     fontSize: 13,
     fontWeight: "900",
@@ -241,12 +257,10 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    color: "#FFFFFF",
+    color: colors.white,
     fontSize: 38,
     fontWeight: "900",
     lineHeight: 44,
-    textShadowColor: "rgba(0,0,0,0.22)",
-    textShadowRadius: 8,
   },
 
   description: {
@@ -254,44 +268,50 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "700",
-    marginTop: 14,
-    textShadowColor: "rgba(0,0,0,0.18)",
-    textShadowRadius: 6,
+    marginTop: spacing.lg,
   },
 
   cardBody: {
-    padding: 20,
+    padding: spacing.xl,
   },
 
   progressRow: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: 8,
+    gap: spacing.sm,
   },
 
   dot: {
-    width: 10,
     height: 10,
-    borderRadius: 999,
+    borderRadius: radii.pill,
+  },
+
+  inactiveDot: {
+    width: 10,
+    backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
+    borderColor: colors.border,
   },
 
   activeDot: {
-    width: 26,
+    width: 28,
+    backgroundColor: colors.cyan,
   },
 
   featureGrid: {
     flexDirection: "row",
-    gap: 8,
-    marginTop: 20,
+    gap: spacing.sm,
+    marginTop: spacing.xl,
   },
 
   featurePill: {
     flex: 1,
     borderWidth: 1,
-    borderRadius: 999,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radii.pill,
     paddingVertical: 10,
-    paddingHorizontal: 10,
+    paddingHorizontal: spacing.sm,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
@@ -299,27 +319,29 @@ const styles = StyleSheet.create({
   },
 
   featureText: {
-    fontSize: 12,
+    ...typography.caption,
+    color: colors.text,
     fontWeight: "900",
   },
 
   primaryButton: {
-    marginTop: 22,
+    marginTop: spacing.xl,
   },
 
   bottomActions: {
-    marginTop: 18,
+    marginTop: spacing.lg,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
 
   secondaryAction: {
-    minWidth: 70,
+    minWidth: 90,
   },
 
   secondaryText: {
-    fontWeight: "800",
+    ...typography.bodyBold,
+    color: colors.textMuted,
   },
 
   disabledText: {

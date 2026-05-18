@@ -2,14 +2,7 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Modal,
-  StyleSheet,
-  View,
-} from "react-native";
+import { Alert, FlatList, Modal, StyleSheet, Text, View } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
@@ -21,23 +14,29 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { AnimatedPressable } from "../../components/AnimatedPressable";
-import { BrandHeader } from "../../components/BrandMark";
-import ThemedButton from "../../components/ThemedButton";
-import ThemedCard from "../../components/ThemedCard";
-import ThemedText from "../../components/ThemedText";
+import { AppButton } from "../../components/AppButton";
+import { AppCard } from "../../components/AppCard";
+import { EmptyState } from "../../components/EmptyState";
+import { LevelUpModal } from "../../components/LevelUpModal";
+import { OrbitProgressBar } from "../../components/OrbitProgressBar";
+import { ScreenHeader } from "../../components/ScreenHeader";
+import { SectionTitle } from "../../components/SectionTitle";
+import { SkeletonCard } from "../../components/SkeletonCard";
+import { XPGainToast } from "../../components/XPGainToast";
 import { useAuth } from "../../context/AuthContext";
-import { useTheme } from "../../hooks/useTheme";
 import { api } from "../../lib/api";
+import { colors, radii, spacing, typography } from "../../lib/theme";
 
 export default function HabitsScreen() {
   const { token } = useAuth();
-  const { theme } = useTheme();
 
   const [habits, setHabits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState(null);
   const [balance, setBalance] = useState(0);
   const [streakCelebration, setStreakCelebration] = useState(null);
+  const [levelUp, setLevelUp] = useState(null);
+  const [xpToast, setXpToast] = useState(0);
 
   const completedToday = useMemo(
     () => habits.filter((habit) => habit.completed_today).length,
@@ -46,7 +45,9 @@ export default function HabitsScreen() {
 
   const activeToday = Math.max(habits.length - completedToday, 0);
   const progressPercent =
-    habits.length === 0 ? 0 : Math.round((completedToday / habits.length) * 100);
+    habits.length === 0
+      ? 0
+      : Math.round((completedToday / habits.length) * 100);
 
   async function fetchHabits() {
     if (!token) return;
@@ -81,6 +82,19 @@ export default function HabitsScreen() {
     try {
       const data = await api.post(`/habits/${habitId}/complete`, {}, token);
 
+      if (data.leveled_up) {
+        setLevelUp({
+          oldLevel: data.old_level,
+          newLevel: data.new_level,
+        });
+      }
+
+      setXpToast(data.xp_earned || 0);
+
+      setTimeout(() => {
+        setXpToast(0);
+      }, 900);
+
       await Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Success
       );
@@ -89,8 +103,10 @@ export default function HabitsScreen() {
 
       setMessage(
         bonus > 0
-          ? `+${data.base_coins} coins • +${bonus} streak bonus`
-          : `+${data.coins_earned} coins`
+          ? `+${data.base_coins} coins • +${bonus} streak bonus • +${
+              data.xp_earned || 0
+            } XP`
+          : `+${data.coins_earned} coins • +${data.xp_earned || 0} XP`
       );
 
       setBalance(data.new_balance);
@@ -161,22 +177,29 @@ export default function HabitsScreen() {
 
   if (loading) {
     return (
-      <View
-        style={[styles.center, { backgroundColor: theme.colors.background }]}
-      >
-        <ActivityIndicator color={theme.colors.primary} />
-        <ThemedText muted style={styles.loadingText}>
-          Loading habits...
-        </ThemedText>
+      <View style={styles.container}>
+        <ScreenHeader title="Habits" subtitle="Loading your orbit..." />
+
+        <SkeletonCard lines={2} />
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonCard compact />
       </View>
     );
   }
 
   return (
-    <View
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-    >
-      <StreakCelebration data={streakCelebration} theme={theme} />
+    <View style={styles.container}>
+      <StreakCelebration data={streakCelebration} />
+
+      <LevelUpModal
+        visible={!!levelUp}
+        oldLevel={levelUp?.oldLevel}
+        newLevel={levelUp?.newLevel}
+        onClose={() => setLevelUp(null)}
+      />
+
+      <XPGainToast xp={xpToast} />
 
       <FlatList
         data={habits}
@@ -184,107 +207,82 @@ export default function HabitsScreen() {
         refreshing={loading}
         onRefresh={fetchHabits}
         contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View>
-            <BrandHeader eyebrow="Daily rhythm" title="Habits" />
+            <ScreenHeader
+              title="Habits"
+              subtitle="Keep your daily orbit moving."
+            />
 
-            <ThemedCard style={styles.summaryCard}>
-              <View
-                style={[
-                  styles.summaryGlow,
-                  { backgroundColor: `${theme.colors.primary}18` },
-                ]}
-              />
+            <AppCard style={styles.summaryCard}>
+              <View style={styles.summaryGlowCyan} />
+              <View style={styles.summaryGlowCoral} />
 
               <View style={styles.summaryTop}>
                 <View style={styles.summaryCopy}>
-                  <ThemedText muted style={styles.summaryLabel}>
-                    Today
-                  </ThemedText>
+                  <Text style={styles.summaryLabel}>Today</Text>
 
-                  <ThemedText style={styles.summaryTitle}>
+                  <Text style={styles.summaryTitle}>
                     {completedToday} of {habits.length} complete
-                  </ThemedText>
+                  </Text>
 
-                  <ThemedText muted style={styles.summarySubtitle}>
+                  <Text style={styles.summarySubtitle}>
                     {activeToday > 0
                       ? `${activeToday} still waiting for you`
                       : habits.length > 0
                       ? "All habits complete. Great work."
                       : "Create your first habit to start."}
-                  </ThemedText>
+                  </Text>
                 </View>
 
-                <View
-                  style={[
-                    styles.coinBadge,
-                    { backgroundColor: theme.colors.surfaceAlt },
-                  ]}
-                >
+                <View style={styles.coinBadge}>
                   <MaterialCommunityIcons
                     name="circle-multiple"
                     size={24}
-                    color={theme.colors.primary}
+                    color={colors.gold}
                   />
-                  <ThemedText style={styles.coinValue}>{balance}</ThemedText>
+                  <Text style={styles.coinValue}>{balance}</Text>
                 </View>
               </View>
 
-              <View
-                style={[
-                  styles.progressOuter,
-                  { backgroundColor: theme.colors.surfaceAlt },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.progressInner,
-                    {
-                      width: `${progressPercent}%`,
-                      backgroundColor: theme.colors.primary,
-                    },
-                  ]}
-                />
-              </View>
+              <OrbitProgressBar
+                percent={progressPercent}
+                style={styles.progressBar}
+              />
 
               <View style={styles.summaryActions}>
-                <ThemedButton
+                <AppButton
+                  title="Add Habit"
                   style={styles.summaryButton}
                   onPress={() => router.push("/create-habit")}
-                >
-                  Add Habit
-                </ThemedButton>
+                />
               </View>
-            </ThemedCard>
+            </AppCard>
 
-            <RewardToast message={message} theme={theme} />
+            <RewardToast message={message} />
 
-            {habits.length > 0 && (
-              <View style={styles.sectionHeader}>
-                <ThemedText variant="section">Today’s Habits</ThemedText>
-                <ThemedText muted style={styles.sectionHint}>
-                  Swipe right to complete. Swipe left to delete.
-                </ThemedText>
-              </View>
-            )}
+            {habits.length > 0 ? (
+              <SectionTitle
+                title="Today’s Habits"
+                action={<Text style={styles.sectionHint}>Swipe to manage</Text>}
+              />
+            ) : null}
           </View>
         }
         ListEmptyComponent={
-          <ThemedCard style={styles.emptyCard}>
-            <Feather name="target" size={34} color={theme.colors.primary} />
+          <AppCard style={styles.emptyCard}>
+            <EmptyState
+              title="No habits yet"
+              description="Start small. Pick one habit you can repeat every day."
+              icon={<Feather name="target" size={38} color={colors.cyan} />}
+            />
 
-            <ThemedText variant="section" style={styles.emptyTitle}>
-              No habits yet
-            </ThemedText>
-
-            <ThemedText muted style={styles.emptyText}>
-              Start small. Pick one habit you can repeat every day.
-            </ThemedText>
-
-            <ThemedButton onPress={() => router.push("/create-habit")}>
-              Create Habit
-            </ThemedButton>
-          </ThemedCard>
+            <AppButton
+              title="Create Habit"
+              onPress={() => router.push("/create-habit")}
+            />
+          </AppCard>
         }
         renderItem={({ item, index }) => {
           const tier = getStreakTier(item.streak || 0);
@@ -294,8 +292,7 @@ export default function HabitsScreen() {
               renderLeftActions={() =>
                 item.completed_today ? null : (
                   <SwipeAction
-                    theme={theme}
-                    color={theme.colors.success}
+                    color={colors.success}
                     icon="check-circle"
                     label="Done"
                   />
@@ -303,8 +300,7 @@ export default function HabitsScreen() {
               }
               renderRightActions={() => (
                 <SwipeAction
-                  theme={theme}
-                  color={theme.colors.danger}
+                  color={colors.danger}
                   icon="trash-2"
                   label="Delete"
                   white
@@ -319,7 +315,6 @@ export default function HabitsScreen() {
                 <HabitCard
                   item={item}
                   tier={tier}
-                  theme={theme}
                   onComplete={() => completeHabit(item.id)}
                   onEdit={() =>
                     router.push({
@@ -345,9 +340,9 @@ export default function HabitsScreen() {
   );
 }
 
-function HabitCard({ item, tier, theme, onComplete, onEdit }) {
+function HabitCard({ item, tier, onComplete, onEdit }) {
   return (
-    <ThemedCard
+    <AppCard
       style={[
         styles.card,
         item.completed_today && styles.completedCard,
@@ -360,11 +355,9 @@ function HabitCard({ item, tier, theme, onComplete, onEdit }) {
             styles.checkCircle,
             {
               backgroundColor: item.completed_today
-                ? theme.colors.success
-                : theme.colors.surfaceAlt,
-              borderColor: item.completed_today
-                ? theme.colors.success
-                : theme.colors.border,
+                ? colors.success
+                : colors.surfaceAlt,
+              borderColor: item.completed_today ? colors.success : colors.border,
             },
           ]}
           onPress={onComplete}
@@ -372,139 +365,109 @@ function HabitCard({ item, tier, theme, onComplete, onEdit }) {
           <Feather
             name={item.completed_today ? "check" : "circle"}
             size={22}
-            color={
-              item.completed_today
-                ? theme.colors.primaryText
-                : theme.colors.textMuted
-            }
+            color={item.completed_today ? colors.white : colors.textMuted}
           />
         </AnimatedPressable>
 
         <View style={styles.cardCopy}>
           <View style={styles.nameRow}>
-            <ThemedText
-              style={[
-                styles.name,
-                item.completed_today && styles.completedText,
-              ]}
+            <Text
+              style={[styles.name, item.completed_today && styles.completedText]}
             >
               {item.name}
-            </ThemedText>
+            </Text>
 
-            <AnimatedPressable
-              style={[
-                styles.iconButton,
-                {
-                  backgroundColor: theme.colors.surfaceAlt,
-                  borderColor: theme.colors.border,
-                },
-              ]}
-              onPress={onEdit}
-            >
-              <Feather name="edit-3" size={15} color={theme.colors.text} />
+            <AnimatedPressable style={styles.iconButton} onPress={onEdit}>
+              <Feather name="edit-3" size={15} color={colors.text} />
             </AnimatedPressable>
           </View>
 
           {!!item.description && (
-            <ThemedText muted style={styles.description}>
-              {item.description}
-            </ThemedText>
+            <Text style={styles.description}>{item.description}</Text>
           )}
         </View>
       </View>
 
       <View style={styles.cardFooter}>
         <CompactPill
-          theme={theme}
           icon="trending-up"
           text={`${item.streak || 0} day streak`}
-          color={getStreakColor(item.streak, theme)}
+          color={getStreakColor(item.streak)}
           highlight={(item.streak || 0) >= 3}
         />
 
         <CompactPill
-          theme={theme}
           icon={tier.icon}
           text={tier.label}
           color={tier.color}
           highlight
         />
 
-        <CompactPill
-          theme={theme}
-          icon="award"
-          text={getNextBonusText(item.streak || 0)}
-        />
+        <CompactPill icon="award" text={getNextBonusText(item.streak || 0)} />
       </View>
 
       <View style={styles.statusRow}>
-        <ThemedText
+        <Text
           style={[
             styles.status,
             {
-              color: item.completed_today
-                ? theme.colors.success
-                : theme.colors.textMuted,
+              color: item.completed_today ? colors.success : colors.textMuted,
             },
           ]}
         >
           {item.completed_today ? "Completed today" : "Tap or swipe to complete"}
-        </ThemedText>
+        </Text>
 
-        <ThemedText muted style={styles.coinText}>
+        <Text style={styles.coinText}>
           +{item.coins_per_completion || 0} coins
-        </ThemedText>
+        </Text>
       </View>
-    </ThemedCard>
+    </AppCard>
   );
 }
 
-function CompactPill({
-  theme,
-  icon,
-  text,
-  color = null,
-  highlight = false,
-}) {
-  const pillColor = color || theme.colors.textMuted;
+function CompactPill({ icon, text, color = null, highlight = false }) {
+  const pillColor = color || colors.textMuted;
 
   return (
     <View
       style={[
         styles.compactPill,
         {
-          backgroundColor: theme.colors.surfaceAlt,
-          borderColor: highlight ? pillColor : theme.colors.border,
+          backgroundColor: highlight ? `${pillColor}12` : colors.surfaceAlt,
+          borderColor: highlight ? pillColor : colors.border,
         },
       ]}
     >
       <Feather name={icon} size={13} color={pillColor} />
-      <ThemedText
-        muted={!highlight}
-        style={[styles.compactPillText, highlight && { color: pillColor }]}
+      <Text
+        style={[
+          styles.compactPillText,
+          { color: highlight ? pillColor : colors.textSecondary },
+        ]}
       >
         {text}
-      </ThemedText>
+      </Text>
     </View>
   );
 }
 
-function SwipeAction({ theme, color, icon, label, white = false }) {
+function SwipeAction({ color, icon, label, white = false }) {
   return (
     <View style={[styles.swipeAction, { backgroundColor: color }]}>
       <Feather
         name={icon}
         size={22}
-        color={white ? "white" : theme.colors.primaryText}
+        color={white ? colors.white : colors.primary}
       />
-      <ThemedText
+      <Text
         style={[
           styles.swipeText,
-          { color: white ? "white" : theme.colors.primaryText },
+          { color: white ? colors.white : colors.primary },
         ]}
       >
         {label}
-      </ThemedText>
+      </Text>
     </View>
   );
 }
@@ -513,7 +476,7 @@ function getStreakTier(streak = 0) {
   if (streak >= 30) {
     return {
       label: "Legendary",
-      color: "#F59E0B",
+      color: colors.gold,
       icon: "award",
       glow: true,
     };
@@ -522,7 +485,7 @@ function getStreakTier(streak = 0) {
   if (streak >= 14) {
     return {
       label: "Elite",
-      color: "#8B5CF6",
+      color: colors.blue,
       icon: "zap",
       glow: true,
     };
@@ -531,7 +494,7 @@ function getStreakTier(streak = 0) {
   if (streak >= 7) {
     return {
       label: "On Fire",
-      color: "#EF4444",
+      color: colors.coral,
       icon: "zap",
       glow: false,
     };
@@ -540,7 +503,7 @@ function getStreakTier(streak = 0) {
   if (streak >= 3) {
     return {
       label: "Momentum",
-      color: "#10B981",
+      color: colors.success,
       icon: "trending-up",
       glow: false,
     };
@@ -548,16 +511,16 @@ function getStreakTier(streak = 0) {
 
   return {
     label: "Starter",
-    color: "#94A3B8",
+    color: colors.textMuted,
     icon: "circle",
     glow: false,
   };
 }
 
-function getStreakColor(streak = 0, theme) {
-  if (streak >= 7) return "#EF4444";
-  if (streak >= 3) return theme.colors.success;
-  return theme.colors.textMuted;
+function getStreakColor(streak = 0) {
+  if (streak >= 7) return colors.coral;
+  if (streak >= 3) return colors.success;
+  return colors.textMuted;
 }
 
 function getNextBonusText(streak = 0) {
@@ -585,7 +548,7 @@ function AnimatedCard({ children, index = 0 }) {
   return <Animated.View style={animatedStyle}>{children}</Animated.View>;
 }
 
-function RewardToast({ message, theme }) {
+function RewardToast({ message }) {
   const scale = useSharedValue(0.9);
   const opacity = useSharedValue(0);
 
@@ -607,24 +570,13 @@ function RewardToast({ message, theme }) {
   if (!message) return null;
 
   return (
-    <Animated.View
-      style={[
-        styles.toast,
-        animatedStyle,
-        {
-          backgroundColor: theme.colors.surfaceAlt,
-          borderColor: theme.colors.success,
-        },
-      ]}
-    >
-      <ThemedText style={[styles.toastText, { color: theme.colors.success }]}>
-        {message}
-      </ThemedText>
+    <Animated.View style={[styles.toast, animatedStyle]}>
+      <Text style={styles.toastText}>{message}</Text>
     </Animated.View>
   );
 }
 
-function StreakCelebration({ data, theme }) {
+function StreakCelebration({ data }) {
   const scale = useSharedValue(0.55);
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(28);
@@ -651,61 +603,21 @@ function StreakCelebration({ data, theme }) {
   return (
     <Modal visible transparent animationType="none">
       <View style={styles.celebrationOverlay}>
-        <Animated.View
-          style={[
-            styles.celebrationCard,
-            animatedStyle,
-            {
-              backgroundColor: theme.colors.surface,
-              borderColor: theme.colors.success,
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.celebrationIconCircle,
-              { backgroundColor: theme.colors.success },
-            ]}
-          >
-            <Feather name="zap" size={38} color={theme.colors.primaryText} />
+        <Animated.View style={[styles.celebrationCard, animatedStyle]}>
+          <View style={styles.celebrationIconCircle}>
+            <Feather name="zap" size={38} color={colors.white} />
           </View>
 
-          <ThemedText
-            style={[styles.celebrationEyebrow, { color: theme.colors.success }]}
-          >
-            Streak Bonus
-          </ThemedText>
+          <Text style={styles.celebrationEyebrow}>Streak Bonus</Text>
 
-          <ThemedText style={styles.celebrationTitle}>
-            {data.streak} days strong
-          </ThemedText>
+          <Text style={styles.celebrationTitle}>{data.streak} days strong</Text>
 
-          <ThemedText muted style={styles.celebrationName}>
-            {data.habitName}
-          </ThemedText>
+          <Text style={styles.celebrationName}>{data.habitName}</Text>
 
-          <View
-            style={[
-              styles.bonusBreakdown,
-              {
-                backgroundColor: theme.colors.surfaceAlt,
-                borderColor: theme.colors.border,
-              },
-            ]}
-          >
-            <ThemedText muted style={styles.bonusLine}>
-              Base coins: +{data.baseCoins}
-            </ThemedText>
-
-            <ThemedText muted style={styles.bonusLine}>
-              Bonus coins: +{data.bonus}
-            </ThemedText>
-
-            <ThemedText
-              style={[styles.bonusTotal, { color: theme.colors.success }]}
-            >
-              Total earned: +{data.total}
-            </ThemedText>
+          <View style={styles.bonusBreakdown}>
+            <Text style={styles.bonusLine}>Base coins: +{data.baseCoins}</Text>
+            <Text style={styles.bonusLine}>Bonus coins: +{data.bonus}</Text>
+            <Text style={styles.bonusTotal}>Total earned: +{data.total}</Text>
           </View>
         </Animated.View>
       </View>
@@ -716,42 +628,43 @@ function StreakCelebration({ data, theme }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xl,
   },
 
   listContent: {
     paddingBottom: 120,
   },
 
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  loadingText: {
-    marginTop: 10,
-  },
-
   summaryCard: {
-    marginTop: 16,
     overflow: "hidden",
   },
 
-  summaryGlow: {
+  summaryGlowCyan: {
     position: "absolute",
     width: 220,
     height: 220,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     top: -130,
     right: -90,
+    backgroundColor: `${colors.cyan}18`,
+  },
+
+  summaryGlowCoral: {
+    position: "absolute",
+    width: 160,
+    height: 160,
+    borderRadius: radii.pill,
+    bottom: -100,
+    left: -70,
+    backgroundColor: `${colors.coral}12`,
   },
 
   summaryTop: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 14,
+    gap: spacing.lg,
   },
 
   summaryCopy: {
@@ -759,52 +672,48 @@ const styles = StyleSheet.create({
   },
 
   summaryLabel: {
-    fontSize: 12,
-    fontWeight: "900",
+    ...typography.caption,
+    color: colors.textSecondary,
     textTransform: "uppercase",
+    letterSpacing: 0.8,
   },
 
   summaryTitle: {
-    fontSize: 26,
-    fontWeight: "900",
-    marginTop: 4,
+    ...typography.h2,
+    color: colors.text,
+    marginTop: spacing.xs,
   },
 
   summarySubtitle: {
-    marginTop: 6,
-    fontWeight: "700",
-    lineHeight: 20,
+    ...typography.bodyBold,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
   },
 
   coinBadge: {
     minWidth: 78,
     minHeight: 78,
-    borderRadius: 24,
+    borderRadius: radii.lg,
     alignItems: "center",
     justifyContent: "center",
-    padding: 12,
+    padding: spacing.md,
+    backgroundColor: `${colors.gold}18`,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
 
   coinValue: {
-    marginTop: 4,
-    fontSize: 20,
-    fontWeight: "900",
+    ...typography.h3,
+    color: colors.text,
+    marginTop: spacing.xs,
   },
 
-  progressOuter: {
-    height: 11,
-    borderRadius: 999,
-    overflow: "hidden",
-    marginTop: 20,
-  },
-
-  progressInner: {
-    height: "100%",
-    borderRadius: 999,
+  progressBar: {
+    marginTop: spacing.xl,
   },
 
   summaryActions: {
-    marginTop: 18,
+    marginTop: spacing.lg,
   },
 
   summaryButton: {
@@ -813,47 +722,33 @@ const styles = StyleSheet.create({
   },
 
   toast: {
-    marginTop: 12,
+    marginTop: spacing.md,
     borderWidth: 1,
-    padding: 12,
-    borderRadius: 18,
+    padding: spacing.md,
+    borderRadius: radii.md,
     alignItems: "center",
+    backgroundColor: `${colors.success}12`,
+    borderColor: colors.success,
   },
 
   toastText: {
-    fontWeight: "900",
+    ...typography.bodyBold,
+    color: colors.success,
     textAlign: "center",
-  },
-
-  sectionHeader: {
-    marginTop: 28,
-    marginBottom: 12,
   },
 
   sectionHint: {
-    marginTop: 4,
-    fontSize: 13,
-    lineHeight: 18,
+    ...typography.caption,
+    color: colors.textMuted,
   },
 
   emptyCard: {
-    marginTop: 20,
+    marginTop: spacing.xl,
     alignItems: "center",
   },
 
-  emptyTitle: {
-    marginTop: 10,
-  },
-
-  emptyText: {
-    marginTop: 6,
-    marginBottom: 16,
-    textAlign: "center",
-    lineHeight: 20,
-  },
-
   card: {
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
 
   completedCard: {
@@ -862,14 +757,14 @@ const styles = StyleSheet.create({
 
   cardTop: {
     flexDirection: "row",
-    gap: 12,
+    gap: spacing.md,
     alignItems: "flex-start",
   },
 
   checkCircle: {
     width: 46,
     height: 46,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
@@ -882,47 +777,51 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: spacing.sm,
   },
 
   name: {
     flex: 1,
-    fontSize: 18,
-    fontWeight: "900",
+    ...typography.h3,
+    color: colors.text,
   },
 
   completedText: {
     textDecorationLine: "line-through",
+    color: colors.textMuted,
   },
 
   iconButton: {
     width: 36,
     height: 36,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
     alignItems: "center",
     justifyContent: "center",
   },
 
   description: {
-    marginTop: 4,
-    lineHeight: 20,
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
   },
 
   cardFooter: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    marginTop: 14,
+    gap: spacing.sm,
+    marginTop: spacing.lg,
   },
 
   compactPill: {
-    borderRadius: 999,
+    borderRadius: radii.pill,
     paddingVertical: 7,
-    paddingHorizontal: 10,
+    paddingHorizontal: spacing.md,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: spacing.sm,
     borderWidth: 1,
   },
 
@@ -932,29 +831,30 @@ const styles = StyleSheet.create({
   },
 
   statusRow: {
-    marginTop: 12,
+    marginTop: spacing.md,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
+    gap: spacing.md,
   },
 
   status: {
     flex: 1,
-    fontWeight: "800",
+    ...typography.caption,
   },
 
   coinText: {
-    fontWeight: "800",
+    ...typography.caption,
+    color: colors.textSecondary,
   },
 
   swipeAction: {
     justifyContent: "center",
     alignItems: "center",
     width: 96,
-    borderRadius: 18,
-    marginBottom: 12,
-    gap: 4,
+    borderRadius: radii.md,
+    marginBottom: spacing.md,
+    gap: spacing.xs,
   },
 
   swipeText: {
@@ -963,65 +863,72 @@ const styles = StyleSheet.create({
 
   celebrationOverlay: {
     flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.78)",
+    backgroundColor: "rgba(15, 23, 42, 0.72)",
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
+    padding: spacing.xl,
   },
 
   celebrationCard: {
     width: "100%",
-    borderRadius: 24,
-    padding: 24,
+    borderRadius: radii.xl,
+    padding: spacing.xl,
     borderWidth: 1,
+    borderColor: colors.success,
+    backgroundColor: colors.surface,
     alignItems: "center",
   },
 
   celebrationIconCircle: {
     width: 74,
     height: 74,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 14,
+    marginBottom: spacing.lg,
+    backgroundColor: colors.success,
   },
 
   celebrationEyebrow: {
-    fontSize: 14,
-    fontWeight: "900",
+    ...typography.caption,
+    color: colors.success,
     textTransform: "uppercase",
     letterSpacing: 1,
   },
 
   celebrationTitle: {
-    fontSize: 30,
-    fontWeight: "900",
-    marginTop: 8,
+    ...typography.h1,
+    color: colors.text,
+    marginTop: spacing.sm,
     textAlign: "center",
   },
 
   celebrationName: {
-    fontWeight: "800",
-    marginTop: 4,
+    ...typography.bodyBold,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
     textAlign: "center",
   },
 
   bonusBreakdown: {
-    marginTop: 20,
-    borderRadius: 18,
-    padding: 14,
+    marginTop: spacing.xl,
+    borderRadius: radii.md,
+    padding: spacing.lg,
     width: "100%",
     borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
   },
 
   bonusLine: {
-    fontWeight: "800",
-    marginBottom: 6,
+    ...typography.bodyBold,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
   },
 
   bonusTotal: {
-    fontWeight: "900",
-    fontSize: 18,
-    marginTop: 4,
+    ...typography.h3,
+    color: colors.success,
+    marginTop: spacing.xs,
   },
 });

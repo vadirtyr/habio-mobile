@@ -1,13 +1,13 @@
-import { Feather } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   StyleSheet,
-  View,
+  Text,
+  View
 } from "react-native";
 import Animated, {
   useAnimatedStyle,
@@ -19,16 +19,23 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { AnimatedPressable } from "../../components/AnimatedPressable";
-import { BrandHeader } from "../../components/BrandMark";
-import ThemedCard from "../../components/ThemedCard";
-import ThemedText from "../../components/ThemedText";
+import { AppCard } from "../../components/AppCard";
+import { EmptyState } from "../../components/EmptyState";
+import { ScreenHeader } from "../../components/ScreenHeader";
+import { SectionTitle } from "../../components/SectionTitle";
+import { SkeletonCard } from "../../components/SkeletonCard";
 import { useAuth } from "../../context/AuthContext";
-import { useTheme } from "../../hooks/useTheme";
 import { api } from "../../lib/api";
+
+import {
+  colors,
+  radii,
+  spacing,
+  typography,
+} from "../../lib/theme";
 
 export default function QuestsScreen() {
   const { token } = useAuth();
-  const { theme } = useTheme();
 
   const [quests, setQuests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -51,16 +58,23 @@ export default function QuestsScreen() {
     if (!token) return;
 
     try {
-      const data = await api.post(`/quests/${quest.id}/claim`, {}, token);
+      const data = await api.post(
+        `/quests/${quest.id}/claim`,
+        {},
+        token
+      );
 
       await Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Success
       );
 
       setMessage(`+${data.coins_earned} coins claimed`);
+
       fetchQuests();
 
-      setTimeout(() => setMessage(null), 2000);
+      setTimeout(() => {
+        setMessage(null);
+      }, 2200);
     } catch (error) {
       Alert.alert("Error", error.message);
     }
@@ -76,222 +90,150 @@ export default function QuestsScreen() {
     }, [token])
   );
 
-  if (loading) {
-    return (
-      <View
-        style={[styles.center, { backgroundColor: theme.colors.background }]}
-      >
-        <ActivityIndicator color={theme.colors.primary} />
-        <ThemedText muted style={styles.loadingText}>
-          Loading quests...
-        </ThemedText>
-      </View>
-    );
-  }
+  const claimableCount = useMemo(
+    () =>
+      quests.filter(
+        (q) => q.claimable && !q.claimed
+      ).length,
+    [quests]
+  );
 
-  const claimableCount = quests.filter((q) => q.claimable && !q.claimed).length;
+  if (loading) {
+  return (
+    <View style={styles.container}>
+      <ScreenHeader
+        title="Quests"
+        subtitle="Loading quests..."
+      />
+
+      <SkeletonCard lines={2} />
+      <SkeletonCard />
+      <SkeletonCard />
+      <SkeletonCard compact />
+    </View>
+  );
+}
 
   return (
-    <View
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-    >
+    <View style={styles.container}>
       <FlatList
         data={quests}
         keyExtractor={(item) => item.id}
         refreshing={loading}
         onRefresh={fetchQuests}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={
+          styles.listContent
+        }
+        showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View>
-            <BrandHeader eyebrow="Daily & Weekly" title="Quests" />
+            <ScreenHeader
+              title="Quests"
+              subtitle="Complete challenges and earn bonus rewards."
+            />
 
-            <ThemedCard style={styles.summaryCard}>
-              <ThemedText muted style={styles.summaryLabel}>
-                Ready to Claim
-              </ThemedText>
-              <ThemedText style={styles.summaryValue}>
-                {claimableCount}
-              </ThemedText>
-              <ThemedText muted style={styles.summarySub}>
-                Complete quests to boost your coins.
-              </ThemedText>
-            </ThemedCard>
+            <AppCard
+              style={styles.summaryCard}
+            >
+              <View
+                style={
+                  styles.summaryGlowPrimary
+                }
+              />
 
-            <RewardToast message={message} theme={theme} />
+              <View
+                style={
+                  styles.summaryGlowSecondary
+                }
+              />
+
+              <View
+                style={styles.summaryTop}
+              >
+                <View>
+                  <Text
+                    style={
+                      styles.summaryLabel
+                    }
+                  >
+                    Ready to Claim
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.summaryValue
+                    }
+                  >
+                    {claimableCount}
+                  </Text>
+                </View>
+
+                <View
+                  style={
+                    styles.summaryIcon
+                  }
+                >
+                  <MaterialCommunityIcons
+                    name="flag-checkered"
+                    size={34}
+                    color={colors.cyan}
+                  />
+                </View>
+              </View>
+
+              <Text
+                style={styles.summarySub}
+              >
+                Complete quests to
+                accelerate your orbit.
+              </Text>
+            </AppCard>
+
+            <RewardToast
+              message={message}
+            />
+
+            {quests.length > 0 ? (
+              <SectionTitle
+                title="Active Quests"
+                action={
+                  <Text
+                    style={
+                      styles.sectionHint
+                    }
+                  >
+                    Daily & Weekly
+                  </Text>
+                }
+              />
+            ) : null}
           </View>
         }
         ListEmptyComponent={
-          <ThemedCard style={styles.emptyCard}>
-            <Feather name="flag" size={36} color={theme.colors.primary} />
-            <ThemedText variant="section" style={styles.emptyTitle}>
-              No quests available
-            </ThemedText>
-            <ThemedText muted style={styles.emptyText}>
-              Complete habits and tasks to make progress.
-            </ThemedText>
-          </ThemedCard>
+          <AppCard
+            style={styles.emptyCard}
+          >
+            <EmptyState
+              title="No quests available"
+              description="Complete habits and tasks to unlock challenges."
+              icon={
+                <Feather
+                  name="flag"
+                  size={42}
+                  color={colors.cyan}
+                />
+              }
+            />
+          </AppCard>
         }
         renderItem={({ item, index }) => (
           <AnimatedCard index={index}>
-            <ThemedCard
-              style={[
-                styles.card,
-                item.claimable &&
-                  !item.claimed && {
-                    borderColor: theme.colors.success,
-                  },
-              ]}
-            >
-              <View style={styles.cardTop}>
-                <View
-                  style={[
-                    styles.iconCircle,
-                    {
-                      backgroundColor:
-                        item.completed || item.claimable
-                          ? theme.colors.surfaceAlt
-                          : theme.colors.surfaceAlt,
-                      borderColor:
-                        item.completed || item.claimable
-                          ? theme.colors.success
-                          : theme.colors.border,
-                    },
-                  ]}
-                >
-                  <Feather
-                    name={
-                      item.claimed
-                        ? "check-circle"
-                        : item.claimable
-                        ? "target"
-                        : "flag"
-                    }
-                    size={22}
-                    color={
-                      item.claimed || item.claimable
-                        ? theme.colors.success
-                        : theme.colors.muted
-                    }
-                  />
-                </View>
-
-                <View style={styles.cardText}>
-                  <ThemedText style={styles.name}>{item.name}</ThemedText>
-                  <ThemedText muted style={styles.description}>
-                    {item.description}
-                  </ThemedText>
-                </View>
-              </View>
-
-              <View
-                style={[
-                  styles.progressOuter,
-                  { backgroundColor: theme.colors.surfaceAlt },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.progressInner,
-                    {
-                      width: `${item.percent || 0}%`,
-                      backgroundColor: item.completed
-                        ? theme.colors.success
-                        : theme.colors.primary,
-                    },
-                  ]}
-                />
-              </View>
-
-              <View style={styles.metaRow}>
-                <MetaPill
-                  theme={theme}
-                  icon={
-                    <Feather
-                      name="trending-up"
-                      size={14}
-                      color={theme.colors.muted}
-                    />
-                  }
-                  text={`${item.progress || 0} / ${item.target}`}
-                />
-
-                <MetaPill
-                  theme={theme}
-                  icon={
-                    <Feather
-                      name="gift"
-                      size={14}
-                      color={theme.colors.muted}
-                    />
-                  }
-                  text={`${item.reward} coins`}
-                />
-
-                <MetaPill
-                  theme={theme}
-                  icon={
-                    <Feather
-                      name="calendar"
-                      size={14}
-                      color={theme.colors.muted}
-                    />
-                  }
-                  text={item.period === "daily" ? "Daily" : "Weekly"}
-                />
-              </View>
-
-              <AnimatedPressable
-                style={[
-                  styles.claimButton,
-                  {
-                    backgroundColor:
-                      item.claimable && !item.claimed
-                        ? theme.colors.success
-                        : theme.colors.surfaceAlt,
-                    borderColor:
-                      item.claimable && !item.claimed
-                        ? theme.colors.success
-                        : theme.colors.border,
-                    opacity: !item.claimable || item.claimed ? 0.75 : 1,
-                  },
-                ]}
-                disabled={!item.claimable || item.claimed}
-                onPress={() => claimQuest(item)}
-              >
-                <Feather
-                  name={
-                    item.claimed
-                      ? "check-circle"
-                      : item.claimable
-                      ? "gift"
-                      : "clock"
-                  }
-                  size={17}
-                  color={
-                    item.claimable && !item.claimed
-                      ? theme.colors.primaryText
-                      : theme.colors.muted
-                  }
-                />
-                <ThemedText
-                  style={[
-                    styles.claimButtonText,
-                    {
-                      color:
-                        item.claimable && !item.claimed
-                          ? theme.colors.primaryText
-                          : theme.colors.muted,
-                    },
-                  ]}
-                >
-                  {item.claimed
-                    ? "Claimed"
-                    : item.claimable
-                    ? "Claim Reward"
-                    : "In Progress"}
-                </ThemedText>
-              </AnimatedPressable>
-            </ThemedCard>
+            <QuestCard
+              item={item}
+              onClaim={() =>
+                claimQuest(item)
+              }
+            />
           </AnimatedCard>
         )}
       />
@@ -299,60 +241,299 @@ export default function QuestsScreen() {
   );
 }
 
-function MetaPill({ theme, icon, text }) {
+function QuestCard({ item, onClaim }) {
+  const completed =
+    item.completed ||
+    item.claimed;
+
+  const claimable =
+    item.claimable &&
+    !item.claimed;
+
   return (
-    <View
+    <AppCard
       style={[
-        styles.metaPill,
-        {
-          backgroundColor: theme.colors.surfaceAlt,
-          borderColor: theme.colors.border,
+        styles.card,
+        claimable && {
+          borderColor:
+            colors.success,
         },
       ]}
     >
+      <View
+        style={styles.cardGlow}
+      />
+
+      <View style={styles.cardTop}>
+        <View
+          style={[
+            styles.iconCircle,
+            {
+              backgroundColor:
+                completed
+                  ? `${colors.success}16`
+                  : colors.surfaceAlt,
+
+              borderColor:
+                completed
+                  ? colors.success
+                  : colors.border,
+            },
+          ]}
+        >
+          <Feather
+            name={
+              item.claimed
+                ? "check-circle"
+                : claimable
+                ? "target"
+                : "flag"
+            }
+            size={22}
+            color={
+              completed
+                ? colors.success
+                : colors.textMuted
+            }
+          />
+        </View>
+
+        <View style={styles.cardText}>
+          <Text style={styles.name}>
+            {item.name}
+          </Text>
+
+          <Text
+            style={styles.description}
+          >
+            {item.description}
+          </Text>
+        </View>
+      </View>
+
+      <View
+        style={styles.progressOuter}
+      >
+        <View
+          style={[
+            styles.progressInner,
+            {
+              width: `${
+                item.percent || 0
+              }%`,
+
+              backgroundColor:
+                completed
+                  ? colors.success
+                  : colors.cyan,
+            },
+          ]}
+        />
+      </View>
+
+      <View style={styles.metaRow}>
+        <MetaPill
+          icon={
+            <Feather
+              name="trending-up"
+              size={14}
+              color={
+                colors.textMuted
+              }
+            />
+          }
+          text={`${
+            item.progress || 0
+          } / ${item.target}`}
+        />
+
+        <MetaPill
+          icon={
+            <Feather
+              name="gift"
+              size={14}
+              color={
+                colors.textMuted
+              }
+            />
+          }
+          text={`${item.reward} coins`}
+        />
+
+        <MetaPill
+          icon={
+            <Feather
+              name="calendar"
+              size={14}
+              color={
+                colors.textMuted
+              }
+            />
+          }
+          text={
+            item.period === "daily"
+              ? "Daily"
+              : "Weekly"
+          }
+        />
+      </View>
+
+      <AnimatedPressable
+        style={[
+          styles.claimButton,
+          {
+            backgroundColor:
+              claimable
+                ? colors.success
+                : colors.surfaceAlt,
+
+            borderColor:
+              claimable
+                ? colors.success
+                : colors.border,
+
+            opacity:
+              !claimable ||
+              item.claimed
+                ? 0.75
+                : 1,
+          },
+        ]}
+        disabled={
+          !claimable || item.claimed
+        }
+        onPress={onClaim}
+      >
+        <Feather
+          name={
+            item.claimed
+              ? "check-circle"
+              : claimable
+              ? "gift"
+              : "clock"
+          }
+          size={17}
+          color={
+            claimable
+              ? colors.white
+              : colors.textMuted
+          }
+        />
+
+        <Text
+          style={[
+            styles.claimButtonText,
+            {
+              color: claimable
+                ? colors.white
+                : colors.textMuted,
+            },
+          ]}
+        >
+          {item.claimed
+            ? "Claimed"
+            : claimable
+            ? "Claim Reward"
+            : "In Progress"}
+        </Text>
+      </AnimatedPressable>
+    </AppCard>
+  );
+}
+
+function MetaPill({ icon, text }) {
+  return (
+    <View style={styles.metaPill}>
       {icon}
-      <ThemedText muted style={styles.metaText}>
+
+      <Text style={styles.metaText}>
         {text}
-      </ThemedText>
+      </Text>
     </View>
   );
 }
 
-function AnimatedCard({ children, index = 0 }) {
+function AnimatedCard({
+  children,
+  index = 0,
+}) {
   const opacity = useSharedValue(0);
-  const translateY = useSharedValue(18);
+  const translateY =
+    useSharedValue(18);
 
   useEffect(() => {
-    opacity.value = withDelay(index * 55, withTiming(1, { duration: 260 }));
-    translateY.value = withDelay(index * 55, withTiming(0, { duration: 260 }));
+    opacity.value = withDelay(
+      index * 55,
+      withTiming(1, {
+        duration: 260,
+      })
+    );
+
+    translateY.value = withDelay(
+      index * 55,
+      withTiming(0, {
+        duration: 260,
+      })
+    );
   }, []);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: translateY.value }],
-  }));
+  const animatedStyle =
+    useAnimatedStyle(() => ({
+      opacity: opacity.value,
+      transform: [
+        {
+          translateY:
+            translateY.value,
+        },
+      ],
+    }));
 
-  return <Animated.View style={animatedStyle}>{children}</Animated.View>;
+  return (
+    <Animated.View
+      style={animatedStyle}
+    >
+      {children}
+    </Animated.View>
+  );
 }
 
-function RewardToast({ message, theme }) {
-  const scale = useSharedValue(0.9);
-  const opacity = useSharedValue(0);
+function RewardToast({ message }) {
+  const scale =
+    useSharedValue(0.9);
+
+  const opacity =
+    useSharedValue(0);
 
   useEffect(() => {
     if (message) {
-      opacity.value = withTiming(1, { duration: 180 });
-      scale.value = withSequence(withSpring(1.08), withSpring(1));
+      opacity.value = withTiming(1, {
+        duration: 180,
+      });
+
+      scale.value = withSequence(
+        withSpring(1.08),
+        withSpring(1)
+      );
     } else {
-      opacity.value = withTiming(0, { duration: 150 });
-      scale.value = withTiming(0.9, { duration: 150 });
+      opacity.value = withTiming(0, {
+        duration: 150,
+      });
+
+      scale.value = withTiming(0.9, {
+        duration: 150,
+      });
     }
   }, [message]);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ scale: scale.value }],
-  }));
+  const animatedStyle =
+    useAnimatedStyle(() => ({
+      opacity: opacity.value,
+      transform: [
+        {
+          scale: scale.value,
+        },
+      ],
+    }));
 
   if (!message) return null;
 
@@ -361,15 +542,11 @@ function RewardToast({ message, theme }) {
       style={[
         styles.toast,
         animatedStyle,
-        {
-          backgroundColor: theme.colors.surfaceAlt,
-          borderColor: theme.colors.success,
-        },
       ]}
     >
-      <ThemedText style={[styles.toastText, { color: theme.colors.success }]}>
+      <Text style={styles.toastText}>
         {message}
-      </ThemedText>
+      </Text>
     </Animated.View>
   );
 }
@@ -377,127 +554,242 @@ function RewardToast({ message, theme }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    backgroundColor:
+      colors.background,
+    paddingHorizontal:
+      spacing.xl,
+    paddingTop: spacing.xl,
   },
+
   listContent: {
     paddingBottom: 120,
   },
+
   center: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor:
+      colors.background,
   },
+
   loadingText: {
-    marginTop: 10,
-    fontWeight: "700",
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
   },
+
   summaryCard: {
-    marginTop: 14,
+    overflow: "hidden",
   },
+
+  summaryGlowPrimary: {
+    position: "absolute",
+    width: 220,
+    height: 220,
+    borderRadius:
+      radii.pill,
+    top: -130,
+    right: -90,
+    backgroundColor:
+      `${colors.cyan}16`,
+  },
+
+  summaryGlowSecondary: {
+    position: "absolute",
+    width: 160,
+    height: 160,
+    borderRadius:
+      radii.pill,
+    bottom: -100,
+    left: -70,
+    backgroundColor:
+      `${colors.success}10`,
+  },
+
+  summaryTop: {
+    flexDirection: "row",
+    justifyContent:
+      "space-between",
+    alignItems: "center",
+  },
+
   summaryLabel: {
-    fontSize: 12,
-    fontWeight: "900",
-    textTransform: "uppercase",
+    ...typography.caption,
+    color:
+      colors.textSecondary,
+    textTransform:
+      "uppercase",
+    letterSpacing: 0.8,
   },
+
   summaryValue: {
     fontSize: 42,
     fontWeight: "900",
-    marginTop: 4,
+    color: colors.text,
+    marginTop: spacing.xs,
   },
+
   summarySub: {
-    marginTop: 4,
-    fontWeight: "700",
+    ...typography.bodyBold,
+    color:
+      colors.textSecondary,
+    marginTop: spacing.md,
   },
-  toast: {
-    marginTop: 12,
+
+  summaryIcon: {
+    width: 72,
+    height: 72,
+    borderRadius:
+      radii.pill,
+    alignItems: "center",
+    justifyContent:
+      "center",
+    backgroundColor:
+      `${colors.cyan}16`,
     borderWidth: 1,
-    padding: 12,
-    borderRadius: 18,
-    alignItems: "center",
+    borderColor:
+      colors.border,
   },
+
+  sectionHint: {
+    ...typography.caption,
+    color: colors.textMuted,
+  },
+
+  toast: {
+    marginTop: spacing.md,
+    borderWidth: 1,
+    padding: spacing.md,
+    borderRadius:
+      radii.lg,
+    alignItems: "center",
+    backgroundColor:
+      `${colors.success}12`,
+    borderColor:
+      colors.success,
+  },
+
   toastText: {
-    fontWeight: "900",
+    ...typography.bodyBold,
+    color: colors.success,
   },
+
   emptyCard: {
-    marginTop: 20,
+    marginTop: spacing.xl,
     alignItems: "center",
   },
-  emptyTitle: {
-    marginTop: 10,
-  },
-  emptyText: {
-    textAlign: "center",
-    marginTop: 6,
-  },
+
   card: {
-    marginBottom: 14,
+    marginBottom: spacing.md,
+    overflow: "hidden",
   },
+
+  cardGlow: {
+    position: "absolute",
+    width: 160,
+    height: 160,
+    borderRadius:
+      radii.pill,
+    top: -100,
+    right: -70,
+    backgroundColor:
+      `${colors.cyan}08`,
+  },
+
   cardTop: {
     flexDirection: "row",
-    gap: 12,
+    gap: spacing.md,
     alignItems: "flex-start",
   },
+
   iconCircle: {
     width: 48,
     height: 48,
-    borderRadius: 999,
-    justifyContent: "center",
+    borderRadius:
+      radii.pill,
+    justifyContent:
+      "center",
     alignItems: "center",
     borderWidth: 1,
   },
+
   cardText: {
     flex: 1,
   },
+
   name: {
-    fontSize: 18,
-    fontWeight: "900",
+    ...typography.h3,
+    color: colors.text,
   },
+
   description: {
-    marginTop: 4,
-    lineHeight: 20,
-    fontWeight: "600",
+    ...typography.body,
+    color:
+      colors.textSecondary,
+    marginTop: spacing.xs,
   },
+
   progressOuter: {
-    marginTop: 14,
+    marginTop: spacing.lg,
     height: 10,
-    borderRadius: 999,
+    borderRadius:
+      radii.pill,
     overflow: "hidden",
+    backgroundColor:
+      colors.surfaceAlt,
   },
+
   progressInner: {
     height: "100%",
-    borderRadius: 999,
+    borderRadius:
+      radii.pill,
   },
+
   metaRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    marginTop: 14,
+    gap: spacing.sm,
+    marginTop: spacing.lg,
   },
+
   metaPill: {
-    borderRadius: 999,
+    borderRadius:
+      radii.pill,
     paddingVertical: 7,
-    paddingHorizontal: 10,
+    paddingHorizontal:
+      spacing.md,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: spacing.sm,
     borderWidth: 1,
+    backgroundColor:
+      colors.surfaceAlt,
+    borderColor:
+      colors.border,
   },
+
   metaText: {
     fontWeight: "900",
     fontSize: 12,
+    color:
+      colors.textSecondary,
   },
+
   claimButton: {
-    marginTop: 14,
-    padding: 14,
-    borderRadius: 18,
+    marginTop: spacing.lg,
+    padding: spacing.lg,
+    borderRadius:
+      radii.lg,
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent:
+      "center",
     borderWidth: 1,
     flexDirection: "row",
-    gap: 8,
+    gap: spacing.sm,
   },
+
   claimButtonText: {
-    fontWeight: "900",
+    ...typography.bodyBold,
   },
 });

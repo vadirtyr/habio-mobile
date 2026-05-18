@@ -1,23 +1,55 @@
+import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Alert, Pressable, StyleSheet, View } from "react-native";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
-import { BrandHeader } from "../components/BrandMark";
-import ThemedButton from "../components/ThemedButton";
-import ThemedCard from "../components/ThemedCard";
-import ThemedInput from "../components/ThemedInput";
-import ThemedScreen from "../components/ThemedScreen";
-import ThemedText from "../components/ThemedText";
+import { AppButton } from "../components/AppButton";
+import { AppCard } from "../components/AppCard";
+import { AppInput } from "../components/AppInput";
+import { ScreenHeader } from "../components/ScreenHeader";
 import { useAuth } from "../context/AuthContext";
-import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
-import { shadows } from "../lib/theme/shadows";
+
+import {
+  colors,
+  radii,
+  shadows,
+  spacing,
+  typography,
+} from "../lib/theme";
 
 const COIN_OPTIONS = [
-  { label: "Low", value: 5, description: "Small/easy effort" },
-  { label: "Medium", value: 10, description: "Normal effort" },
-  { label: "High", value: 20, description: "Hard effort" },
-  { label: "Life Changing", value: 50, description: "Major effort" },
+  {
+    label: "Low",
+    value: 5,
+    description: "Small daily effort",
+    accent: colors.success,
+  },
+  {
+    label: "Medium",
+    value: 10,
+    description: "Balanced routine",
+    accent: colors.cyan,
+  },
+  {
+    label: "High",
+    value: 20,
+    description: "Focused challenge",
+    accent: colors.blue,
+  },
+  {
+    label: "Life Changing",
+    value: 50,
+    description: "Major commitment",
+    accent: colors.coral,
+  },
 ];
 
 function getDifficultyForCoins(coins) {
@@ -41,23 +73,32 @@ function getInitialCoins(params) {
 
 export default function EditHabitScreen() {
   const { token } = useAuth();
-  const { theme } = useTheme();
   const params = useLocalSearchParams();
 
   const [name, setName] = useState(params.name || "");
-  const [description, setDescription] = useState(params.description || "");
-  const [selectedCoins, setSelectedCoins] = useState(getInitialCoins(params));
-  const [submitting, setSubmitting] = useState(false);
+  const [description, setDescription] =
+    useState(params.description || "");
+
+  const [selectedCoins, setSelectedCoins] =
+    useState(getInitialCoins(params));
+
+  const [submitting, setSubmitting] =
+    useState(false);
 
   async function updateHabit() {
     if (!token) return;
 
     if (!name.trim()) {
-      Alert.alert("Missing name", "Enter a habit name.");
+      Alert.alert(
+        "Missing name",
+        "Enter a habit name."
+      );
+
       return;
     }
 
     if (submitting) return;
+
     setSubmitting(true);
 
     try {
@@ -66,8 +107,12 @@ export default function EditHabitScreen() {
         {
           name: name.trim(),
           description: description.trim(),
-          frequency: params.frequency || "daily",
-          difficulty: getDifficultyForCoins(selectedCoins),
+          frequency:
+            params.frequency || "daily",
+          difficulty:
+            getDifficultyForCoins(
+              selectedCoins
+            ),
           custom_coins: selectedCoins,
           icon: params.icon || "flame",
         },
@@ -83,248 +128,326 @@ export default function EditHabitScreen() {
   }
 
   return (
-    <ThemedScreen
+    <ScrollView
+      style={styles.screen}
       contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
     >
-      <BrandHeader eyebrow="Edit Habit" title="Update Habit" />
+      <ScreenHeader
+        title="Update Habit"
+        subtitle="Adjust the habit without losing momentum."
+      />
 
-      <ThemedText muted style={styles.subtitle}>
-        Adjust the habit details without losing your progress.
-      </ThemedText>
+      <AppCard>
+        <View style={styles.section}>
+          <Text style={styles.label}>
+            Habit name
+          </Text>
 
-      <ThemedCard>
-        <ThemedText style={styles.label}>Habit name</ThemedText>
+          <AppInput
+            placeholder="Habit name"
+            value={name}
+            onChangeText={setName}
+          />
+        </View>
 
-        <ThemedInput
-          placeholder="Habit name"
-          value={name}
-          onChangeText={setName}
-          style={styles.input}
-        />
+        <View style={styles.section}>
+          <Text style={styles.label}>
+            Description
+          </Text>
 
-        <ThemedText style={styles.label}>Description</ThemedText>
+          <AppInput
+            placeholder="Optional notes"
+            value={description}
+            onChangeText={setDescription}
+            multiline
+          />
+        </View>
 
-        <ThemedInput
-          placeholder="Optional notes"
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          style={styles.input}
-        />
+        <View style={styles.section}>
+          <Text style={styles.label}>
+            Coin value
+          </Text>
 
-        <ThemedText style={styles.label}>Coin value</ThemedText>
+          <View style={styles.coinGrid}>
+            {COIN_OPTIONS.map((option) => {
+              const active =
+                selectedCoins === option.value;
 
-        <View style={styles.coinGrid}>
-          {COIN_OPTIONS.map((option) => {
-            const active = selectedCoins === option.value;
+              return (
+                <Pressable
+                  key={option.value}
+                  onPress={() =>
+                    setSelectedCoins(option.value)
+                  }
+                  style={[
+                    styles.coinOption,
+                    {
+                      borderColor: active
+                        ? option.accent
+                        : colors.border,
 
-            return (
-              <Pressable
-                key={option.value}
-                onPress={() => setSelectedCoins(option.value)}
-                style={[
-                  styles.coinOption,
-                  {
-                    backgroundColor: active
-                      ? theme.colors.primary
-                      : theme.colors.surfaceAlt,
-                    borderColor: active
-                      ? theme.colors.primary
-                      : theme.colors.border,
-                  },
-                  active && {
-                    shadowColor: theme.colors.primary,
-                    ...shadows.medium,
-                  },
-                ]}
+                      backgroundColor: active
+                        ? `${option.accent}12`
+                        : colors.surfaceAlt,
+                    },
+
+                    active && styles.coinActive,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.coinDot,
+                      {
+                        backgroundColor:
+                          option.accent,
+                      },
+                    ]}
+                  />
+
+                  <Text
+                    style={[
+                      styles.coinLabel,
+                      active && {
+                        color: option.accent,
+                      },
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+
+                  <Text
+                    style={styles.coinValue}
+                  >
+                    {option.value} coins
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.coinDescription
+                    }
+                  >
+                    {option.description}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.previewBox}>
+          <View style={styles.previewGlow} />
+
+          <View style={styles.previewTop}>
+            <View style={styles.iconCircle}>
+              <Text style={styles.iconText}>
+                🔥
+              </Text>
+            </View>
+
+            <View style={styles.previewText}>
+              <Text style={styles.previewTitle}>
+                {name.trim() ||
+                  "Your habit"}
+              </Text>
+
+              <Text
+                style={styles.previewSubtitle}
               >
-                <ThemedText
-                  style={[
-                    styles.coinLabel,
-                    {
-                      color: active
-                        ? theme.colors.primaryText
-                        : theme.colors.text,
-                    },
-                  ]}
-                >
-                  {option.label}
-                </ThemedText>
-
-                <ThemedText
-                  style={[
-                    styles.coinValue,
-                    {
-                      color: active
-                        ? theme.colors.primaryText
-                        : theme.colors.muted,
-                    },
-                  ]}
-                >
-                  {option.value} coins
-                </ThemedText>
-
-                <ThemedText
-                  style={[
-                    styles.coinDescription,
-                    {
-                      color: active
-                        ? theme.colors.primaryText
-                        : theme.colors.muted,
-                    },
-                  ]}
-                >
-                  {option.description}
-                </ThemedText>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <View
-          style={[
-            styles.previewBox,
-            {
-              backgroundColor: theme.colors.surfaceAlt,
-              borderColor: theme.colors.border,
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.iconCircle,
-              {
-                backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.success,
-              },
-            ]}
-          >
-            <ThemedText style={styles.iconText}>🔥</ThemedText>
+                {params.frequency ||
+                  "daily"}{" "}
+                •{" "}
+                {getDifficultyForCoins(
+                  selectedCoins
+                )}{" "}
+                • {selectedCoins} coins
+              </Text>
+            </View>
           </View>
 
-          <View style={styles.previewText}>
-            <ThemedText style={styles.previewTitle}>
-              {name.trim() || "Your habit"}
-            </ThemedText>
+          <View style={styles.previewFooter}>
+            <Feather
+              name="repeat"
+              size={16}
+              color={colors.cyan}
+            />
 
-            <ThemedText muted style={styles.previewSubtitle}>
-              {params.frequency || "daily"} •{" "}
-              {getDifficultyForCoins(selectedCoins)} • {selectedCoins} coins
-            </ThemedText>
+            <Text style={styles.previewHint}>
+              Momentum compounds daily.
+            </Text>
           </View>
         </View>
-      </ThemedCard>
+      </AppCard>
 
-      <ThemedButton
-        style={[styles.button, submitting && styles.buttonDisabled]}
+      <AppButton
+        title={
+          submitting
+            ? "Saving..."
+            : "Save Changes"
+        }
         onPress={updateHabit}
         disabled={submitting}
-      >
-        {submitting ? "Saving..." : "Save Changes"}
-      </ThemedButton>
+        style={styles.button}
+      />
 
       <Pressable
         style={styles.cancelButton}
-        onPress={() => router.replace("/(tabs)/habits")}
+        onPress={() =>
+          router.replace("/(tabs)/habits")
+        }
       >
-        <ThemedText muted style={styles.cancelText}>
+        <Text style={styles.cancelText}>
           Cancel
-        </ThemedText>
+        </Text>
       </Pressable>
-    </ThemedScreen>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+
   container: {
-    padding: 20,
-    paddingTop: 20,
-    paddingBottom: 40,
+    padding: spacing.xl,
+    paddingBottom: 80,
   },
-  subtitle: {
-    marginTop: 8,
-    marginBottom: 14,
-    lineHeight: 20,
+
+  section: {
+    marginBottom: spacing.xl,
   },
+
   label: {
-    fontWeight: "900",
-    marginBottom: 8,
-    marginTop: 4,
+    ...typography.bodyBold,
+    color: colors.text,
+    marginBottom: spacing.sm,
   },
-  input: {
-    marginBottom: 14,
-  },
+
   coinGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 14,
+    gap: spacing.md,
   },
+
   coinOption: {
     width: "47%",
+    borderRadius: radii.xl,
     borderWidth: 1,
-    borderRadius: 18,
-    padding: 12,
+    padding: spacing.lg,
+    backgroundColor: colors.surfaceAlt,
   },
+
+  coinActive: {
+    ...shadows.soft,
+  },
+
+  coinDot: {
+    width: 10,
+    height: 10,
+    borderRadius: radii.pill,
+    marginBottom: spacing.md,
+  },
+
   coinLabel: {
-    fontSize: 15,
-    fontWeight: "900",
+    ...typography.bodyBold,
+    color: colors.text,
   },
+
   coinValue: {
-    fontSize: 13,
-    fontWeight: "800",
-    marginTop: 4,
+    ...typography.h3,
+    color: colors.text,
+    marginTop: spacing.xs,
   },
+
   coinDescription: {
-    fontSize: 12,
-    fontWeight: "600",
-    marginTop: 4,
-    lineHeight: 16,
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
+    lineHeight: 18,
   },
+
   previewBox: {
-    marginTop: 8,
-    borderRadius: 18,
-    padding: 14,
+    overflow: "hidden",
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    padding: spacing.lg,
+  },
+
+  previewGlow: {
+    position: "absolute",
+    width: 180,
+    height: 180,
+    borderRadius: radii.pill,
+    top: -100,
+    right: -80,
+    backgroundColor: `${colors.cyan}14`,
+  },
+
+  previewTop: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    borderWidth: 1,
+    gap: spacing.md,
   },
+
   iconCircle: {
-    width: 46,
-    height: 46,
-    borderRadius: 999,
+    width: 56,
+    height: 56,
+    borderRadius: radii.pill,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: colors.surface,
     borderWidth: 1,
+    borderColor: colors.border,
   },
+
   iconText: {
-    fontSize: 22,
+    fontSize: 28,
   },
+
   previewText: {
     flex: 1,
   },
+
   previewTitle: {
-    fontSize: 17,
-    fontWeight: "900",
+    ...typography.h3,
+    color: colors.text,
   },
+
   previewSubtitle: {
-    marginTop: 3,
-    fontWeight: "700",
+    ...typography.bodyBold,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
     textTransform: "capitalize",
   },
-  button: {
-    marginTop: 10,
-  },
-  buttonDisabled: {
-    opacity: 0.65,
-  },
-  cancelButton: {
-    padding: 14,
+
+  previewFooter: {
+    flexDirection: "row",
     alignItems: "center",
+    gap: spacing.sm,
+    marginTop: spacing.lg,
   },
+
+  previewHint: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+
+  button: {
+    marginTop: spacing.xl,
+  },
+
+  cancelButton: {
+    alignItems: "center",
+    paddingVertical: spacing.lg,
+  },
+
   cancelText: {
-    fontWeight: "800",
+    ...typography.bodyBold,
+    color: colors.textMuted,
   },
 });

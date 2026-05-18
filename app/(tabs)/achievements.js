@@ -2,12 +2,12 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   Modal,
   StyleSheet,
-  View,
+  Text,
+  View
 } from "react-native";
 import Animated, {
   useAnimatedStyle,
@@ -16,13 +16,14 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-import { BrandHeader } from "../../components/BrandMark";
-import ThemedButton from "../../components/ThemedButton";
-import ThemedCard from "../../components/ThemedCard";
-import ThemedText from "../../components/ThemedText";
+import { AppButton } from "../../components/AppButton";
+import { AppCard } from "../../components/AppCard";
+import { EmptyState } from "../../components/EmptyState";
+import { ScreenHeader } from "../../components/ScreenHeader";
+import { SkeletonCard } from "../../components/SkeletonCard";
 import { useAuth } from "../../context/AuthContext";
-import { useTheme } from "../../hooks/useTheme";
 import { api } from "../../lib/api";
+import { colors, radii, spacing, typography } from "../../lib/theme";
 
 const CATEGORY_ORDER = [
   "Habits",
@@ -44,7 +45,6 @@ const THEME_REWARDS = {
 
 export default function AchievementsScreen() {
   const { token } = useAuth();
-  const { theme } = useTheme();
 
   const [achievements, setAchievements] = useState([]);
   const [earnedCount, setEarnedCount] = useState(0);
@@ -132,86 +132,82 @@ export default function AchievementsScreen() {
   }, [achievements]);
 
   if (loading) {
-    return (
-      <View
-        style={[styles.center, { backgroundColor: theme.colors.background }]}
-      >
-        <ActivityIndicator color={theme.colors.primary} />
-        <ThemedText muted style={styles.loadingText}>
-          Loading achievements...
-        </ThemedText>
-      </View>
-    );
-  }
+  return (
+    <View style={styles.container}>
+      <ScreenHeader
+        title="Achievements"
+        subtitle="Loading achievements..."
+      />
+
+      <SkeletonCard lines={2} />
+      <SkeletonCard />
+      <SkeletonCard />
+      <SkeletonCard compact />
+    </View>
+  );
+}
 
   return (
-    <View
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-    >
+    <View style={styles.container}>
       <FlatList
         data={listData}
         keyExtractor={(row) => row.id}
         refreshing={loading}
         onRefresh={fetchAchievements}
         contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View>
-            <BrandHeader eyebrow="Progress" title="Achievements" />
+            <ScreenHeader
+              title="Achievements"
+              subtitle="Track milestones and unlock rewards."
+            />
 
-            <ThemedCard style={styles.summaryCard}>
+            <AppCard style={styles.summaryCard}>
+              <View style={styles.summaryGlowGold} />
+              <View style={styles.summaryGlowCyan} />
+
               <View style={styles.summaryTop}>
                 <View>
-                  <ThemedText muted style={styles.summaryLabel}>
-                    Earned Badges
-                  </ThemedText>
+                  <Text style={styles.summaryLabel}>Earned Badges</Text>
 
-                  <ThemedText style={styles.summaryValue}>
+                  <Text style={styles.summaryValue}>
                     {earnedCount} / {total}
-                  </ThemedText>
+                  </Text>
                 </View>
 
-                <View
-                  style={[
-                    styles.summaryIcon,
-                    {
-                      backgroundColor: theme.colors.surfaceAlt,
-                      borderColor: theme.colors.border,
-                    },
-                  ]}
-                >
+                <View style={styles.summaryIcon}>
                   <MaterialCommunityIcons
                     name="trophy-outline"
                     size={34}
-                    color={theme.colors.primary}
+                    color={colors.gold}
                   />
                 </View>
               </View>
 
-              <ThemedText muted style={styles.summarySub}>
+              <Text style={styles.summarySub}>
                 Complete goals to unlock badges and exclusive themes.
-              </ThemedText>
-            </ThemedCard>
+              </Text>
+            </AppCard>
           </View>
         }
         ListEmptyComponent={
-          <ThemedCard style={styles.emptyCard}>
-            <Feather name="award" size={36} color={theme.colors.primary} />
-            <ThemedText variant="section" style={styles.emptyTitle}>
-              No achievements yet
-            </ThemedText>
-            <ThemedText muted style={styles.emptyText}>
-              Complete habits, tasks, and rewards to unlock badges.
-            </ThemedText>
-          </ThemedCard>
+          <AppCard style={styles.emptyCard}>
+            <EmptyState
+              title="No achievements yet"
+              description="Complete habits, tasks, and rewards to unlock badges."
+              icon={<Feather name="award" size={42} color={colors.gold} />}
+            />
+          </AppCard>
         }
         renderItem={({ item, index }) => {
           if (item.type === "header") {
-            return <CategoryHeader category={item.category} theme={theme} />;
+            return <CategoryHeader category={item.category} />;
           }
 
           return (
             <AnimatedCard index={index}>
-              <AchievementCard achievement={item.item} theme={theme} />
+              <AchievementCard achievement={item.item} />
             </AnimatedCard>
           );
         }}
@@ -220,36 +216,32 @@ export default function AchievementsScreen() {
       <AchievementCelebrationModal
         visible={!!celebrationTarget}
         achievement={celebrationTarget}
-        theme={theme}
         onClose={dismissCelebration}
       />
     </View>
   );
 }
 
-function CategoryHeader({ category, theme }) {
+function CategoryHeader({ category }) {
   return (
     <View style={styles.categoryHeader}>
-      <ThemedText style={styles.categoryTitle}>{category}</ThemedText>
-
-      <View
-        style={[styles.categoryLine, { backgroundColor: theme.colors.border }]}
-      />
+      <Text style={styles.categoryTitle}>{category}</Text>
+      <View style={styles.categoryLine} />
     </View>
   );
 }
 
-function AchievementCard({ achievement, theme }) {
+function AchievementCard({ achievement }) {
   const themeReward = THEME_REWARDS[achievement.id];
   const earned = !!achievement.earned;
   const newlyEarned = !!achievement.newly_earned;
 
   return (
-    <ThemedCard
+    <AppCard
       style={[
         styles.card,
-        earned && { borderColor: theme.colors.success },
-        newlyEarned && { borderColor: theme.colors.primary },
+        earned && { borderColor: colors.success },
+        newlyEarned && { borderColor: colors.cyan },
       ]}
     >
       <View style={styles.cardTop}>
@@ -258,65 +250,41 @@ function AchievementCard({ achievement, theme }) {
             styles.iconCircle,
             {
               backgroundColor: earned
-                ? theme.colors.success
-                : theme.colors.surfaceAlt,
-              borderColor: earned ? theme.colors.success : theme.colors.border,
+                ? `${colors.success}16`
+                : colors.surfaceAlt,
+              borderColor: earned ? colors.success : colors.border,
             },
           ]}
         >
           <Feather
             name={earned ? "award" : "lock"}
             size={22}
-            color={earned ? theme.colors.primaryText : theme.colors.muted}
+            color={earned ? colors.success : colors.textMuted}
           />
         </View>
 
         <View style={styles.cardText}>
           <View style={styles.nameRow}>
-            <ThemedText style={styles.name}>{achievement.name}</ThemedText>
+            <Text style={styles.name}>{achievement.name}</Text>
 
-            {newlyEarned && (
-              <View
-                style={[
-                  styles.newBadge,
-                  {
-                    backgroundColor: theme.colors.primary,
-                    borderColor: theme.colors.primary,
-                  },
-                ]}
-              >
-                <ThemedText
-                  style={[
-                    styles.newBadgeText,
-                    { color: theme.colors.primaryText },
-                  ]}
-                >
-                  New
-                </ThemedText>
+            {newlyEarned ? (
+              <View style={styles.newBadge}>
+                <Text style={styles.newBadgeText}>New</Text>
               </View>
-            )}
+            ) : null}
           </View>
 
-          <ThemedText muted style={styles.description}>
-            {achievement.description}
-          </ThemedText>
+          <Text style={styles.description}>{achievement.description}</Text>
         </View>
       </View>
 
-      <View
-        style={[
-          styles.progressOuter,
-          { backgroundColor: theme.colors.surfaceAlt },
-        ]}
-      >
+      <View style={styles.progressOuter}>
         <View
           style={[
             styles.progressInner,
             {
               width: `${achievement.percent || 0}%`,
-              backgroundColor: earned
-                ? theme.colors.success
-                : theme.colors.primary,
+              backgroundColor: earned ? colors.success : colors.cyan,
             },
           ]}
         />
@@ -324,10 +292,7 @@ function AchievementCard({ achievement, theme }) {
 
       <View style={styles.metaRow}>
         <MetaPill
-          theme={theme}
-          icon={
-            <Feather name="trending-up" size={14} color={theme.colors.muted} />
-          }
+          icon={<Feather name="trending-up" size={14} color={colors.textMuted} />}
           text={`${achievement.raw_progress || 0} / ${achievement.target}`}
         />
 
@@ -335,59 +300,46 @@ function AchievementCard({ achievement, theme }) {
           style={[
             styles.statusPill,
             {
-              backgroundColor: theme.colors.surfaceAlt,
-              borderColor: earned ? theme.colors.success : theme.colors.border,
+              borderColor: earned ? colors.success : colors.border,
+              backgroundColor: earned ? `${colors.success}12` : colors.surfaceAlt,
             },
           ]}
         >
           <Feather
             name={earned ? "check-circle" : "clock"}
             size={14}
-            color={earned ? theme.colors.success : theme.colors.primary}
+            color={earned ? colors.success : colors.cyan}
           />
-          <ThemedText
+
+          <Text
             style={[
               styles.statusText,
               {
-                color: earned ? theme.colors.success : theme.colors.primary,
+                color: earned ? colors.success : colors.cyan,
               },
             ]}
           >
             {earned ? "Unlocked" : `${achievement.percent || 0}%`}
-          </ThemedText>
+          </Text>
         </View>
 
-        {themeReward && (
-          <View
-            style={[
-              styles.themeRewardPill,
-              {
-                backgroundColor: theme.colors.surfaceAlt,
-                borderColor: theme.colors.warning || "#EAB308",
-              },
-            ]}
-          >
+        {themeReward ? (
+          <View style={styles.themeRewardPill}>
             <MaterialCommunityIcons
               name="palette-outline"
               size={14}
-              color={theme.colors.warning || "#EAB308"}
+              color={colors.gold}
             />
-            <ThemedText
-              style={[
-                styles.themeRewardText,
-                { color: theme.colors.warning || "#EAB308" },
-              ]}
-            >
-              Unlocks {themeReward}
-            </ThemedText>
+
+            <Text style={styles.themeRewardText}>Unlocks {themeReward}</Text>
           </View>
-        )}
+        ) : null}
       </View>
-    </ThemedCard>
+    </AppCard>
   );
 }
 
-function AchievementCelebrationModal({ visible, achievement, theme, onClose }) {
+function AchievementCelebrationModal({ visible, achievement, onClose }) {
   if (!achievement) return null;
 
   const themeReward = THEME_REWARDS[achievement.id];
@@ -395,93 +347,53 @@ function AchievementCelebrationModal({ visible, achievement, theme, onClose }) {
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.modalOverlay}>
-        <View
-          style={[
-            styles.modalCard,
-            {
-              backgroundColor: theme.colors.surface,
-              borderColor: theme.colors.success,
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.celebrationIcon,
-              {
-                backgroundColor: theme.colors.surfaceAlt,
-                borderColor: theme.colors.success,
-              },
-            ]}
-          >
+        <View style={styles.modalCard}>
+          <View style={styles.celebrationIcon}>
             <MaterialCommunityIcons
               name="trophy-award"
               size={42}
-              color={theme.colors.success}
+              color={colors.success}
             />
           </View>
 
-          <ThemedText
-            style={[styles.modalEyebrow, { color: theme.colors.success }]}
-          >
-            Achievement Unlocked
-          </ThemedText>
+          <Text style={styles.modalEyebrow}>Achievement Unlocked</Text>
 
-          <ThemedText style={styles.modalTitle}>{achievement.name}</ThemedText>
+          <Text style={styles.modalTitle}>{achievement.name}</Text>
 
-          <ThemedText muted style={styles.modalDescription}>
-            {achievement.description}
-          </ThemedText>
+          <Text style={styles.modalDescription}>{achievement.description}</Text>
 
-          {themeReward && (
-            <View
-              style={[
-                styles.modalRewardBox,
-                {
-                  backgroundColor: theme.colors.surfaceAlt,
-                  borderColor: theme.colors.warning || "#EAB308",
-                },
-              ]}
-            >
+          {themeReward ? (
+            <View style={styles.modalRewardBox}>
               <MaterialCommunityIcons
                 name="palette-outline"
                 size={22}
-                color={theme.colors.warning || "#EAB308"}
+                color={colors.gold}
               />
 
               <View style={{ flex: 1 }}>
-                <ThemedText
-                  style={[
-                    styles.modalRewardTitle,
-                    { color: theme.colors.warning || "#EAB308" },
-                  ]}
-                >
-                  Theme Reward
-                </ThemedText>
+                <Text style={styles.modalRewardTitle}>Theme Reward</Text>
 
-                <ThemedText muted style={styles.modalRewardText}>
+                <Text style={styles.modalRewardText}>
                   {themeReward} is now available in the Theme Store.
-                </ThemedText>
+                </Text>
               </View>
             </View>
-          )}
+          ) : null}
 
           <View style={styles.modalActions}>
-            {themeReward && (
-              <ThemedButton
+            {themeReward ? (
+              <AppButton
                 variant="secondary"
                 style={styles.modalButton}
+                title="Theme Store"
                 onPress={() => {
                   onClose();
                   router.push("/theme-store");
                 }}
-              >
-                Theme Store
-              </ThemedButton>
-            )}
+              />
+            ) : null}
 
-            <ThemedButton style={styles.modalButton} onPress={onClose}>
-              Nice
-            </ThemedButton>
+            <AppButton style={styles.modalButton} title="Nice" onPress={onClose} />
           </View>
         </View>
       </View>
@@ -489,21 +401,11 @@ function AchievementCelebrationModal({ visible, achievement, theme, onClose }) {
   );
 }
 
-function MetaPill({ theme, icon, text }) {
+function MetaPill({ icon, text }) {
   return (
-    <View
-      style={[
-        styles.metaPill,
-        {
-          backgroundColor: theme.colors.surfaceAlt,
-          borderColor: theme.colors.border,
-        },
-      ]}
-    >
+    <View style={styles.metaPill}>
       {icon}
-      <ThemedText muted style={styles.metaText}>
-        {text}
-      </ThemedText>
+      <Text style={styles.metaText}>{text}</Text>
     </View>
   );
 }
@@ -528,176 +430,239 @@ function AnimatedCard({ children, index = 0 }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xl,
   },
+
   listContent: {
     paddingBottom: 120,
   },
+
   center: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: colors.background,
   },
+
   loadingText: {
-    marginTop: 10,
-    fontWeight: "700",
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
   },
+
   summaryCard: {
-    marginTop: 14,
+    overflow: "hidden",
   },
+
+  summaryGlowGold: {
+    position: "absolute",
+    width: 220,
+    height: 220,
+    borderRadius: radii.pill,
+    top: -130,
+    right: -90,
+    backgroundColor: `${colors.gold}18`,
+  },
+
+  summaryGlowCyan: {
+    position: "absolute",
+    width: 160,
+    height: 160,
+    borderRadius: radii.pill,
+    bottom: -100,
+    left: -70,
+    backgroundColor: `${colors.cyan}10`,
+  },
+
   summaryTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
+
   summaryLabel: {
-    fontSize: 12,
-    fontWeight: "900",
+    ...typography.caption,
+    color: colors.textSecondary,
     textTransform: "uppercase",
+    letterSpacing: 0.8,
   },
+
   summaryValue: {
     fontSize: 42,
     fontWeight: "900",
-    marginTop: 4,
+    color: colors.text,
+    marginTop: spacing.xs,
   },
+
   summarySub: {
-    marginTop: 10,
-    fontWeight: "700",
+    ...typography.bodyBold,
+    color: colors.textSecondary,
+    marginTop: spacing.md,
   },
+
   summaryIcon: {
     width: 66,
     height: 66,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: `${colors.gold}18`,
   },
+
   emptyCard: {
-    marginTop: 20,
+    marginTop: spacing.xl,
     alignItems: "center",
   },
-  emptyTitle: {
-    marginTop: 10,
-  },
-  emptyText: {
-    textAlign: "center",
-    marginTop: 6,
-  },
+
   categoryHeader: {
-    marginTop: 24,
-    marginBottom: 10,
+    marginTop: spacing.xl,
+    marginBottom: spacing.md,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: spacing.md,
   },
+
   categoryTitle: {
-    fontSize: 18,
-    fontWeight: "900",
+    ...typography.h3,
+    color: colors.text,
   },
+
   categoryLine: {
     flex: 1,
     height: 1,
+    backgroundColor: colors.divider,
   },
+
   card: {
-    marginBottom: 14,
+    marginBottom: spacing.md,
   },
+
   cardTop: {
     flexDirection: "row",
-    gap: 12,
+    gap: spacing.md,
     alignItems: "flex-start",
   },
+
   iconCircle: {
     width: 48,
     height: 48,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
   },
+
   cardText: {
     flex: 1,
   },
+
   nameRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: spacing.sm,
   },
+
   name: {
     flex: 1,
-    fontSize: 18,
-    fontWeight: "900",
+    ...typography.h3,
+    color: colors.text,
   },
+
   description: {
-    marginTop: 4,
-    lineHeight: 20,
-    fontWeight: "600",
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
   },
+
   newBadge: {
     borderWidth: 1,
-    borderRadius: 999,
+    borderColor: colors.cyan,
+    backgroundColor: colors.cyan,
+    borderRadius: radii.pill,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
+
   newBadgeText: {
     fontSize: 11,
     fontWeight: "900",
     textTransform: "uppercase",
+    color: colors.white,
   },
+
   progressOuter: {
-    marginTop: 14,
+    marginTop: spacing.lg,
     height: 10,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     overflow: "hidden",
+    backgroundColor: colors.surfaceAlt,
   },
+
   progressInner: {
     height: "100%",
-    borderRadius: 999,
+    borderRadius: radii.pill,
   },
+
   metaRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    marginTop: 14,
+    gap: spacing.sm,
+    marginTop: spacing.lg,
   },
+
   metaPill: {
-    borderRadius: 999,
+    borderRadius: radii.pill,
     paddingVertical: 7,
-    paddingHorizontal: 10,
+    paddingHorizontal: spacing.md,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: spacing.sm,
     borderWidth: 1,
+    backgroundColor: colors.surfaceAlt,
+    borderColor: colors.border,
   },
+
   metaText: {
     fontWeight: "900",
     fontSize: 12,
+    color: colors.textSecondary,
   },
+
   statusPill: {
-    borderRadius: 999,
+    borderRadius: radii.pill,
     paddingVertical: 7,
-    paddingHorizontal: 10,
+    paddingHorizontal: spacing.md,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: spacing.sm,
     borderWidth: 1,
   },
+
   statusText: {
     fontWeight: "900",
     fontSize: 12,
   },
+
   themeRewardPill: {
-    borderRadius: 999,
+    borderRadius: radii.pill,
     paddingVertical: 7,
-    paddingHorizontal: 10,
+    paddingHorizontal: spacing.md,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: spacing.sm,
     borderWidth: 1,
+    backgroundColor: `${colors.gold}12`,
+    borderColor: colors.gold,
   },
+
   themeRewardText: {
     fontWeight: "900",
     fontSize: 12,
+    color: colors.gold,
   },
 
   modalOverlay: {
@@ -705,67 +670,85 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(15, 23, 42, 0.72)",
     alignItems: "center",
     justifyContent: "center",
-    padding: 20,
+    padding: spacing.xl,
   },
+
   modalCard: {
     width: "100%",
-    borderRadius: 30,
+    borderRadius: radii.xl,
     borderWidth: 1,
-    padding: 24,
+    borderColor: colors.success,
+    backgroundColor: colors.surface,
+    padding: spacing.xl,
     alignItems: "center",
   },
+
   celebrationIcon: {
     width: 86,
     height: 86,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     borderWidth: 1,
+    borderColor: colors.success,
+    backgroundColor: `${colors.success}12`,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 18,
+    marginBottom: spacing.lg,
   },
+
   modalEyebrow: {
-    fontSize: 13,
-    fontWeight: "900",
+    ...typography.caption,
+    color: colors.success,
     textTransform: "uppercase",
     letterSpacing: 1,
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
+
   modalTitle: {
-    fontSize: 30,
-    fontWeight: "900",
+    ...typography.h1,
+    color: colors.text,
     textAlign: "center",
   },
+
   modalDescription: {
-    marginTop: 8,
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
     textAlign: "center",
-    lineHeight: 21,
   },
+
   modalRewardBox: {
     width: "100%",
-    marginTop: 18,
-    borderRadius: 22,
+    marginTop: spacing.lg,
+    borderRadius: radii.lg,
     borderWidth: 1,
-    padding: 14,
+    borderColor: colors.gold,
+    backgroundColor: `${colors.gold}12`,
+    padding: spacing.lg,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: spacing.md,
   },
+
   modalRewardTitle: {
-    fontSize: 13,
+    ...typography.caption,
+    color: colors.gold,
     fontWeight: "900",
     textTransform: "uppercase",
   },
+
   modalRewardText: {
-    marginTop: 3,
-    fontWeight: "700",
-    lineHeight: 19,
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
   },
+
   modalActions: {
     width: "100%",
     flexDirection: "row",
-    gap: 10,
-    marginTop: 20,
+    gap: spacing.sm,
+    marginTop: spacing.xl,
   },
+
   modalButton: {
     flex: 1,
   },

@@ -1,23 +1,35 @@
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { BrandHeader } from "../../components/BrandMark";
-import ThemedButton from "../../components/ThemedButton";
-import ThemedCard from "../../components/ThemedCard";
-import ThemedScreen from "../../components/ThemedScreen";
-import ThemedText from "../../components/ThemedText";
+import { AppButton } from "../../components/AppButton";
+import { AppCard } from "../../components/AppCard";
+import { ScreenHeader } from "../../components/ScreenHeader";
+import { SectionTitle } from "../../components/SectionTitle";
+
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../hooks/useTheme";
 
-const QUICK_THEMES = ["light", "dark", "nature", "focus"];
+import {
+  colors,
+  radii,
+  shadows,
+  spacing,
+  typography,
+} from "../../lib/theme";
+
+const QUICK_THEMES = [
+  "light",
+  "dark",
+  "nature",
+  "focus",
+];
 
 export default function SettingsScreen() {
   const { logout } = useAuth();
 
   const {
-    theme,
     themeName,
     themes,
     ownedThemes,
@@ -27,164 +39,163 @@ export default function SettingsScreen() {
   const activeTheme = themes[themeName];
 
   return (
-    <ThemedScreen>
-      <ScrollView contentContainerStyle={styles.container}>
-        <BrandHeader eyebrow="Preferences" title="Settings" />
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.container}
+      showsVerticalScrollIndicator={false}
+    >
+      <ScreenHeader
+        title="Settings"
+        subtitle="Customize your orbit and account experience."
+      />
 
-        <ThemedText muted style={styles.subtitle}>
-          Customize your Habio experience.
-        </ThemedText>
+      <AppCard padded={false} style={styles.heroCard}>
+        <LinearGradient
+          colors={
+            activeTheme?.gradient || [
+              colors.background,
+              colors.cyan,
+            ]
+          }
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.heroGradient}
+        >
+          <View style={styles.heroGlow} />
 
-        <ThemedCard style={styles.heroCard}>
-          <LinearGradient
-            colors={
-              activeTheme?.gradient || [
-                theme.colors.background,
-                theme.colors.primary,
-              ]
-            }
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.heroGradient}
-          >
-            <View style={styles.heroOverlay}>
-              <View style={styles.heroTop}>
-                <View style={styles.heroCopy}>
-                  <ThemedText style={styles.heroEyebrow}>
-                    Current Theme
-                  </ThemedText>
+          <View style={styles.heroTop}>
+            <View style={styles.heroCopy}>
+              <Text style={styles.heroEyebrow}>
+                Current Theme
+              </Text>
 
-                  <ThemedText style={styles.heroTitle}>
-                    {activeTheme?.name || themeName}
-                  </ThemedText>
+              <Text style={styles.heroTitle}>
+                {activeTheme?.name ||
+                  themeName}
+              </Text>
 
-                  <ThemedText style={styles.heroSubtitle}>
-                    {activeTheme?.tagline || "Personalize your experience"}
-                  </ThemedText>
-                </View>
-
-                <View style={styles.heroIcon}>
-                  <MaterialCommunityIcons
-                    name="palette-outline"
-                    size={34}
-                    color="#FFFFFF"
-                  />
-                </View>
-              </View>
+              <Text style={styles.heroSubtitle}>
+                {activeTheme?.tagline ||
+                  "Personalize your experience"}
+              </Text>
             </View>
-          </LinearGradient>
 
-          <View style={styles.quickThemes}>
-            {QUICK_THEMES.map((key) => {
-              const item = themes[key];
-              const active = themeName === key;
-
-              return (
-                <ThemeChip
-                  key={key}
-                  label={item.name}
-                  active={active}
-                  theme={theme}
-                  onPress={() => setThemeName(key)}
-                />
-              );
-            })}
-          </View>
-
-          <ThemedButton
-            style={styles.storeButton}
-            onPress={() => router.push("/theme-store")}
-          >
-            Open Theme Store
-          </ThemedButton>
-        </ThemedCard>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <ThemedText variant="section">Personalization</ThemedText>
-
-            <View
-              style={[
-                styles.sectionBadge,
-                {
-                  backgroundColor: theme.colors.surfaceAlt,
-                  borderColor: theme.colors.border,
-                },
-              ]}
-            >
-              <ThemedText muted style={styles.sectionBadgeText}>
-                {ownedThemes.length} owned
-              </ThemedText>
+            <View style={styles.heroIcon}>
+              <MaterialCommunityIcons
+                name="palette-outline"
+                size={34}
+                color="#FFFFFF"
+              />
             </View>
           </View>
+        </LinearGradient>
 
-          <ThemedCard style={styles.card}>
-            <SettingsRow
-              icon="palette-outline"
-              label="Theme Store"
-              subtitle="Unlock and equip new themes"
-              theme={theme}
-              onPress={() => router.push("/theme-store")}
-            />
+        <View style={styles.quickThemes}>
+          {QUICK_THEMES.map((key) => {
+            const item = themes[key];
+            const active =
+              themeName === key;
 
-            <SettingsRow
-              icon="refresh"
-              label="Restart Onboarding"
-              subtitle="Go through the setup flow again"
-              theme={theme}
-              onPress={() => router.push("/onboarding")}
-            />
-          </ThemedCard>
+            return (
+              <ThemeChip
+                key={key}
+                label={item.name}
+                active={active}
+                onPress={() =>
+                  setThemeName(key)
+                }
+              />
+            );
+          })}
         </View>
 
-        <View style={styles.section}>
-          <ThemedText variant="section">Account</ThemedText>
+        <AppButton
+          style={styles.storeButton}
+          title="Open Theme Store"
+          onPress={() =>
+            router.push("/theme-store")
+          }
+        />
+      </AppCard>
 
-          <ThemedCard style={styles.card}>
-            <SettingsRow
-              icon="lock-reset"
-              label="Change Password"
-              subtitle="Update your account password"
-              theme={theme}
-              onPress={() => router.push("/change-password")}
-            />
+      <SectionTitle
+        title="Personalization"
+      />
 
-            <SettingsRow
-              icon="shield-lock-outline"
-              label="Privacy Policy"
-              subtitle="View privacy and data handling"
-              theme={theme}
-              onPress={() => router.push("/privacy-policy")}
-            />
+      <AppCard>
+        <SettingsRow
+          icon="palette-outline"
+          label="Theme Store"
+          subtitle="Unlock and equip new themes"
+          onPress={() =>
+            router.push("/theme-store")
+          }
+        />
 
-            <SettingsRow
-              icon="delete-outline"
-              label="Delete Account"
-              subtitle="Permanently remove your account"
-              theme={theme}
-              onPress={() => router.push("/delete-account")}
-              danger
-            />
-          </ThemedCard>
-        </View>
+        <SettingsRow
+          icon="refresh"
+          label="Restart Onboarding"
+          subtitle="Go through the setup flow again"
+          onPress={() =>
+            router.push("/onboarding")
+          }
+          last
+        />
+      </AppCard>
 
-        <View style={styles.section}>
-          <ThemedButton
-            variant="secondary"
-            style={styles.logoutButton}
-            onPress={logout}
-          >
-            Log Out
-          </ThemedButton>
-        </View>
+      <SectionTitle title="Account" />
 
-        <View style={styles.footer}>
-          <ThemedText muted style={styles.footerText}>
-            Habio • Build better days
-          </ThemedText>
-        </View>
-      </ScrollView>
-    </ThemedScreen>
+      <AppCard>
+        <SettingsRow
+          icon="lock-reset"
+          label="Change Password"
+          subtitle="Update your account password"
+          onPress={() =>
+            router.push(
+              "/change-password"
+            )
+          }
+        />
+
+        <SettingsRow
+          icon="shield-lock-outline"
+          label="Privacy Policy"
+          subtitle="View privacy and data handling"
+          onPress={() =>
+            router.push(
+              "/privacy-policy"
+            )
+          }
+        />
+
+        <SettingsRow
+          icon="delete-outline"
+          label="Delete Account"
+          subtitle="Permanently remove your account"
+          danger
+          last
+          onPress={() =>
+            router.push(
+              "/delete-account"
+            )
+          }
+        />
+      </AppCard>
+
+      <AppButton
+        variant="secondary"
+        style={styles.logoutButton}
+        title="Log Out"
+        onPress={logout}
+      />
+
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>
+          OurOrbit • Small actions shape
+          your orbit
+        </Text>
+      </View>
+    </ScrollView>
   );
 }
 
@@ -193,19 +204,17 @@ function SettingsRow({
   label,
   subtitle,
   onPress,
-  theme,
   danger = false,
+  last = false,
 }) {
   return (
-    <ThemedButton
-      variant="ghost"
-      style={[
-        styles.rowButton,
-        {
-          borderBottomColor: theme.colors.border,
-        },
-      ]}
+    <Pressable
       onPress={onPress}
+      style={({ pressed }) => [
+        styles.row,
+        !last && styles.rowBorder,
+        pressed && styles.rowPressed,
+      ]}
     >
       <View style={styles.rowLeft}>
         <View
@@ -213,97 +222,118 @@ function SettingsRow({
             styles.rowIcon,
             {
               backgroundColor: danger
-                ? `${theme.colors.danger}15`
-                : `${theme.colors.primary}14`,
+                ? `${colors.danger}12`
+                : `${colors.cyan}12`,
+
               borderColor: danger
-                ? `${theme.colors.danger}30`
-                : `${theme.colors.primary}25`,
+                ? `${colors.danger}30`
+                : `${colors.cyan}25`,
             },
           ]}
         >
           <MaterialCommunityIcons
             name={icon}
             size={20}
-            color={danger ? theme.colors.danger : theme.colors.primary}
+            color={
+              danger
+                ? colors.danger
+                : colors.cyan
+            }
           />
         </View>
 
         <View style={styles.rowCopy}>
-          <ThemedText
+          <Text
             style={[
               styles.rowLabel,
               danger && {
-                color: theme.colors.danger,
+                color: colors.danger,
               },
             ]}
           >
             {label}
-          </ThemedText>
+          </Text>
 
-          <ThemedText muted style={styles.rowSubtitle}>
+          <Text
+            style={styles.rowSubtitle}
+          >
             {subtitle}
-          </ThemedText>
+          </Text>
         </View>
       </View>
 
       <Feather
         name="chevron-right"
         size={20}
-        color={theme.colors.textMuted}
+        color={colors.textMuted}
       />
-    </ThemedButton>
+    </Pressable>
   );
 }
 
-function ThemeChip({ label, active, onPress, theme }) {
+function ThemeChip({
+  label,
+  active,
+  onPress,
+}) {
   return (
-    <ThemedButton
-      variant={active ? "primary" : "secondary"}
+    <Pressable
+      onPress={onPress}
       style={[
         styles.themeChip,
-        !active && {
-          borderColor: theme.colors.border,
-        },
+        active && styles.themeChipActive,
       ]}
-      onPress={onPress}
     >
-      {label}
-    </ThemedButton>
+      <Text
+        style={[
+          styles.themeChipText,
+          active &&
+            styles.themeChipTextActive,
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+
   container: {
-    padding: 20,
+    padding: spacing.xl,
     paddingBottom: 120,
   },
 
-  subtitle: {
-    marginTop: 8,
-    lineHeight: 20,
-  },
-
   heroCard: {
-    marginTop: 18,
     overflow: "hidden",
-    padding: 0,
   },
 
   heroGradient: {
-    minHeight: 170,
-    padding: 22,
+    minHeight: 180,
+    padding: spacing.xl,
     justifyContent: "space-between",
+    overflow: "hidden",
   },
 
-  heroOverlay: {
-    flex: 1,
-    justifyContent: "space-between",
+  heroGlow: {
+    position: "absolute",
+    width: 220,
+    height: 220,
+    borderRadius: radii.pill,
+    backgroundColor:
+      "rgba(255,255,255,0.08)",
+    top: -120,
+    right: -90,
   },
 
   heroTop: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 16,
+    gap: spacing.lg,
   },
 
   heroCopy: {
@@ -319,15 +349,15 @@ const styles = StyleSheet.create({
   },
 
   heroTitle: {
-    color: "#FFFFFF",
+    color: colors.white,
     fontSize: 34,
     fontWeight: "900",
-    marginTop: 6,
+    marginTop: spacing.xs,
   },
 
   heroSubtitle: {
     color: "rgba(255,255,255,0.92)",
-    marginTop: 8,
+    marginTop: spacing.sm,
     lineHeight: 20,
     fontWeight: "700",
   },
@@ -335,8 +365,9 @@ const styles = StyleSheet.create({
   heroIcon: {
     width: 74,
     height: 74,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.14)",
+    borderRadius: radii.pill,
+    backgroundColor:
+      "rgba(255,255,255,0.14)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -344,67 +375,71 @@ const styles = StyleSheet.create({
   quickThemes: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
-    padding: 20,
-    paddingTop: 18,
+    gap: spacing.sm,
+    padding: spacing.xl,
+    paddingTop: spacing.lg,
   },
 
   themeChip: {
     minWidth: 100,
-  },
-
-  storeButton: {
-    marginHorizontal: 20,
-    marginBottom: 20,
-  },
-
-  section: {
-    marginTop: 28,
-  },
-
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  sectionBadge: {
+    paddingVertical: 12,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radii.pill,
     borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
-  sectionBadgeText: {
-    fontSize: 12,
+  themeChipActive: {
+    backgroundColor: colors.cyan,
+    borderColor: colors.cyan,
+    ...shadows.soft,
+  },
+
+  themeChipText: {
+    ...typography.caption,
+    color: colors.text,
     fontWeight: "900",
   },
 
-  card: {
-    marginTop: 12,
+  themeChipTextActive: {
+    color: colors.white,
   },
 
-  rowButton: {
-    paddingVertical: 18,
-    paddingHorizontal: 0,
-    borderBottomWidth: 1,
-    borderRadius: 0,
+  storeButton: {
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.xl,
+  },
+
+  row: {
+    paddingVertical: spacing.lg,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+  },
+
+  rowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+  },
+
+  rowPressed: {
+    opacity: 0.72,
   },
 
   rowLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    gap: spacing.md,
     flex: 1,
   },
 
   rowIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 46,
+    height: 46,
+    borderRadius: radii.lg,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
@@ -415,27 +450,29 @@ const styles = StyleSheet.create({
   },
 
   rowLabel: {
-    fontSize: 16,
-    fontWeight: "800",
+    ...typography.bodyBold,
+    color: colors.text,
   },
 
   rowSubtitle: {
-    marginTop: 4,
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
     lineHeight: 18,
-    fontSize: 13,
   },
 
   logoutButton: {
-    marginTop: 4,
+    marginTop: spacing.lg,
   },
 
   footer: {
-    marginTop: 30,
+    marginTop: spacing.xl,
     alignItems: "center",
   },
 
   footerText: {
-    fontSize: 13,
+    ...typography.caption,
+    color: colors.textMuted,
     fontWeight: "700",
   },
 });

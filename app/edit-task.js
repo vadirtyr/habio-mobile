@@ -1,24 +1,57 @@
+import { Feather } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Alert, Platform, Pressable, StyleSheet, View } from "react-native";
+import {
+  Alert,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
-import { BrandHeader } from "../components/BrandMark";
-import ThemedButton from "../components/ThemedButton";
-import ThemedCard from "../components/ThemedCard";
-import ThemedInput from "../components/ThemedInput";
-import ThemedScreen from "../components/ThemedScreen";
-import ThemedText from "../components/ThemedText";
+import { AppButton } from "../components/AppButton";
+import { AppCard } from "../components/AppCard";
+import { AppInput } from "../components/AppInput";
+import { ScreenHeader } from "../components/ScreenHeader";
 import { useAuth } from "../context/AuthContext";
-import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
-import { shadows } from "../lib/theme/shadows";
+
+import {
+  colors,
+  radii,
+  shadows,
+  spacing,
+  typography,
+} from "../lib/theme";
 
 const COIN_OPTIONS = [
-  { label: "Low", value: 5, description: "Small/easy effort" },
-  { label: "Medium", value: 10, description: "Normal effort" },
-  { label: "High", value: 20, description: "Hard effort" },
-  { label: "Life Changing", value: 50, description: "Major effort" },
+  {
+    label: "Low",
+    value: 5,
+    description: "Quick win",
+    accent: colors.success,
+  },
+  {
+    label: "Medium",
+    value: 10,
+    description: "Normal effort",
+    accent: colors.cyan,
+  },
+  {
+    label: "High",
+    value: 20,
+    description: "Focused work",
+    accent: colors.blue,
+  },
+  {
+    label: "Life Changing",
+    value: 50,
+    description: "Major impact",
+    accent: colors.coral,
+  },
 ];
 
 function getDifficultyForCoins(coins) {
@@ -46,27 +79,41 @@ function formatDate(date) {
 
 export default function EditTaskScreen() {
   const { token } = useAuth();
-  const { theme } = useTheme();
   const params = useLocalSearchParams();
 
   const [name, setName] = useState(params.name || "");
-  const [description, setDescription] = useState(params.description || "");
-  const [selectedCoins, setSelectedCoins] = useState(getInitialCoins(params));
+  const [description, setDescription] =
+    useState(params.description || "");
+
+  const [selectedCoins, setSelectedCoins] =
+    useState(getInitialCoins(params));
+
   const [dueDate, setDueDate] = useState(
-    params.due_date ? new Date(params.due_date) : null
+    params.due_date
+      ? new Date(params.due_date)
+      : null
   );
-  const [showPicker, setShowPicker] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+
+  const [showPicker, setShowPicker] =
+    useState(false);
+
+  const [submitting, setSubmitting] =
+    useState(false);
 
   async function updateTask() {
     if (!token) return;
 
     if (!name.trim()) {
-      Alert.alert("Missing name", "Enter a task name.");
+      Alert.alert(
+        "Missing name",
+        "Enter a task name."
+      );
+
       return;
     }
 
     if (submitting) return;
+
     setSubmitting(true);
 
     try {
@@ -75,10 +122,14 @@ export default function EditTaskScreen() {
         {
           name: name.trim(),
           description: description.trim(),
-          difficulty: getDifficultyForCoins(selectedCoins),
+          difficulty:
+            getDifficultyForCoins(selectedCoins),
           custom_coins: selectedCoins,
-          due_date: dueDate ? formatDate(dueDate) : null,
-          recurrence: params.recurrence || "none",
+          due_date: dueDate
+            ? formatDate(dueDate)
+            : null,
+          recurrence:
+            params.recurrence || "none",
         },
         token
       );
@@ -91,7 +142,10 @@ export default function EditTaskScreen() {
     }
   }
 
-  function handleDateChange(event, selectedDate) {
+  function handleDateChange(
+    event,
+    selectedDate
+  ) {
     if (Platform.OS === "android") {
       setShowPicker(false);
     }
@@ -102,334 +156,440 @@ export default function EditTaskScreen() {
   }
 
   return (
-    <ThemedScreen
+    <ScrollView
+      style={styles.screen}
       contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
     >
-      <BrandHeader eyebrow="Edit Task" title="Update Task" />
+      <ScreenHeader
+        title="Update Task"
+        subtitle="Adjust details, timing, or reward value."
+      />
 
-      <ThemedText muted style={styles.subtitle}>
-        Adjust the task details, notes, due date, or coin value.
-      </ThemedText>
+      <AppCard>
+        <View style={styles.section}>
+          <Text style={styles.label}>
+            Task name
+          </Text>
 
-      <ThemedCard>
-        <ThemedText style={styles.label}>Task name</ThemedText>
-
-        <ThemedInput
-          placeholder="Task name"
-          value={name}
-          onChangeText={setName}
-          style={styles.input}
-        />
-
-        <ThemedText style={styles.label}>Description</ThemedText>
-
-        <ThemedInput
-          placeholder="Optional notes"
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          style={styles.input}
-        />
-
-        <ThemedText style={styles.label}>Coin value</ThemedText>
-
-        <View style={styles.coinGrid}>
-          {COIN_OPTIONS.map((option) => {
-            const active = selectedCoins === option.value;
-
-            return (
-              <Pressable
-                key={option.value}
-                onPress={() => setSelectedCoins(option.value)}
-                style={[
-                  styles.coinOption,
-                  {
-                    backgroundColor: active
-                      ? theme.colors.primary
-                      : theme.colors.surfaceAlt,
-                    borderColor: active
-                      ? theme.colors.primary
-                      : theme.colors.border,
-                  },
-                  active && {
-                    shadowColor: theme.colors.primary,
-                    ...shadows.medium,
-                  },
-                ]}
-              >
-                <ThemedText
-                  style={[
-                    styles.coinLabel,
-                    {
-                      color: active
-                        ? theme.colors.primaryText
-                        : theme.colors.text,
-                    },
-                  ]}
-                >
-                  {option.label}
-                </ThemedText>
-
-                <ThemedText
-                  style={[
-                    styles.coinValue,
-                    {
-                      color: active
-                        ? theme.colors.primaryText
-                        : theme.colors.muted,
-                    },
-                  ]}
-                >
-                  {option.value} coins
-                </ThemedText>
-
-                <ThemedText
-                  style={[
-                    styles.coinDescription,
-                    {
-                      color: active
-                        ? theme.colors.primaryText
-                        : theme.colors.muted,
-                    },
-                  ]}
-                >
-                  {option.description}
-                </ThemedText>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <ThemedText style={styles.label}>Due date</ThemedText>
-
-        <Pressable
-          style={[
-            styles.dateButton,
-            {
-              backgroundColor: theme.colors.surfaceAlt,
-              borderColor: theme.colors.border,
-            },
-          ]}
-          onPress={() => setShowPicker(true)}
-        >
-          <View>
-            <ThemedText muted style={styles.dateLabel}>
-              {dueDate ? "Selected date" : "No due date"}
-            </ThemedText>
-
-            <ThemedText style={styles.dateText}>
-              {dueDate ? formatDate(dueDate) : "Tap to pick a date"}
-            </ThemedText>
-          </View>
-
-          <ThemedText style={styles.dateIcon}>📅</ThemedText>
-        </Pressable>
-
-        {dueDate && (
-          <Pressable
-            style={[
-              styles.clearDateButton,
-              {
-                backgroundColor: theme.colors.surfaceAlt,
-                borderColor: theme.colors.danger,
-              },
-            ]}
-            onPress={() => setDueDate(null)}
-          >
-            <ThemedText
-              style={[styles.clearDateText, { color: theme.colors.danger }]}
-            >
-              Clear due date
-            </ThemedText>
-          </Pressable>
-        )}
-
-        {showPicker && (
-          <DateTimePicker
-            value={dueDate || new Date()}
-            mode="date"
-            display="default"
-            onChange={handleDateChange}
+          <AppInput
+            placeholder="Task name"
+            value={name}
+            onChangeText={setName}
           />
-        )}
+        </View>
 
-        <View
-          style={[
-            styles.previewBox,
-            {
-              backgroundColor: theme.colors.surfaceAlt,
-              borderColor: theme.colors.border,
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.iconCircle,
-              {
-                backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.primary,
-              },
-            ]}
-          >
-            <ThemedText style={styles.iconText}>📌</ThemedText>
-          </View>
+        <View style={styles.section}>
+          <Text style={styles.label}>
+            Description
+          </Text>
 
-          <View style={styles.previewText}>
-            <ThemedText style={styles.previewTitle}>
-              {name.trim() || "Your task"}
-            </ThemedText>
+          <AppInput
+            placeholder="Optional notes"
+            value={description}
+            onChangeText={setDescription}
+            multiline
+          />
+        </View>
 
-            <ThemedText muted style={styles.previewSubtitle}>
-              {dueDate ? formatDate(dueDate) : "No due date"} •{" "}
-              {getDifficultyForCoins(selectedCoins)} • {selectedCoins} coins
-            </ThemedText>
+        <View style={styles.section}>
+          <Text style={styles.label}>
+            Coin value
+          </Text>
+
+          <View style={styles.coinGrid}>
+            {COIN_OPTIONS.map((option) => {
+              const active =
+                selectedCoins === option.value;
+
+              return (
+                <Pressable
+                  key={option.value}
+                  onPress={() =>
+                    setSelectedCoins(option.value)
+                  }
+                  style={[
+                    styles.coinOption,
+                    {
+                      borderColor: active
+                        ? option.accent
+                        : colors.border,
+
+                      backgroundColor: active
+                        ? `${option.accent}12`
+                        : colors.surfaceAlt,
+                    },
+
+                    active && styles.coinActive,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.coinDot,
+                      {
+                        backgroundColor:
+                          option.accent,
+                      },
+                    ]}
+                  />
+
+                  <Text
+                    style={[
+                      styles.coinLabel,
+                      active && {
+                        color: option.accent,
+                      },
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+
+                  <Text
+                    style={styles.coinValue}
+                  >
+                    {option.value} coins
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.coinDescription
+                    }
+                  >
+                    {option.description}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
         </View>
-      </ThemedCard>
 
-      <ThemedButton
-        style={[styles.button, submitting && styles.buttonDisabled]}
+        <View style={styles.section}>
+          <Text style={styles.label}>
+            Due date
+          </Text>
+
+          <Pressable
+            style={styles.dateButton}
+            onPress={() =>
+              setShowPicker(true)
+            }
+          >
+            <View>
+              <Text style={styles.dateLabel}>
+                {dueDate
+                  ? "Selected date"
+                  : "No due date"}
+              </Text>
+
+              <Text style={styles.dateText}>
+                {dueDate
+                  ? formatDate(dueDate)
+                  : "Tap to pick a date"}
+              </Text>
+            </View>
+
+            <View style={styles.dateIconCircle}>
+              <Text style={styles.dateIcon}>
+                📅
+              </Text>
+            </View>
+          </Pressable>
+
+          {dueDate && (
+            <Pressable
+              style={styles.clearDateButton}
+              onPress={() =>
+                setDueDate(null)
+              }
+            >
+              <Text
+                style={styles.clearDateText}
+              >
+                Clear due date
+              </Text>
+            </Pressable>
+          )}
+
+          {showPicker && (
+            <DateTimePicker
+              value={dueDate || new Date()}
+              mode="date"
+              display="default"
+              onChange={handleDateChange}
+            />
+          )}
+        </View>
+
+        <View style={styles.previewBox}>
+          <View style={styles.previewGlow} />
+
+          <View style={styles.previewTop}>
+            <View style={styles.iconCircle}>
+              <Text style={styles.iconText}>
+                📌
+              </Text>
+            </View>
+
+            <View style={styles.previewText}>
+              <Text style={styles.previewTitle}>
+                {name.trim() ||
+                  "Your task"}
+              </Text>
+
+              <Text
+                style={styles.previewSubtitle}
+              >
+                {dueDate
+                  ? formatDate(dueDate)
+                  : "No due date"}{" "}
+                •{" "}
+                {getDifficultyForCoins(
+                  selectedCoins
+                )}{" "}
+                • {selectedCoins} coins
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.previewFooter}>
+            <Feather
+              name="check-square"
+              size={16}
+              color={colors.blue}
+            />
+
+            <Text style={styles.previewHint}>
+              Progress comes from execution.
+            </Text>
+          </View>
+        </View>
+      </AppCard>
+
+      <AppButton
+        title={
+          submitting
+            ? "Saving..."
+            : "Save Changes"
+        }
         onPress={updateTask}
         disabled={submitting}
-      >
-        {submitting ? "Saving..." : "Save Changes"}
-      </ThemedButton>
+        style={styles.button}
+      />
 
       <Pressable
         style={styles.cancelButton}
-        onPress={() => router.replace("/(tabs)/tasks")}
+        onPress={() =>
+          router.replace("/(tabs)/tasks")
+        }
       >
-        <ThemedText muted style={styles.cancelText}>
+        <Text style={styles.cancelText}>
           Cancel
-        </ThemedText>
+        </Text>
       </Pressable>
-    </ThemedScreen>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+
   container: {
-    padding: 20,
-    paddingTop: 20,
-    paddingBottom: 40,
+    padding: spacing.xl,
+    paddingBottom: 80,
   },
-  subtitle: {
-    marginTop: 8,
-    marginBottom: 20,
-    lineHeight: 20,
+
+  section: {
+    marginBottom: spacing.xl,
   },
+
   label: {
-    fontWeight: "900",
-    marginBottom: 8,
-    marginTop: 4,
+    ...typography.bodyBold,
+    color: colors.text,
+    marginBottom: spacing.sm,
   },
-  input: {
-    marginBottom: 14,
-  },
+
   coinGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 14,
+    gap: spacing.md,
   },
+
   coinOption: {
     width: "47%",
+    borderRadius: radii.xl,
     borderWidth: 1,
-    borderRadius: 18,
-    padding: 12,
+    padding: spacing.lg,
+    backgroundColor: colors.surfaceAlt,
   },
+
+  coinActive: {
+    ...shadows.soft,
+  },
+
+  coinDot: {
+    width: 10,
+    height: 10,
+    borderRadius: radii.pill,
+    marginBottom: spacing.md,
+  },
+
   coinLabel: {
-    fontSize: 15,
-    fontWeight: "900",
+    ...typography.bodyBold,
+    color: colors.text,
   },
+
   coinValue: {
-    fontSize: 13,
-    fontWeight: "800",
-    marginTop: 4,
+    ...typography.h3,
+    color: colors.text,
+    marginTop: spacing.xs,
   },
+
   coinDescription: {
-    fontSize: 12,
-    fontWeight: "600",
-    marginTop: 4,
-    lineHeight: 16,
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
+    lineHeight: 18,
   },
+
   dateButton: {
     borderWidth: 1,
-    padding: 14,
-    borderRadius: 14,
-    marginBottom: 10,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radii.xl,
+    padding: spacing.lg,
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "center",
   },
+
   dateLabel: {
-    fontSize: 12,
-    fontWeight: "800",
+    ...typography.caption,
+    color: colors.textMuted,
     textTransform: "uppercase",
+    letterSpacing: 0.8,
   },
+
   dateText: {
-    fontSize: 16,
-    fontWeight: "900",
-    marginTop: 3,
+    ...typography.bodyBold,
+    color: colors.text,
+    marginTop: spacing.xs,
   },
-  dateIcon: {
-    fontSize: 22,
-  },
-  clearDateButton: {
-    alignSelf: "flex-start",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    marginBottom: 10,
-    borderWidth: 1,
-  },
-  clearDateText: {
-    fontWeight: "900",
-  },
-  previewBox: {
-    marginTop: 8,
-    borderRadius: 18,
-    padding: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    borderWidth: 1,
-  },
-  iconCircle: {
-    width: 46,
-    height: 46,
-    borderRadius: 999,
+
+  dateIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surface,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
+    borderColor: colors.border,
   },
-  iconText: {
+
+  dateIcon: {
     fontSize: 22,
   },
+
+  clearDateButton: {
+    alignSelf: "flex-start",
+    marginTop: spacing.md,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: radii.pill,
+    backgroundColor: `${colors.danger}12`,
+    borderWidth: 1,
+    borderColor: `${colors.danger}30`,
+  },
+
+  clearDateText: {
+    ...typography.caption,
+    color: colors.danger,
+    fontWeight: "900",
+  },
+
+  previewBox: {
+    overflow: "hidden",
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    padding: spacing.lg,
+  },
+
+  previewGlow: {
+    position: "absolute",
+    width: 180,
+    height: 180,
+    borderRadius: radii.pill,
+    top: -100,
+    right: -80,
+    backgroundColor: `${colors.blue}14`,
+  },
+
+  previewTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+
+  iconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: radii.pill,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+
+  iconText: {
+    fontSize: 28,
+  },
+
   previewText: {
     flex: 1,
   },
+
   previewTitle: {
-    fontSize: 17,
-    fontWeight: "900",
+    ...typography.h3,
+    color: colors.text,
   },
+
   previewSubtitle: {
-    marginTop: 3,
-    fontWeight: "700",
+    ...typography.bodyBold,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
     textTransform: "capitalize",
   },
-  button: {
-    marginTop: 10,
-  },
-  buttonDisabled: {
-    opacity: 0.65,
-  },
-  cancelButton: {
-    padding: 14,
+
+  previewFooter: {
+    flexDirection: "row",
     alignItems: "center",
+    gap: spacing.sm,
+    marginTop: spacing.lg,
   },
+
+  previewHint: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+
+  button: {
+    marginTop: spacing.xl,
+  },
+
+  cancelButton: {
+    alignItems: "center",
+    paddingVertical: spacing.lg,
+  },
+
   cancelText: {
-    fontWeight: "800",
+    ...typography.bodyBold,
+    color: colors.textMuted,
   },
 });
