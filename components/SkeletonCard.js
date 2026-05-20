@@ -8,18 +8,14 @@ import Animated, {
     withTiming,
 } from "react-native-reanimated";
 
+import { useTheme } from "../hooks/useTheme";
+import { radii, spacing } from "../lib/theme";
 import { AppCard } from "./AppCard";
 
-import {
-    colors,
-    radii,
-    spacing,
-} from "../lib/theme";
+export function SkeletonCard({ lines = 3, compact = false }) {
+  const { theme } = useTheme();
+  const c = theme.colors;
 
-export function SkeletonCard({
-  lines = 3,
-  compact = false,
-}) {
   const opacity = useSharedValue(0.45);
 
   opacity.value = withRepeat(
@@ -37,38 +33,37 @@ export function SkeletonCard({
     true
   );
 
-  const animatedStyle =
-    useAnimatedStyle(() => ({
-      opacity: opacity.value,
-    }));
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
+
+  const skeletonColor = c.skeleton || c.surfaceAlt;
 
   return (
-    <AppCard
-      style={[
-        styles.card,
-        compact && styles.compactCard,
-      ]}
-    >
+    <AppCard style={[styles.card, compact && styles.compactCard]}>
       <Animated.View
         style={[
           styles.lineLarge,
+          {
+            backgroundColor: skeletonColor,
+          },
           animatedStyle,
         ]}
       />
 
-      {Array.from({ length: lines }).map(
-        (_, index) => (
-          <Animated.View
-            key={index}
-            style={[
-              styles.line,
-              animatedStyle,
-              index === lines - 1 &&
-                styles.shortLine,
-            ]}
-          />
-        )
-      )}
+      {Array.from({ length: lines }).map((_, index) => (
+        <Animated.View
+          key={index}
+          style={[
+            styles.line,
+            {
+              backgroundColor: skeletonColor,
+            },
+            animatedStyle,
+            index === lines - 1 && styles.shortLine,
+          ]}
+        />
+      ))}
     </AppCard>
   );
 }
@@ -86,7 +81,6 @@ const styles = StyleSheet.create({
     height: 20,
     width: "60%",
     borderRadius: radii.pill,
-    backgroundColor: colors.surfaceAlt,
     marginBottom: spacing.lg,
   },
 
@@ -94,7 +88,6 @@ const styles = StyleSheet.create({
     height: 12,
     width: "100%",
     borderRadius: radii.pill,
-    backgroundColor: colors.surfaceAlt,
     marginBottom: spacing.sm,
   },
 

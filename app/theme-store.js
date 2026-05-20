@@ -2,6 +2,9 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
+import { AnimatedScreen } from "../components/AnimatedScreen";
+import { ScreenHeader } from "../components/ScreenHeader";
+import { SkeletonCard } from "../components/SkeletonCard";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     Alert,
@@ -24,7 +27,7 @@ import { AppCard } from "../components/AppCard";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
-import { colors, radii, spacing, typography } from "../lib/theme";
+import { radii, spacing, typography } from "../lib/theme";
 
 const ACHIEVEMENT_LABELS = {
   "streak-7": "Reach a 7-day streak",
@@ -35,19 +38,24 @@ const ACHIEVEMENT_LABELS = {
   "quests-10": "Claim 10 quest rewards",
 };
 
-const RARITY_COLORS = {
-  common: "#94A3B8",
-  rare: "#06B6D4",
-  epic: "#8B5CF6",
-  legendary: "#F59E0B",
-};
-
 function getAchievementLabel(id) {
   return ACHIEVEMENT_LABELS[id] || "Complete the required achievement";
 }
 
-function getRarityColor(item) {
-  return RARITY_COLORS[item.rarity || "common"] || RARITY_COLORS.common;
+function getRarityColor(item, c) {
+  switch (item.rarity) {
+    case "legendary":
+      return c.gold || c.primary;
+
+    case "epic":
+      return c.coral || c.primary;
+
+    case "rare":
+      return c.cyan || c.primary;
+
+    default:
+      return c.textMuted || c.muted;
+  }
 }
 
 export default function ThemeStoreScreen() {
@@ -55,6 +63,7 @@ export default function ThemeStoreScreen() {
 
   const {
     themeName,
+    theme,
     setThemeName,
     themes,
     ownedThemes,
@@ -64,13 +73,49 @@ export default function ThemeStoreScreen() {
     clearUnlockedThemesNow,
   } = useTheme();
 
+  const c = theme.colors;
+
   const [coinBalance, setCoinBalance] = useState(0);
   const [loadingBalance, setLoadingBalance] = useState(true);
   const [purchaseTarget, setPurchaseTarget] = useState(null);
   const [unlockTarget, setUnlockTarget] = useState(null);
   const [purchasing, setPurchasing] = useState(false);
   const [equippedMessage, setEquippedMessage] = useState(null);
+if (loadingBalance || syncing)
+  return (
+    <View
+      style={[
+        styles.screen,
+        {
+          backgroundColor: c.background,
+        },
+      ]}
+    >
+      <View style={styles.container}>
+        <ScreenHeader
+          title="Theme Store"
+          subtitle="Loading your orbit themes..."
+        />
 
+        <AnimatedScreen delay={40}>
+          <SkeletonCard lines={2} />
+        </AnimatedScreen>
+
+        <AnimatedScreen delay={80}>
+          <SkeletonCard />
+        </AnimatedScreen>
+
+        <AnimatedScreen delay={120}>
+          <SkeletonCard />
+        </AnimatedScreen>
+
+        <AnimatedScreen delay={160}>
+          <SkeletonCard compact />
+        </AnimatedScreen>
+      </View>
+    </View>
+  );
+}
   const sections = useMemo(() => {
     const entries = Object.entries(themes);
 
@@ -220,64 +265,106 @@ export default function ThemeStoreScreen() {
   }
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: c.background }]}>
       <ScrollView
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerRow}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Feather name="arrow-left" size={20} color={colors.text} />
+          <Pressable
+            onPress={() => router.back()}
+            style={[
+              styles.backButton,
+              {
+                backgroundColor: c.surfaceAlt,
+                borderColor: c.border,
+              },
+            ]}
+          >
+            <Feather name="arrow-left" size={20} color={c.text} />
           </Pressable>
 
           <View style={{ flex: 1 }}>
-            <Text style={styles.eyebrow}>Personalize OurOrbit</Text>
-            <Text style={styles.title}>Theme Store</Text>
+            <Text style={[styles.eyebrow, { color: c.textSecondary }]}>
+              Personalize OurOrbit
+            </Text>
+            <Text style={[styles.title, { color: c.text }]}>Theme Store</Text>
           </View>
         </View>
 
         <AppCard style={styles.heroCard}>
-          <View style={styles.heroGlow} />
+          <View
+            style={[
+              styles.heroGlow,
+              { backgroundColor: c.surfaceGlow || `${c.cyan || c.primary}18` },
+            ]}
+          />
 
           <View style={styles.heroTop}>
             <View style={styles.heroCopy}>
-              <Text style={styles.heroLabel}>Available Coins</Text>
+              <Text style={[styles.heroLabel, { color: c.textSecondary }]}>
+                Available Coins
+              </Text>
 
-              <Text style={styles.heroValue}>
+              <Text style={[styles.heroValue, { color: c.text }]}>
                 {loadingBalance ? "..." : coinBalance}
               </Text>
 
-              <Text style={styles.heroSub}>
+              <Text style={[styles.heroSub, { color: c.textSecondary }]}>
                 Earn coins by completing habits, tasks, and quests.
               </Text>
             </View>
 
-            <View style={styles.coinIcon}>
+            <View
+              style={[
+                styles.coinIcon,
+                {
+                  backgroundColor: `${c.cyan || c.primary}12`,
+                  borderColor: c.border,
+                },
+              ]}
+            >
               <MaterialCommunityIcons
                 name="palette-outline"
                 size={32}
-                color={colors.cyan}
+                color={c.cyan || c.primary}
               />
             </View>
           </View>
         </AppCard>
 
         {equippedMessage ? (
-          <AppCard style={styles.equippedToast}>
-            <Text style={styles.equippedText}>{equippedMessage}</Text>
+          <AppCard
+            style={[
+              styles.equippedToast,
+              {
+                borderColor: c.success,
+                backgroundColor: `${c.success}12`,
+              },
+            ]}
+          >
+            <Text style={[styles.equippedText, { color: c.success }]}>
+              {equippedMessage}
+            </Text>
           </AppCard>
         ) : null}
 
         {syncing ? (
           <AppCard style={styles.syncCard}>
-            <Text style={styles.syncText}>Syncing theme ownership...</Text>
+            <Text style={[styles.syncText, { color: c.textSecondary }]}>
+              Syncing theme ownership...
+            </Text>
           </AppCard>
         ) : null}
 
         {sections.map((section) => (
           <View key={section.title} style={styles.section}>
-            <Text style={styles.sectionTitle}>{section.title}</Text>
-            <Text style={styles.sectionHint}>{section.subtitle}</Text>
+            <Text style={[styles.sectionTitle, { color: c.text }]}>
+              {section.title}
+            </Text>
+            <Text style={[styles.sectionHint, { color: c.textSecondary }]}>
+              {section.subtitle}
+            </Text>
 
             {section.data.map(([key, item]) => {
               const selected = themeName === key;
@@ -291,7 +378,8 @@ export default function ThemeStoreScreen() {
                 achievement ||
                 level ||
                 coinBalance >= item.price;
-              const rarityColor = getRarityColor(item);
+
+              const rarityColor = getRarityColor(item, c);
 
               return (
                 <ThemeCard
@@ -305,6 +393,7 @@ export default function ThemeStoreScreen() {
                   affordable={affordable}
                   coinBalance={coinBalance}
                   rarityColor={rarityColor}
+                  themeColors={c}
                   onPress={() => handleThemePress(key)}
                 />
               );
@@ -318,6 +407,7 @@ export default function ThemeStoreScreen() {
         purchaseTarget={purchaseTarget}
         coinBalance={coinBalance}
         purchasing={purchasing}
+        themeColors={c}
         onCancel={() => setPurchaseTarget(null)}
         onConfirm={confirmPurchase}
       />
@@ -325,6 +415,7 @@ export default function ThemeStoreScreen() {
       <UnlockModal
         visible={!!unlockTarget}
         unlockTarget={unlockTarget}
+        themeColors={c}
         onDismiss={dismissUnlockModal}
         onEquip={equipUnlockedTheme}
       />
@@ -342,8 +433,10 @@ function ThemeCard({
   affordable,
   coinBalance,
   rarityColor,
+  themeColors,
   onPress,
 }) {
+  const c = themeColors;
   const scale = useSharedValue(1);
 
   useEffect(() => {
@@ -365,8 +458,8 @@ function ThemeCard({
       <AppCard
         style={[
           styles.themeCard,
-          selected && { borderColor: colors.cyan },
-          !selected && { borderColor: locked ? colors.warning : rarityColor },
+          selected && { borderColor: c.cyan || c.primary },
+          !selected && { borderColor: locked ? c.warning : rarityColor },
           notEnoughCoins && styles.unaffordableCard,
         ]}
       >
@@ -397,23 +490,27 @@ function ThemeCard({
 
           <View style={styles.themeInfo}>
             <View style={styles.titleRow}>
-              <Text style={styles.themeName}>{item.name}</Text>
+              <Text style={[styles.themeName, { color: c.text }]}>
+                {item.name}
+              </Text>
 
               <View
                 style={[
                   styles.badge,
                   {
-                    backgroundColor: selected ? colors.cyan : colors.surfaceAlt,
-                    borderColor: selected ? colors.cyan : colors.border,
+                    backgroundColor: selected
+                      ? c.cyan || c.primary
+                      : c.surfaceAlt,
+                    borderColor: selected ? c.cyan || c.primary : c.border,
                   },
                 ]}
               >
                 <Text
                   style={[
                     styles.badgeText,
-                    selected
-                      ? { color: colors.white }
-                      : { color: colors.textMuted },
+                    {
+                      color: selected ? "#FFFFFF" : c.textMuted || c.muted,
+                    },
                   ]}
                 >
                   {selected
@@ -431,17 +528,19 @@ function ThemeCard({
               </View>
             </View>
 
-            <Text style={styles.description}>{item.description}</Text>
+            <Text style={[styles.description, { color: c.textSecondary }]}>
+              {item.description}
+            </Text>
 
             {level && !owned ? (
               <View style={styles.achievementRow}>
                 <MaterialCommunityIcons
                   name="orbit"
                   size={16}
-                  color={colors.warning}
+                  color={c.warning}
                 />
 
-                <Text style={styles.achievementText}>
+                <Text style={[styles.achievementText, { color: c.warning }]}>
                   Reach Orbit Level {item.unlockLevel}
                 </Text>
               </View>
@@ -452,17 +551,17 @@ function ThemeCard({
                 <MaterialCommunityIcons
                   name="trophy-outline"
                   size={16}
-                  color={colors.warning}
+                  color={c.warning}
                 />
 
-                <Text style={styles.achievementText}>
+                <Text style={[styles.achievementText, { color: c.warning }]}>
                   {getAchievementLabel(item.unlockAchievement)}
                 </Text>
               </View>
             ) : null}
 
             {notEnoughCoins ? (
-              <Text style={styles.shortText}>
+              <Text style={[styles.shortText, { color: c.danger }]}>
                 {item.price - coinBalance} coins short
               </Text>
             ) : null}
@@ -545,40 +644,68 @@ function PurchaseModal({
   purchaseTarget,
   coinBalance,
   purchasing,
+  themeColors,
   onCancel,
   onConfirm,
 }) {
   if (!purchaseTarget) return null;
 
+  const c = themeColors;
   const item = purchaseTarget.theme;
   const remaining = coinBalance - item.price;
-  const rarityColor = getRarityColor(item);
+  const rarityColor = getRarityColor(item, c);
 
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.modalOverlay}>
-        <View style={[styles.modalCard, { borderColor: rarityColor }]}>
+        <View
+          style={[
+            styles.modalCard,
+            {
+              borderColor: rarityColor,
+              backgroundColor: c.surface,
+            },
+          ]}
+        >
           <ThemePreview item={item} large />
 
-          <Text style={styles.modalEyebrow}>
+          <Text style={[styles.modalEyebrow, { color: c.textSecondary }]}>
             {(item.rarity || "common").toUpperCase()} THEME
           </Text>
 
-          <Text style={styles.modalTitle}>Buy {item.name}?</Text>
+          <Text style={[styles.modalTitle, { color: c.text }]}>
+            Buy {item.name}?
+          </Text>
 
-          <Text style={styles.modalDescription}>
+          <Text style={[styles.modalDescription, { color: c.textSecondary }]}>
             This permanently unlocks and equips the theme.
           </Text>
 
-          <View style={styles.costBox}>
+          <View
+            style={[
+              styles.costBox,
+              {
+                borderColor: c.border,
+                backgroundColor: c.surfaceAlt,
+              },
+            ]}
+          >
             <View style={styles.costItem}>
-              <Text style={styles.costLabel}>Cost</Text>
-              <Text style={styles.costValue}>{item.price} coins</Text>
+              <Text style={[styles.costLabel, { color: c.textMuted || c.muted }]}>
+                Cost
+              </Text>
+              <Text style={[styles.costValue, { color: c.text }]}>
+                {item.price} coins
+              </Text>
             </View>
 
             <View style={styles.costItem}>
-              <Text style={styles.costLabel}>After</Text>
-              <Text style={styles.costValue}>{remaining} coins</Text>
+              <Text style={[styles.costLabel, { color: c.textMuted || c.muted }]}>
+                After
+              </Text>
+              <Text style={[styles.costValue, { color: c.text }]}>
+                {remaining} coins
+              </Text>
             </View>
           </View>
 
@@ -604,17 +731,34 @@ function PurchaseModal({
   );
 }
 
-function UnlockModal({ visible, unlockTarget, onDismiss, onEquip }) {
+function UnlockModal({ visible, unlockTarget, themeColors, onDismiss, onEquip }) {
   if (!unlockTarget) return null;
 
+  const c = themeColors;
   const item = unlockTarget.theme;
-  const rarityColor = getRarityColor(item);
+  const rarityColor = getRarityColor(item, c);
 
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.modalOverlay}>
-        <View style={[styles.modalCard, { borderColor: rarityColor }]}>
-          <View style={[styles.unlockIcon, { borderColor: rarityColor }]}>
+        <View
+          style={[
+            styles.modalCard,
+            {
+              borderColor: rarityColor,
+              backgroundColor: c.surface,
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.unlockIcon,
+              {
+                borderColor: rarityColor,
+                backgroundColor: c.surfaceAlt,
+              },
+            ]}
+          >
             <MaterialCommunityIcons
               name={item.type === "level" ? "orbit" : "trophy-award"}
               size={38}
@@ -628,9 +772,9 @@ function UnlockModal({ visible, unlockTarget, onDismiss, onEquip }) {
             Theme Unlocked
           </Text>
 
-          <Text style={styles.modalTitle}>{item.name}</Text>
+          <Text style={[styles.modalTitle, { color: c.text }]}>{item.name}</Text>
 
-          <Text style={styles.modalDescription}>
+          <Text style={[styles.modalDescription, { color: c.textSecondary }]}>
             {item.type === "level"
               ? `You reached Orbit Level ${item.unlockLevel}.`
               : "You earned this theme through achievement progress."}
@@ -659,7 +803,6 @@ function UnlockModal({ visible, unlockTarget, onDismiss, onEquip }) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
   },
 
   container: {
@@ -682,20 +825,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    backgroundColor: colors.surfaceAlt,
-    borderColor: colors.border,
   },
 
   eyebrow: {
     ...typography.caption,
-    color: colors.textSecondary,
     textTransform: "uppercase",
     letterSpacing: 0.8,
   },
 
   title: {
     ...typography.h1,
-    color: colors.text,
     marginTop: spacing.xs,
   },
 
@@ -710,7 +849,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     top: -130,
     right: -90,
-    backgroundColor: `${colors.cyan}18`,
   },
 
   heroTop: {
@@ -725,7 +863,6 @@ const styles = StyleSheet.create({
 
   heroLabel: {
     ...typography.caption,
-    color: colors.textSecondary,
     textTransform: "uppercase",
     letterSpacing: 0.8,
   },
@@ -733,13 +870,11 @@ const styles = StyleSheet.create({
   heroValue: {
     fontSize: 42,
     fontWeight: "900",
-    color: colors.text,
     marginTop: spacing.xs,
   },
 
   heroSub: {
     ...typography.bodyBold,
-    color: colors.textSecondary,
     marginTop: spacing.sm,
   },
 
@@ -750,20 +885,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    backgroundColor: `${colors.cyan}12`,
-    borderColor: colors.border,
   },
 
   equippedToast: {
     marginTop: spacing.md,
     borderWidth: 1,
-    borderColor: colors.success,
-    backgroundColor: `${colors.success}12`,
   },
 
   equippedText: {
     ...typography.bodyBold,
-    color: colors.success,
     textAlign: "center",
   },
 
@@ -773,7 +903,6 @@ const styles = StyleSheet.create({
 
   syncText: {
     ...typography.body,
-    color: colors.textSecondary,
   },
 
   section: {
@@ -782,12 +911,10 @@ const styles = StyleSheet.create({
 
   sectionTitle: {
     ...typography.h3,
-    color: colors.text,
   },
 
   sectionHint: {
     ...typography.caption,
-    color: colors.textSecondary,
     marginTop: spacing.xs,
     marginBottom: spacing.md,
   },
@@ -817,7 +944,7 @@ const styles = StyleSheet.create({
   },
 
   gradientTitle: {
-    color: colors.white,
+    color: "#FFFFFF",
     fontSize: 22,
     fontWeight: "900",
   },
@@ -897,13 +1024,11 @@ const styles = StyleSheet.create({
 
   themeName: {
     ...typography.h3,
-    color: colors.text,
     flex: 1,
   },
 
   description: {
     ...typography.body,
-    color: colors.textSecondary,
     marginTop: spacing.sm,
   },
 
@@ -917,13 +1042,11 @@ const styles = StyleSheet.create({
   achievementText: {
     flex: 1,
     ...typography.caption,
-    color: colors.warning,
     fontWeight: "900",
   },
 
   shortText: {
     ...typography.caption,
-    color: colors.danger,
     fontWeight: "900",
     marginTop: spacing.sm,
   },
@@ -958,7 +1081,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: spacing.xl,
     alignItems: "center",
-    backgroundColor: colors.surface,
   },
 
   modalPreview: {
@@ -1002,20 +1124,17 @@ const styles = StyleSheet.create({
 
   modalEyebrow: {
     ...typography.caption,
-    color: colors.textSecondary,
     fontWeight: "900",
     marginBottom: spacing.sm,
   },
 
   modalTitle: {
     ...typography.h1,
-    color: colors.text,
     textAlign: "center",
   },
 
   modalDescription: {
     ...typography.body,
-    color: colors.textSecondary,
     marginTop: spacing.sm,
     textAlign: "center",
   },
@@ -1024,8 +1143,6 @@ const styles = StyleSheet.create({
     width: "100%",
     borderRadius: radii.xl,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
     padding: spacing.lg,
     marginTop: spacing.lg,
     flexDirection: "row",
@@ -1039,14 +1156,12 @@ const styles = StyleSheet.create({
 
   costLabel: {
     ...typography.caption,
-    color: colors.textMuted,
     fontWeight: "900",
     textTransform: "uppercase",
   },
 
   costValue: {
     ...typography.h3,
-    color: colors.text,
     marginTop: spacing.xs,
   },
 
@@ -1069,7 +1184,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: spacing.lg,
-    backgroundColor: colors.surfaceAlt,
   },
 
   unlockEyebrow: {

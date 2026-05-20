@@ -16,11 +16,11 @@ import { AppInput } from "../components/AppInput";
 import { ScreenHeader } from "../components/ScreenHeader";
 
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../hooks/useTheme";
 
 import { api } from "../lib/api";
 
 import {
-  colors,
   radii,
   spacing,
   typography,
@@ -28,6 +28,8 @@ import {
 
 export default function EditRewardScreen() {
   const { token } = useAuth();
+  const { theme } = useTheme();
+  const c = theme.colors;
 
   const params = useLocalSearchParams();
 
@@ -107,7 +109,13 @@ export default function EditRewardScreen() {
 
   return (
     <ScrollView
-      style={styles.screen}
+      style={[
+        styles.screen,
+        {
+          backgroundColor:
+            c.background,
+        },
+      ]}
       contentContainerStyle={
         styles.container
       }
@@ -123,7 +131,14 @@ export default function EditRewardScreen() {
 
       <AppCard>
         <View style={styles.section}>
-          <Text style={styles.label}>
+          <Text
+            style={[
+              styles.label,
+              {
+                color: c.text,
+              },
+            ]}
+          >
             Reward name
           </Text>
 
@@ -135,7 +150,14 @@ export default function EditRewardScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>
+          <Text
+            style={[
+              styles.label,
+              {
+                color: c.text,
+              },
+            ]}
+          >
             Description
           </Text>
 
@@ -150,7 +172,14 @@ export default function EditRewardScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>
+          <Text
+            style={[
+              styles.label,
+              {
+                color: c.text,
+              },
+            ]}
+          >
             Coin cost
           </Text>
 
@@ -162,40 +191,83 @@ export default function EditRewardScreen() {
           />
         </View>
 
-        <View style={styles.previewBox}>
+        <View
+          style={[
+            styles.previewBox,
+            {
+              borderColor:
+                c.border,
+
+              backgroundColor:
+                c.surfaceAlt,
+            },
+          ]}
+        >
           <View
-            style={styles.previewGlow}
+            style={[
+              styles.previewGlow,
+              {
+                backgroundColor:
+                  `${
+                    c.gold ||
+                    c.primary
+                  }16`,
+              },
+            ]}
           />
 
           <View
-            style={styles.previewTop}
+            style={
+              styles.previewTop
+            }
           >
             <View
-              style={styles.iconCircle}
+              style={[
+                styles.iconCircle,
+                {
+                  backgroundColor:
+                    c.surface,
+
+                  borderColor:
+                    c.border,
+                },
+              ]}
             >
               <Text
-                style={styles.iconText}
+                style={
+                  styles.iconText
+                }
               >
                 🎁
               </Text>
             </View>
 
             <View
-              style={styles.previewText}
+              style={
+                styles.previewText
+              }
             >
               <Text
-                style={
-                  styles.previewTitle
-                }
+                style={[
+                  styles.previewTitle,
+                  {
+                    color:
+                      c.text,
+                  },
+                ]}
               >
                 {name.trim() ||
                   "Your reward"}
               </Text>
 
               <Text
-                style={
-                  styles.previewSubtitle
-                }
+                style={[
+                  styles.previewSubtitle,
+                  {
+                    color:
+                      c.textSecondary,
+                  },
+                ]}
               >
                 {cost
                   ? `${cost} coins`
@@ -212,11 +284,20 @@ export default function EditRewardScreen() {
             <Feather
               name="gift"
               size={16}
-              color={colors.gold}
+              color={
+                c.gold ||
+                c.primary
+              }
             />
 
             <Text
-              style={styles.previewHint}
+              style={[
+                styles.previewHint,
+                {
+                  color:
+                    c.textSecondary,
+                },
+              ]}
             >
               Keep rewards motivating.
             </Text>
@@ -243,7 +324,16 @@ export default function EditRewardScreen() {
           )
         }
       >
-        <Text style={styles.cancelText}>
+        <Text
+          style={[
+            styles.cancelText,
+            {
+              color:
+                c.textMuted ||
+                c.muted,
+            },
+          ]}
+        >
           Cancel
         </Text>
       </Pressable>
@@ -254,8 +344,6 @@ export default function EditRewardScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor:
-      colors.background,
   },
 
   container: {
@@ -269,7 +357,6 @@ const styles = StyleSheet.create({
 
   label: {
     ...typography.bodyBold,
-    color: colors.text,
     marginBottom: spacing.sm,
   },
 
@@ -277,24 +364,22 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderRadius:
       radii.xl,
+
     borderWidth: 1,
-    borderColor:
-      colors.border,
-    backgroundColor:
-      colors.surfaceAlt,
     padding: spacing.lg,
   },
 
   previewGlow: {
     position: "absolute",
+
     width: 180,
     height: 180,
+
     borderRadius:
       radii.pill,
+
     top: -100,
     right: -80,
-    backgroundColor:
-      `${colors.gold}16`,
   },
 
   previewTop: {
@@ -306,16 +391,16 @@ const styles = StyleSheet.create({
   iconCircle: {
     width: 56,
     height: 56,
+
     borderRadius:
       radii.pill,
+
     justifyContent:
       "center",
+
     alignItems: "center",
-    backgroundColor:
-      colors.surface,
+
     borderWidth: 1,
-    borderColor:
-      colors.border,
   },
 
   iconText: {
@@ -328,13 +413,10 @@ const styles = StyleSheet.create({
 
   previewTitle: {
     ...typography.h3,
-    color: colors.text,
   },
 
   previewSubtitle: {
     ...typography.bodyBold,
-    color:
-      colors.textSecondary,
     marginTop: spacing.xs,
   },
 
@@ -347,8 +429,6 @@ const styles = StyleSheet.create({
 
   previewHint: {
     ...typography.caption,
-    color:
-      colors.textSecondary,
   },
 
   button: {
@@ -363,7 +443,5 @@ const styles = StyleSheet.create({
 
   cancelText: {
     ...typography.bodyBold,
-    color:
-      colors.textMuted,
   },
 });

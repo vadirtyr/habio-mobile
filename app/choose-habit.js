@@ -9,8 +9,9 @@ import { AppButton } from "../components/AppButton";
 import { AppCard } from "../components/AppCard";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
-import { colors, radii, shadows, spacing, typography } from "../lib/theme";
+import { radii, shadows, spacing, typography } from "../lib/theme";
 
 const habitCategories = [
   {
@@ -73,6 +74,8 @@ const habitCategories = [
 
 export default function ChooseHabitScreen() {
   const { token } = useAuth();
+  const { theme } = useTheme();
+  const c = theme.colors;
 
   const [selectedCategoryKey, setSelectedCategoryKey] = useState("health");
   const [selectedHabits, setSelectedHabits] = useState([]);
@@ -149,7 +152,7 @@ export default function ChooseHabitScreen() {
 
   return (
     <ScrollView
-      style={styles.screen}
+      style={[styles.screen, { backgroundColor: c.background }]}
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}
     >
@@ -216,43 +219,71 @@ export default function ChooseHabitScreen() {
       <AppCard style={styles.habitCard}>
         <View style={styles.sectionHeader}>
           <View>
-            <Text style={styles.sectionTitle}>Suggested habits</Text>
-            <Text style={styles.sectionHint}>Start with a few small wins.</Text>
+            <Text style={[styles.sectionTitle, { color: c.text }]}>
+              Suggested habits
+            </Text>
+
+            <Text style={[styles.sectionHint, { color: c.textSecondary }]}>
+              Start with a few small wins.
+            </Text>
           </View>
 
-          <View style={styles.sectionBadge}>
+          <View
+            style={[
+              styles.sectionBadge,
+              {
+                borderColor: c.border,
+                backgroundColor: c.surfaceAlt,
+              },
+            ]}
+          >
             <MaterialCommunityIcons
               name="lightning-bolt-outline"
               size={15}
-              color={colors.gold}
+              color={c.gold || c.primary}
             />
-            <Text style={styles.sectionBadgeText}>Momentum</Text>
+            <Text style={[styles.sectionBadgeText, { color: c.textSecondary }]}>
+              Momentum
+            </Text>
           </View>
         </View>
 
         {selectedCategory.habits.map((habitName) => {
           const selected = selectedHabits.includes(habitName);
+          const accentColor = c.cyan || c.primary;
 
           return (
             <AnimatedPressable
               key={habitName}
-              style={[styles.habitRow, selected && styles.habitRowSelected]}
+              style={[
+                styles.habitRow,
+                {
+                  borderColor: selected ? accentColor : c.border,
+                  backgroundColor: selected ? `${accentColor}12` : c.surfaceAlt,
+                },
+              ]}
               onPress={() => toggleHabit(habitName)}
             >
               <View
                 style={[
                   styles.checkCircle,
-                  selected && styles.checkCircleSelected,
+                  {
+                    borderColor: selected ? accentColor : c.border,
+                    backgroundColor: selected ? accentColor : "transparent",
+                  },
                 ]}
               >
                 {selected ? (
-                  <Feather name="check" size={15} color={colors.white} />
+                  <Feather name="check" size={15} color="#FFFFFF" />
                 ) : null}
               </View>
 
               <View style={styles.habitCopy}>
-                <Text style={styles.habitText}>{habitName}</Text>
-                <Text style={styles.habitSubtext}>
+                <Text style={[styles.habitText, { color: c.text }]}>
+                  {habitName}
+                </Text>
+
+                <Text style={[styles.habitSubtext, { color: c.textSecondary }]}>
                   Build consistency and strengthen momentum.
                 </Text>
               </View>
@@ -260,7 +291,7 @@ export default function ChooseHabitScreen() {
               <Feather
                 name={selected ? "check-circle" : "plus-circle"}
                 size={22}
-                color={selected ? colors.cyan : colors.textMuted}
+                color={selected ? accentColor : c.textMuted || c.muted}
               />
             </AnimatedPressable>
           );
@@ -270,21 +301,39 @@ export default function ChooseHabitScreen() {
       {selectedHabits.length > 0 ? (
         <AppCard style={styles.selectedCard}>
           <View style={styles.selectedHeader}>
-            <Text style={styles.selectedTitle}>Your orbit</Text>
-            <Text style={styles.selectedCount}>{selectedHabits.length}</Text>
+            <Text style={[styles.selectedTitle, { color: c.text }]}>
+              Your orbit
+            </Text>
+
+            <Text style={[styles.selectedCount, { color: c.cyan || c.primary }]}>
+              {selectedHabits.length}
+            </Text>
           </View>
 
           <View style={styles.selectedPills}>
-            {selectedHabits.map((habitName) => (
-              <AnimatedPressable
-                key={habitName}
-                style={styles.selectedPill}
-                onPress={() => toggleHabit(habitName)}
-              >
-                <Text style={styles.selectedPillText}>{habitName}</Text>
-                <Feather name="x" size={13} color={colors.cyan} />
-              </AnimatedPressable>
-            ))}
+            {selectedHabits.map((habitName) => {
+              const accentColor = c.cyan || c.primary;
+
+              return (
+                <AnimatedPressable
+                  key={habitName}
+                  style={[
+                    styles.selectedPill,
+                    {
+                      borderColor: accentColor,
+                      backgroundColor: `${accentColor}12`,
+                    },
+                  ]}
+                  onPress={() => toggleHabit(habitName)}
+                >
+                  <Text style={[styles.selectedPillText, { color: accentColor }]}>
+                    {habitName}
+                  </Text>
+
+                  <Feather name="x" size={13} color={accentColor} />
+                </AnimatedPressable>
+              );
+            })}
           </View>
         </AppCard>
       ) : null}
@@ -315,7 +364,6 @@ export default function ChooseHabitScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
   },
 
   container: {
@@ -365,13 +413,13 @@ const styles = StyleSheet.create({
   },
 
   heroBadgeText: {
-    color: colors.white,
+    color: "#FFFFFF",
     fontWeight: "900",
     fontSize: 12,
   },
 
   heroTitle: {
-    color: colors.white,
+    color: "#FFFFFF",
     fontSize: 40,
     fontWeight: "900",
   },
@@ -421,7 +469,7 @@ const styles = StyleSheet.create({
   },
 
   categoryText: {
-    color: colors.white,
+    color: "#FFFFFF",
     fontWeight: "900",
     fontSize: 16,
   },
@@ -440,12 +488,10 @@ const styles = StyleSheet.create({
 
   sectionTitle: {
     ...typography.h3,
-    color: colors.text,
   },
 
   sectionHint: {
     ...typography.caption,
-    color: colors.textSecondary,
     marginTop: spacing.xs,
   },
 
@@ -454,8 +500,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 5,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
     borderRadius: radii.pill,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -463,15 +507,12 @@ const styles = StyleSheet.create({
 
   sectionBadgeText: {
     ...typography.caption,
-    color: colors.textSecondary,
     fontWeight: "900",
   },
 
   habitRow: {
     borderRadius: radii.xl,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
     padding: spacing.lg,
     flexDirection: "row",
     alignItems: "center",
@@ -479,24 +520,13 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
 
-  habitRowSelected: {
-    borderColor: colors.cyan,
-    backgroundColor: `${colors.cyan}12`,
-  },
-
   checkCircle: {
     width: 30,
     height: 30,
     borderRadius: radii.pill,
     borderWidth: 2,
-    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
-  },
-
-  checkCircleSelected: {
-    backgroundColor: colors.cyan,
-    borderColor: colors.cyan,
   },
 
   habitCopy: {
@@ -505,12 +535,10 @@ const styles = StyleSheet.create({
 
   habitText: {
     ...typography.bodyBold,
-    color: colors.text,
   },
 
   habitSubtext: {
     ...typography.caption,
-    color: colors.textSecondary,
     marginTop: spacing.xs,
     lineHeight: 18,
   },
@@ -527,13 +555,11 @@ const styles = StyleSheet.create({
 
   selectedTitle: {
     ...typography.h3,
-    color: colors.text,
   },
 
   selectedCount: {
     fontSize: 28,
     fontWeight: "900",
-    color: colors.cyan,
   },
 
   selectedPills: {
@@ -548,8 +574,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.sm,
     borderWidth: 1,
-    borderColor: colors.cyan,
-    backgroundColor: `${colors.cyan}12`,
     borderRadius: radii.pill,
     paddingVertical: 8,
     paddingHorizontal: 14,
@@ -557,7 +581,6 @@ const styles = StyleSheet.create({
 
   selectedPillText: {
     ...typography.caption,
-    color: colors.cyan,
     fontWeight: "900",
   },
 

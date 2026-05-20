@@ -15,10 +15,10 @@ import { AppCard } from "../components/AppCard";
 import { AppInput } from "../components/AppInput";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
 
 import {
-  colors,
   radii,
   shadows,
   spacing,
@@ -30,25 +30,21 @@ const COIN_OPTIONS = [
     label: "Low",
     value: 5,
     description: "Small daily effort",
-    accent: colors.success,
   },
   {
     label: "Medium",
     value: 10,
     description: "Balanced routine",
-    accent: colors.cyan,
   },
   {
     label: "High",
     value: 20,
     description: "Focused challenge",
-    accent: colors.blue,
   },
   {
     label: "Life Changing",
     value: 50,
     description: "Major commitment",
-    accent: colors.coral,
   },
 ];
 
@@ -73,6 +69,9 @@ function getInitialCoins(params) {
 
 export default function EditHabitScreen() {
   const { token } = useAuth();
+  const { theme } = useTheme();
+  const c = theme.colors;
+
   const params = useLocalSearchParams();
 
   const [name, setName] = useState(params.name || "");
@@ -109,10 +108,12 @@ export default function EditHabitScreen() {
           description: description.trim(),
           frequency:
             params.frequency || "daily",
+
           difficulty:
             getDifficultyForCoins(
               selectedCoins
             ),
+
           custom_coins: selectedCoins,
           icon: params.icon || "flame",
         },
@@ -129,7 +130,12 @@ export default function EditHabitScreen() {
 
   return (
     <ScrollView
-      style={styles.screen}
+      style={[
+        styles.screen,
+        {
+          backgroundColor: c.background,
+        },
+      ]}
       contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
@@ -141,7 +147,14 @@ export default function EditHabitScreen() {
 
       <AppCard>
         <View style={styles.section}>
-          <Text style={styles.label}>
+          <Text
+            style={[
+              styles.label,
+              {
+                color: c.text,
+              },
+            ]}
+          >
             Habit name
           </Text>
 
@@ -153,7 +166,14 @@ export default function EditHabitScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>
+          <Text
+            style={[
+              styles.label,
+              {
+                color: c.text,
+              },
+            ]}
+          >
             Description
           </Text>
 
@@ -166,14 +186,32 @@ export default function EditHabitScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>
+          <Text
+            style={[
+              styles.label,
+              {
+                color: c.text,
+              },
+            ]}
+          >
             Coin value
           </Text>
 
           <View style={styles.coinGrid}>
-            {COIN_OPTIONS.map((option) => {
+            {COIN_OPTIONS.map((option, index) => {
               const active =
                 selectedCoins === option.value;
+
+              const accentColors = [
+                c.success,
+                c.cyan || c.primary,
+                c.blue || c.primary,
+                c.coral || c.primary,
+              ];
+
+              const accent =
+                accentColors[index] ||
+                c.primary;
 
               return (
                 <Pressable
@@ -185,12 +223,12 @@ export default function EditHabitScreen() {
                     styles.coinOption,
                     {
                       borderColor: active
-                        ? option.accent
-                        : colors.border,
+                        ? accent
+                        : c.border,
 
                       backgroundColor: active
-                        ? `${option.accent}12`
-                        : colors.surfaceAlt,
+                        ? `${accent}12`
+                        : c.surfaceAlt,
                     },
 
                     active && styles.coinActive,
@@ -201,7 +239,7 @@ export default function EditHabitScreen() {
                       styles.coinDot,
                       {
                         backgroundColor:
-                          option.accent,
+                          accent,
                       },
                     ]}
                   />
@@ -209,8 +247,10 @@ export default function EditHabitScreen() {
                   <Text
                     style={[
                       styles.coinLabel,
-                      active && {
-                        color: option.accent,
+                      {
+                        color: active
+                          ? accent
+                          : c.text,
                       },
                     ]}
                   >
@@ -218,15 +258,24 @@ export default function EditHabitScreen() {
                   </Text>
 
                   <Text
-                    style={styles.coinValue}
+                    style={[
+                      styles.coinValue,
+                      {
+                        color: c.text,
+                      },
+                    ]}
                   >
                     {option.value} coins
                   </Text>
 
                   <Text
-                    style={
-                      styles.coinDescription
-                    }
+                    style={[
+                      styles.coinDescription,
+                      {
+                        color:
+                          c.textSecondary,
+                      },
+                    ]}
                   >
                     {option.description}
                   </Text>
@@ -236,24 +285,65 @@ export default function EditHabitScreen() {
           </View>
         </View>
 
-        <View style={styles.previewBox}>
-          <View style={styles.previewGlow} />
+        <View
+          style={[
+            styles.previewBox,
+            {
+              borderColor: c.border,
+              backgroundColor:
+                c.surfaceAlt,
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.previewGlow,
+              {
+                backgroundColor: `${
+                  c.cyan || c.primary
+                }14`,
+              },
+            ]}
+          />
 
           <View style={styles.previewTop}>
-            <View style={styles.iconCircle}>
+            <View
+              style={[
+                styles.iconCircle,
+                {
+                  backgroundColor:
+                    c.surface,
+
+                  borderColor: c.border,
+                },
+              ]}
+            >
               <Text style={styles.iconText}>
                 🔥
               </Text>
             </View>
 
             <View style={styles.previewText}>
-              <Text style={styles.previewTitle}>
+              <Text
+                style={[
+                  styles.previewTitle,
+                  {
+                    color: c.text,
+                  },
+                ]}
+              >
                 {name.trim() ||
                   "Your habit"}
               </Text>
 
               <Text
-                style={styles.previewSubtitle}
+                style={[
+                  styles.previewSubtitle,
+                  {
+                    color:
+                      c.textSecondary,
+                  },
+                ]}
               >
                 {params.frequency ||
                   "daily"}{" "}
@@ -270,10 +360,20 @@ export default function EditHabitScreen() {
             <Feather
               name="repeat"
               size={16}
-              color={colors.cyan}
+              color={
+                c.cyan || c.primary
+              }
             />
 
-            <Text style={styles.previewHint}>
+            <Text
+              style={[
+                styles.previewHint,
+                {
+                  color:
+                    c.textSecondary,
+                },
+              ]}
+            >
               Momentum compounds daily.
             </Text>
           </View>
@@ -297,7 +397,16 @@ export default function EditHabitScreen() {
           router.replace("/(tabs)/habits")
         }
       >
-        <Text style={styles.cancelText}>
+        <Text
+          style={[
+            styles.cancelText,
+            {
+              color:
+                c.textMuted ||
+                c.muted,
+            },
+          ]}
+        >
           Cancel
         </Text>
       </Pressable>
@@ -308,7 +417,6 @@ export default function EditHabitScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
   },
 
   container: {
@@ -322,7 +430,6 @@ const styles = StyleSheet.create({
 
   label: {
     ...typography.bodyBold,
-    color: colors.text,
     marginBottom: spacing.sm,
   },
 
@@ -337,7 +444,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.xl,
     borderWidth: 1,
     padding: spacing.lg,
-    backgroundColor: colors.surfaceAlt,
   },
 
   coinActive: {
@@ -353,18 +459,15 @@ const styles = StyleSheet.create({
 
   coinLabel: {
     ...typography.bodyBold,
-    color: colors.text,
   },
 
   coinValue: {
     ...typography.h3,
-    color: colors.text,
     marginTop: spacing.xs,
   },
 
   coinDescription: {
     ...typography.caption,
-    color: colors.textSecondary,
     marginTop: spacing.sm,
     lineHeight: 18,
   },
@@ -373,8 +476,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderRadius: radii.xl,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
     padding: spacing.lg,
   },
 
@@ -385,7 +486,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     top: -100,
     right: -80,
-    backgroundColor: `${colors.cyan}14`,
   },
 
   previewTop: {
@@ -400,9 +500,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
   },
 
   iconText: {
@@ -415,12 +513,10 @@ const styles = StyleSheet.create({
 
   previewTitle: {
     ...typography.h3,
-    color: colors.text,
   },
 
   previewSubtitle: {
     ...typography.bodyBold,
-    color: colors.textSecondary,
     marginTop: spacing.xs,
     textTransform: "capitalize",
   },
@@ -434,7 +530,6 @@ const styles = StyleSheet.create({
 
   previewHint: {
     ...typography.caption,
-    color: colors.textSecondary,
   },
 
   button: {
@@ -448,6 +543,5 @@ const styles = StyleSheet.create({
 
   cancelText: {
     ...typography.bodyBold,
-    color: colors.textMuted,
   },
 });

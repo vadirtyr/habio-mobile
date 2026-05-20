@@ -1,11 +1,11 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
-  View,
-  Text,
-  TextInput,
+  Alert,
   Pressable,
   StyleSheet,
-  Alert,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 
 export default function LoginScreen() {
@@ -18,7 +18,7 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Habio</Text>
+      <Text style={styles.title}>OurOrbit</Text>
 
       <TextInput
         style={styles.input}

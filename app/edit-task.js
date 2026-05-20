@@ -16,43 +16,18 @@ import { AppButton } from "../components/AppButton";
 import { AppCard } from "../components/AppCard";
 import { AppInput } from "../components/AppInput";
 import { ScreenHeader } from "../components/ScreenHeader";
+
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../hooks/useTheme";
+
 import { api } from "../lib/api";
 
 import {
-  colors,
   radii,
   shadows,
   spacing,
   typography,
 } from "../lib/theme";
-
-const COIN_OPTIONS = [
-  {
-    label: "Low",
-    value: 5,
-    description: "Quick win",
-    accent: colors.success,
-  },
-  {
-    label: "Medium",
-    value: 10,
-    description: "Normal effort",
-    accent: colors.cyan,
-  },
-  {
-    label: "High",
-    value: 20,
-    description: "Focused work",
-    accent: colors.blue,
-  },
-  {
-    label: "Life Changing",
-    value: 50,
-    description: "Major impact",
-    accent: colors.coral,
-  },
-];
 
 function getDifficultyForCoins(coins) {
   if (coins === 5) return "easy";
@@ -79,9 +54,40 @@ function formatDate(date) {
 
 export default function EditTaskScreen() {
   const { token } = useAuth();
+  const { theme } = useTheme();
+  const c = theme.colors;
+
   const params = useLocalSearchParams();
 
+  const COIN_OPTIONS = [
+    {
+      label: "Low",
+      value: 5,
+      description: "Quick win",
+      accent: c.success,
+    },
+    {
+      label: "Medium",
+      value: 10,
+      description: "Normal effort",
+      accent: c.cyan || c.primary,
+    },
+    {
+      label: "High",
+      value: 20,
+      description: "Focused work",
+      accent: c.blue || c.primary,
+    },
+    {
+      label: "Life Changing",
+      value: 50,
+      description: "Major impact",
+      accent: c.coral || c.primary,
+    },
+  ];
+
   const [name, setName] = useState(params.name || "");
+
   const [description, setDescription] =
     useState(params.description || "");
 
@@ -122,12 +128,18 @@ export default function EditTaskScreen() {
         {
           name: name.trim(),
           description: description.trim(),
+
           difficulty:
-            getDifficultyForCoins(selectedCoins),
+            getDifficultyForCoins(
+              selectedCoins
+            ),
+
           custom_coins: selectedCoins,
+
           due_date: dueDate
             ? formatDate(dueDate)
             : null,
+
           recurrence:
             params.recurrence || "none",
         },
@@ -136,7 +148,10 @@ export default function EditTaskScreen() {
 
       router.replace("/(tabs)/tasks");
     } catch (error) {
-      Alert.alert("Error", error.message);
+      Alert.alert(
+        "Error",
+        error.message
+      );
     } finally {
       setSubmitting(false);
     }
@@ -157,10 +172,20 @@ export default function EditTaskScreen() {
 
   return (
     <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.container}
+      style={[
+        styles.screen,
+        {
+          backgroundColor:
+            c.background,
+        },
+      ]}
+      contentContainerStyle={
+        styles.container
+      }
       keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
+      showsVerticalScrollIndicator={
+        false
+      }
     >
       <ScreenHeader
         title="Update Task"
@@ -169,7 +194,14 @@ export default function EditTaskScreen() {
 
       <AppCard>
         <View style={styles.section}>
-          <Text style={styles.label}>
+          <Text
+            style={[
+              styles.label,
+              {
+                color: c.text,
+              },
+            ]}
+          >
             Task name
           </Text>
 
@@ -181,7 +213,14 @@ export default function EditTaskScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>
+          <Text
+            style={[
+              styles.label,
+              {
+                color: c.text,
+              },
+            ]}
+          >
             Description
           </Text>
 
@@ -194,7 +233,14 @@ export default function EditTaskScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>
+          <Text
+            style={[
+              styles.label,
+              {
+                color: c.text,
+              },
+            ]}
+          >
             Coin value
           </Text>
 
@@ -207,21 +253,24 @@ export default function EditTaskScreen() {
                 <Pressable
                   key={option.value}
                   onPress={() =>
-                    setSelectedCoins(option.value)
+                    setSelectedCoins(
+                      option.value
+                    )
                   }
                   style={[
                     styles.coinOption,
                     {
                       borderColor: active
                         ? option.accent
-                        : colors.border,
+                        : c.border,
 
                       backgroundColor: active
                         ? `${option.accent}12`
-                        : colors.surfaceAlt,
+                        : c.surfaceAlt,
                     },
 
-                    active && styles.coinActive,
+                    active &&
+                      styles.coinActive,
                   ]}
                 >
                   <View
@@ -237,8 +286,10 @@ export default function EditTaskScreen() {
                   <Text
                     style={[
                       styles.coinLabel,
-                      active && {
-                        color: option.accent,
+                      {
+                        color: active
+                          ? option.accent
+                          : c.text,
                       },
                     ]}
                   >
@@ -246,15 +297,24 @@ export default function EditTaskScreen() {
                   </Text>
 
                   <Text
-                    style={styles.coinValue}
+                    style={[
+                      styles.coinValue,
+                      {
+                        color: c.text,
+                      },
+                    ]}
                   >
                     {option.value} coins
                   </Text>
 
                   <Text
-                    style={
-                      styles.coinDescription
-                    }
+                    style={[
+                      styles.coinDescription,
+                      {
+                        color:
+                          c.textSecondary,
+                      },
+                    ]}
                   >
                     {option.description}
                   </Text>
@@ -265,32 +325,81 @@ export default function EditTaskScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>
+          <Text
+            style={[
+              styles.label,
+              {
+                color: c.text,
+              },
+            ]}
+          >
             Due date
           </Text>
 
           <Pressable
-            style={styles.dateButton}
+            style={[
+              styles.dateButton,
+              {
+                borderColor:
+                  c.border,
+
+                backgroundColor:
+                  c.surfaceAlt,
+              },
+            ]}
             onPress={() =>
               setShowPicker(true)
             }
           >
             <View>
-              <Text style={styles.dateLabel}>
+              <Text
+                style={[
+                  styles.dateLabel,
+                  {
+                    color:
+                      c.textMuted ||
+                      c.muted,
+                  },
+                ]}
+              >
                 {dueDate
                   ? "Selected date"
                   : "No due date"}
               </Text>
 
-              <Text style={styles.dateText}>
+              <Text
+                style={[
+                  styles.dateText,
+                  {
+                    color: c.text,
+                  },
+                ]}
+              >
                 {dueDate
-                  ? formatDate(dueDate)
+                  ? formatDate(
+                      dueDate
+                    )
                   : "Tap to pick a date"}
               </Text>
             </View>
 
-            <View style={styles.dateIconCircle}>
-              <Text style={styles.dateIcon}>
+            <View
+              style={[
+                styles.dateIconCircle,
+                {
+                  backgroundColor:
+                    c.surface,
+
+                  borderColor:
+                    c.border,
+                },
+              ]}
+            >
+              <Text
+                style={
+                  styles.dateIcon
+                }
+              >
                 📅
               </Text>
             </View>
@@ -298,13 +407,28 @@ export default function EditTaskScreen() {
 
           {dueDate && (
             <Pressable
-              style={styles.clearDateButton}
+              style={[
+                styles.clearDateButton,
+                {
+                  backgroundColor:
+                    `${c.danger}12`,
+
+                  borderColor:
+                    `${c.danger}30`,
+                },
+              ]}
               onPress={() =>
                 setDueDate(null)
               }
             >
               <Text
-                style={styles.clearDateText}
+                style={[
+                  styles.clearDateText,
+                  {
+                    color:
+                      c.danger,
+                  },
+                ]}
               >
                 Clear due date
               </Text>
@@ -313,53 +437,135 @@ export default function EditTaskScreen() {
 
           {showPicker && (
             <DateTimePicker
-              value={dueDate || new Date()}
+              value={
+                dueDate ||
+                new Date()
+              }
               mode="date"
               display="default"
-              onChange={handleDateChange}
+              onChange={
+                handleDateChange
+              }
             />
           )}
         </View>
 
-        <View style={styles.previewBox}>
-          <View style={styles.previewGlow} />
+        <View
+          style={[
+            styles.previewBox,
+            {
+              borderColor:
+                c.border,
 
-          <View style={styles.previewTop}>
-            <View style={styles.iconCircle}>
-              <Text style={styles.iconText}>
+              backgroundColor:
+                c.surfaceAlt,
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.previewGlow,
+              {
+                backgroundColor:
+                  `${
+                    c.blue ||
+                    c.primary
+                  }14`,
+              },
+            ]}
+          />
+
+          <View
+            style={
+              styles.previewTop
+            }
+          >
+            <View
+              style={[
+                styles.iconCircle,
+                {
+                  backgroundColor:
+                    c.surface,
+
+                  borderColor:
+                    c.border,
+                },
+              ]}
+            >
+              <Text
+                style={
+                  styles.iconText
+                }
+              >
                 📌
               </Text>
             </View>
 
-            <View style={styles.previewText}>
-              <Text style={styles.previewTitle}>
+            <View
+              style={
+                styles.previewText
+              }
+            >
+              <Text
+                style={[
+                  styles.previewTitle,
+                  {
+                    color:
+                      c.text,
+                  },
+                ]}
+              >
                 {name.trim() ||
                   "Your task"}
               </Text>
 
               <Text
-                style={styles.previewSubtitle}
+                style={[
+                  styles.previewSubtitle,
+                  {
+                    color:
+                      c.textSecondary,
+                  },
+                ]}
               >
                 {dueDate
-                  ? formatDate(dueDate)
+                  ? formatDate(
+                      dueDate
+                    )
                   : "No due date"}{" "}
                 •{" "}
                 {getDifficultyForCoins(
                   selectedCoins
                 )}{" "}
-                • {selectedCoins} coins
+                •{" "}
+                {selectedCoins} coins
               </Text>
             </View>
           </View>
 
-          <View style={styles.previewFooter}>
+          <View
+            style={
+              styles.previewFooter
+            }
+          >
             <Feather
               name="check-square"
               size={16}
-              color={colors.blue}
+              color={
+                c.blue ||
+                c.primary
+              }
             />
 
-            <Text style={styles.previewHint}>
+            <Text
+              style={[
+                styles.previewHint,
+                {
+                  color:
+                    c.textSecondary,
+                },
+              ]}
+            >
               Progress comes from execution.
             </Text>
           </View>
@@ -380,10 +586,21 @@ export default function EditTaskScreen() {
       <Pressable
         style={styles.cancelButton}
         onPress={() =>
-          router.replace("/(tabs)/tasks")
+          router.replace(
+            "/(tabs)/tasks"
+          )
         }
       >
-        <Text style={styles.cancelText}>
+        <Text
+          style={[
+            styles.cancelText,
+            {
+              color:
+                c.textMuted ||
+                c.muted,
+            },
+          ]}
+        >
           Cancel
         </Text>
       </Pressable>
@@ -394,7 +611,6 @@ export default function EditTaskScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
   },
 
   container: {
@@ -408,7 +624,6 @@ const styles = StyleSheet.create({
 
   label: {
     ...typography.bodyBold,
-    color: colors.text,
     marginBottom: spacing.sm,
   },
 
@@ -423,7 +638,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.xl,
     borderWidth: 1,
     padding: spacing.lg,
-    backgroundColor: colors.surfaceAlt,
   },
 
   coinActive: {
@@ -439,26 +653,21 @@ const styles = StyleSheet.create({
 
   coinLabel: {
     ...typography.bodyBold,
-    color: colors.text,
   },
 
   coinValue: {
     ...typography.h3,
-    color: colors.text,
     marginTop: spacing.xs,
   },
 
   coinDescription: {
     ...typography.caption,
-    color: colors.textSecondary,
     marginTop: spacing.sm,
     lineHeight: 18,
   },
 
   dateButton: {
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
     borderRadius: radii.xl,
     padding: spacing.lg,
     flexDirection: "row",
@@ -468,14 +677,12 @@ const styles = StyleSheet.create({
 
   dateLabel: {
     ...typography.caption,
-    color: colors.textMuted,
     textTransform: "uppercase",
     letterSpacing: 0.8,
   },
 
   dateText: {
     ...typography.bodyBold,
-    color: colors.text,
     marginTop: spacing.xs,
   },
 
@@ -483,11 +690,9 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: radii.pill,
-    backgroundColor: colors.surface,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: colors.border,
   },
 
   dateIcon: {
@@ -500,14 +705,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: radii.pill,
-    backgroundColor: `${colors.danger}12`,
     borderWidth: 1,
-    borderColor: `${colors.danger}30`,
   },
 
   clearDateText: {
     ...typography.caption,
-    color: colors.danger,
     fontWeight: "900",
   },
 
@@ -515,8 +717,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderRadius: radii.xl,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
     padding: spacing.lg,
   },
 
@@ -527,7 +727,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     top: -100,
     right: -80,
-    backgroundColor: `${colors.blue}14`,
   },
 
   previewTop: {
@@ -542,9 +741,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
   },
 
   iconText: {
@@ -557,12 +754,10 @@ const styles = StyleSheet.create({
 
   previewTitle: {
     ...typography.h3,
-    color: colors.text,
   },
 
   previewSubtitle: {
     ...typography.bodyBold,
-    color: colors.textSecondary,
     marginTop: spacing.xs,
     textTransform: "capitalize",
   },
@@ -576,7 +771,6 @@ const styles = StyleSheet.create({
 
   previewHint: {
     ...typography.caption,
-    color: colors.textSecondary,
   },
 
   button: {
@@ -590,6 +784,5 @@ const styles = StyleSheet.create({
 
   cancelText: {
     ...typography.bodyBold,
-    color: colors.textMuted,
   },
 });

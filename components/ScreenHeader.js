@@ -1,7 +1,8 @@
 import { StyleSheet, Text, View } from "react-native";
 
+import { useTheme } from "../hooks/useTheme";
+
 import {
-    colors,
     spacing,
     typography,
 } from "../lib/theme";
@@ -11,15 +12,33 @@ export function ScreenHeader({
   subtitle,
   right,
 }) {
+  const { theme } = useTheme();
+  const c = theme.colors;
+
   return (
     <View style={styles.container}>
       <View style={styles.left}>
-        <Text style={styles.title}>
+        <Text
+          style={[
+            styles.title,
+            {
+              color: c.text,
+            },
+          ]}
+        >
           {title}
         </Text>
 
         {subtitle ? (
-          <Text style={styles.subtitle}>
+          <Text
+            style={[
+              styles.subtitle,
+              {
+                color:
+                  c.textSecondary,
+              },
+            ]}
+          >
             {subtitle}
           </Text>
         ) : null}
@@ -48,12 +67,10 @@ const styles = StyleSheet.create({
 
   title: {
     ...typography.h1,
-    color: colors.text,
   },
 
   subtitle: {
     ...typography.body,
-    color: colors.textSecondary,
     marginTop: spacing.xs,
   },
 });

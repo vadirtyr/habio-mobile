@@ -1,41 +1,74 @@
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Alert,
-  FlatList,
-  Modal,
-  StyleSheet,
-  Text,
-  View
-} from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, FlatList, Modal, StyleSheet, Text, View } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withDelay,
+  withSequence,
+  withSpring,
   withTiming,
 } from "react-native-reanimated";
 
 import { AnimatedPressable } from "../../components/AnimatedPressable";
+import { AnimatedScreen } from "../../components/AnimatedScreen";
 import { AppButton } from "../../components/AppButton";
 import { AppCard } from "../../components/AppCard";
+import { BrandHeader } from "../../components/BrandMark";
 import { EmptyState } from "../../components/EmptyState";
-import { ScreenHeader } from "../../components/ScreenHeader";
+import { OrbitProgressBar } from "../../components/OrbitProgressBar";
 import { SectionTitle } from "../../components/SectionTitle";
 import { SkeletonCard } from "../../components/SkeletonCard";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../hooks/useTheme";
 import { api } from "../../lib/api";
-import { colors, radii, spacing, typography } from "../../lib/theme";
+import { radii, spacing, typography } from "../../lib/theme";
 
 export default function RewardsScreen() {
   const { token } = useAuth();
+  const { theme } = useTheme();
+  const c = theme.colors;
 
   const [rewards, setRewards] = useState([]);
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState(null);
   const [redeemedReward, setRedeemedReward] = useState(null);
+
+  const firstBalanceLoad = useRef(true);
+  const coinScale = useSharedValue(1);
+
+  const coinAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: coinScale.value }],
+  }));
+
+  useEffect(() => {
+    if (firstBalanceLoad.current) {
+      firstBalanceLoad.current = false;
+      return;
+    }
+
+    coinScale.value = withSequence(
+      withSpring(1.1, { damping: 12, stiffness: 260 }),
+      withSpring(1, { damping: 14, stiffness: 240 })
+    );
+  }, [balance]);
+
+  const sortedRewards = useMemo(() => {
+    return [...rewards].sort((a, b) => {
+      const aRedeemable = balance >= a.cost;
+      const bRedeemable = balance >= b.cost;
+
+      if (aRedeemable === bRedeemable) {
+        return a.cost - b.cost;
+      }
+
+      return aRedeemable ? -1 : 1;
+    });
+  }, [rewards, balance]);
 
   const redeemableCount = useMemo(
     () => rewards.filter((reward) => balance >= reward.cost).length,
@@ -56,6 +89,12 @@ export default function RewardsScreen() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    await fetchRewards();
+    setRefreshing(false);
   }
 
   async function redeemReward(reward) {
@@ -81,7 +120,7 @@ export default function RewardsScreen() {
       fetchRewards();
 
       setTimeout(() => setMessage(null), 2200);
-      setTimeout(() => setRedeemedReward(null), 2000);
+      setTimeout(() => setRedeemedReward(null), 2200);
     } catch (error) {
       Alert.alert("Error", error.message);
     }
@@ -119,10 +158,6 @@ export default function RewardsScreen() {
     }
   }
 
-  useEffect(() => {
-    fetchRewards();
-  }, [token]);
-
   useFocusEffect(
     useCallback(() => {
       fetchRewards();
@@ -130,113 +165,149 @@ export default function RewardsScreen() {
   );
 
   if (loading) {
-  return (
-    <View style={styles.container}>
-      <ScreenHeader
-        title="Rewards"
-        subtitle="Loading rewards..."
-      />
+    return (
+      <View style={[styles.container, { backgroundColor: c.background }]}>
+        <BrandHeader
+          eyebrow="OurOrbit"
+          title="Rewards"
+          subtitle="Loading rewards..."
+          compact
+        />
 
-      <SkeletonCard lines={2} />
-      <SkeletonCard />
-      <SkeletonCard />
-      <SkeletonCard compact />
-    </View>
-  );
-}
+        <SkeletonCard lines={2} />
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonCard compact />
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: c.background }]}>
       <RedeemCelebration reward={redeemedReward} />
 
       <FlatList
-        data={rewards}
+        data={sortedRewards}
         keyExtractor={(item) => item.id}
-        refreshing={loading}
-        onRefresh={fetchRewards}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View>
-            <ScreenHeader
-              title="Rewards"
-              subtitle="Spend coins on things worth earning."
-            />
+            <AnimatedScreen delay={40}>
+              <BrandHeader
+                eyebrow="OurOrbit"
+                title="Rewards"
+                subtitle="Spend coins on things worth earning."
+                compact
+              />
+            </AnimatedScreen>
 
-            <AppCard style={styles.heroCard}>
-              <View style={styles.heroGlowGold} />
-              <View style={styles.heroGlowCoral} />
+            <AnimatedScreen delay={80}>
+              <AppCard style={styles.heroCard}>
+                <View
+                  style={[
+                    styles.heroGlowGold,
+                    { backgroundColor: `${c.gold || c.primary}18` },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.heroGlowCoral,
+                    { backgroundColor: `${c.coral || c.primary}10` },
+                  ]}
+                />
 
-              <View style={styles.heroTop}>
-                <View style={styles.heroCopy}>
-                  <Text style={styles.heroEyebrow}>Available Coins</Text>
+                <View style={styles.heroTop}>
+                  <View style={styles.heroCopy}>
+                    <Text style={[styles.heroEyebrow, { color: c.textSecondary }]}>
+                      Available Coins
+                    </Text>
 
-                  <Text style={styles.heroValue}>{balance}</Text>
+                    <Text style={[styles.heroValue, { color: c.text }]}>
+                      {balance}
+                    </Text>
 
-                  <Text style={styles.heroSubtitle}>
-                    {redeemableCount > 0
-                      ? `${redeemableCount} reward${
-                          redeemableCount === 1 ? "" : "s"
-                        } ready to redeem`
-                      : "Keep building momentum"}
-                  </Text>
+                    <Text style={[styles.heroSubtitle, { color: c.textSecondary }]}>
+                      {redeemableCount > 0
+                        ? `${redeemableCount} reward${
+                            redeemableCount === 1 ? "" : "s"
+                          } ready to redeem`
+                        : "Keep building momentum"}
+                    </Text>
+                  </View>
+
+                  <Animated.View
+                    style={[
+                      styles.coinCircle,
+                      {
+                        backgroundColor: `${c.gold || c.primary}18`,
+                        borderColor: c.border,
+                      },
+                      coinAnimatedStyle,
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name="gift-outline"
+                      size={34}
+                      color={c.gold || c.primary}
+                    />
+                  </Animated.View>
                 </View>
 
-                <View style={styles.coinCircle}>
-                  <MaterialCommunityIcons
-                    name="gift-outline"
-                    size={34}
-                    color={colors.gold}
+                <View style={styles.heroActions}>
+                  <AppButton
+                    title="Add Reward"
+                    style={styles.heroButton}
+                    onPress={() => router.push("/create-reward")}
                   />
                 </View>
-              </View>
-
-              <View style={styles.heroActions}>
-                <AppButton
-                  title="Add Reward"
-                  style={styles.heroButton}
-                  onPress={() => router.push("/create-reward")}
-                />
-              </View>
-            </AppCard>
+              </AppCard>
+            </AnimatedScreen>
 
             <RewardToast message={message} />
 
             {rewards.length > 0 ? (
-              <SectionTitle
-                title="Reward Shop"
-                action={
-                  <Text style={styles.sectionHint}>
-                    Earn it. Redeem it.
-                  </Text>
-                }
-              />
+              <AnimatedScreen delay={120}>
+                <SectionTitle
+                  title="Reward Shop"
+                  subtitle="Earn it. Redeem it."
+                />
+              </AnimatedScreen>
             ) : null}
           </View>
         }
         ListEmptyComponent={
-          <AppCard style={styles.emptyCard}>
-            <EmptyState
-              title="No rewards yet"
-              description="Add rewards that genuinely motivate you."
-              icon={
-                <MaterialCommunityIcons
-                  name="gift-outline"
-                  size={42}
-                  color={colors.gold}
-                />
-              }
-            />
+          <AnimatedScreen delay={120}>
+            <AppCard style={styles.emptyCard}>
+              <EmptyState
+                title="No rewards yet"
+                description="Add rewards that genuinely motivate you."
+                icon={
+                  <MaterialCommunityIcons
+                    name="gift-outline"
+                    size={42}
+                    color={c.gold || c.primary}
+                  />
+                }
+              />
 
-            <AppButton
-              title="Create Reward"
-              onPress={() => router.push("/create-reward")}
-            />
-          </AppCard>
+              <AppButton
+                title="Create Reward"
+                onPress={() => router.push("/create-reward")}
+              />
+            </AppCard>
+          </AnimatedScreen>
         }
         renderItem={({ item, index }) => {
           const canRedeem = balance >= item.cost;
-          const rarity = getRewardTier(item.cost);
+          const rarity = getRewardTier(item.cost, c);
+          const shortBy = Math.max(0, item.cost - balance);
+          const progress =
+            item.cost > 0
+              ? Math.min(100, Math.round((balance / item.cost) * 100))
+              : 100;
 
           return (
             <AnimatedCard index={index}>
@@ -245,6 +316,8 @@ export default function RewardsScreen() {
                 canRedeem={canRedeem}
                 rarity={rarity}
                 balance={balance}
+                shortBy={shortBy}
+                progress={progress}
                 onRedeem={() => redeemReward(item)}
                 onDelete={() => confirmDeleteReward(item)}
                 onEdit={() =>
@@ -273,128 +346,211 @@ function RewardCard({
   canRedeem,
   rarity,
   balance,
+  shortBy,
+  progress,
   onRedeem,
   onEdit,
   onDelete,
 }) {
+  const { theme } = useTheme();
+  const c = theme.colors;
+
+  const cardScale = useSharedValue(1);
+  const glowScale = useSharedValue(0.95);
+
+  const cardAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: cardScale.value }],
+  }));
+
+  const glowAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: glowScale.value }],
+  }));
+
+  const lockedLabel =
+    shortBy <= 25 ? "Almost there" : `${shortBy} coins short`;
+
+  function handleRedeem() {
+    if (!canRedeem) return;
+
+    cardScale.value = withSequence(
+      withSpring(1.025, { damping: 12, stiffness: 260 }),
+      withSpring(1, { damping: 15, stiffness: 240 })
+    );
+
+    glowScale.value = withSequence(
+      withTiming(1.12, { duration: 160 }),
+      withTiming(0.95, { duration: 260 })
+    );
+
+    onRedeem();
+  }
+
   return (
-    <AppCard
+    <Animated.View
       style={[
-        styles.card,
-        !canRedeem && styles.lockedCard,
-        canRedeem && { borderColor: rarity.color },
+        cardAnimatedStyle,
+        !canRedeem && styles.lockedRewardWrap,
       ]}
     >
-      <View
+      <AppCard
         style={[
-          styles.rarityGlow,
-          {
-            backgroundColor: `${rarity.color}15`,
+          styles.card,
+          !canRedeem && {
+            borderColor: c.border,
+            backgroundColor: c.surfaceAlt,
           },
+          canRedeem && { borderColor: rarity.color },
         ]}
-      />
-
-      <View style={styles.cardTop}>
-        <View
+      >
+        <Animated.View
           style={[
-            styles.iconCircle,
+            styles.rarityGlow,
             {
-              backgroundColor: canRedeem
-                ? `${rarity.color}18`
-                : colors.surfaceAlt,
-              borderColor: canRedeem ? rarity.color : colors.border,
+              backgroundColor: `${rarity.color}15`,
             },
+            glowAnimatedStyle,
           ]}
-        >
-          <Feather
-            name={canRedeem ? "gift" : "lock"}
-            size={22}
-            color={canRedeem ? rarity.color : colors.textMuted}
+        />
+
+        <View style={styles.cardTop}>
+          <View
+            style={[
+              styles.iconCircle,
+              {
+                backgroundColor: canRedeem
+                  ? `${rarity.color}18`
+                  : c.surfaceAlt,
+                borderColor: canRedeem ? rarity.color : c.border,
+              },
+            ]}
+          >
+            <Feather
+              name={canRedeem ? "gift" : "lock"}
+              size={22}
+              color={canRedeem ? rarity.color : c.textMuted || c.muted}
+            />
+          </View>
+
+          <View style={styles.cardCopy}>
+            <View style={styles.nameRow}>
+              <Text style={[styles.name, { color: c.text }]}>{item.name}</Text>
+
+              <CompactPill text={rarity.label} color={rarity.color} highlight />
+            </View>
+
+            {!!item.description && (
+              <Text style={[styles.description, { color: c.textSecondary }]}>
+                {item.description}
+              </Text>
+            )}
+          </View>
+        </View>
+
+        <View style={styles.metaRow}>
+          <CompactPill
+            icon="circle"
+            text={`${item.cost} coins`}
+            highlight
+            color={rarity.color}
+          />
+
+          <CompactPill
+            icon="repeat"
+            text={`${item.times_redeemed || 0} redeemed`}
           />
         </View>
 
-        <View style={styles.cardCopy}>
-          <View style={styles.nameRow}>
-            <Text style={styles.name}>{item.name}</Text>
+        {!canRedeem ? (
+          <View style={styles.unlockProgress}>
+            <View style={styles.unlockProgressTop}>
+              <Text style={[styles.unlockText, { color: c.textSecondary }]}>
+                {balance} / {item.cost} coins
+              </Text>
 
-            <CompactPill text={rarity.label} color={rarity.color} highlight />
+              <Text style={[styles.unlockText, { color: c.textSecondary }]}>
+                {lockedLabel}
+              </Text>
+            </View>
+
+            <OrbitProgressBar percent={progress} />
           </View>
-
-          {!!item.description && (
-            <Text style={styles.description}>{item.description}</Text>
-          )}
-        </View>
-      </View>
-
-      <View style={styles.metaRow}>
-        <CompactPill
-          icon="circle"
-          text={`${item.cost} coins`}
-          highlight
-          color={rarity.color}
-        />
-
-        <CompactPill
-          icon="repeat"
-          text={`${item.times_redeemed || 0} redeemed`}
-        />
-      </View>
-
-      <AnimatedPressable
-        style={[
-          styles.redeemButton,
-          {
-            backgroundColor: canRedeem ? rarity.color : colors.surfaceAlt,
-            borderColor: canRedeem ? rarity.color : colors.border,
-          },
-        ]}
-        disabled={!canRedeem}
-        onPress={onRedeem}
-      >
-        <Feather
-          name={canRedeem ? "shopping-bag" : "lock"}
-          size={17}
-          color={canRedeem ? colors.white : colors.textMuted}
-        />
-
-        <Text
-          style={[
-            styles.redeemButtonText,
-            {
-              color: canRedeem ? colors.white : colors.textMuted,
-            },
-          ]}
-        >
-          {canRedeem ? "Redeem Reward" : `${item.cost - balance} coins short`}
-        </Text>
-      </AnimatedPressable>
-
-      <View style={styles.bottomRow}>
-        <AnimatedPressable style={styles.smallButton} onPress={onEdit}>
-          <Feather name="edit-3" size={15} color={colors.text} />
-        </AnimatedPressable>
+        ) : null}
 
         <AnimatedPressable
-          style={[styles.smallButton, styles.dangerSmallButton]}
-          onPress={onDelete}
+          style={[
+            styles.redeemButton,
+            {
+              backgroundColor: canRedeem ? rarity.color : c.surfaceAlt,
+              borderColor: canRedeem ? rarity.color : c.border,
+            },
+          ]}
+          disabled={!canRedeem}
+          onPress={handleRedeem}
+          scaleTo={0.965}
         >
-          <Feather name="trash-2" size={15} color={colors.danger} />
+          <Feather
+            name={canRedeem ? "shopping-bag" : "lock"}
+            size={17}
+            color={canRedeem ? "#FFFFFF" : c.textMuted || c.muted}
+          />
+
+          <Text
+            style={[
+              styles.redeemButtonText,
+              {
+                color: canRedeem ? "#FFFFFF" : c.textMuted || c.muted,
+              },
+            ]}
+          >
+            {canRedeem ? "Redeem Reward" : lockedLabel}
+          </Text>
         </AnimatedPressable>
-      </View>
-    </AppCard>
+
+        <View style={styles.bottomRow}>
+          <AnimatedPressable
+            style={[
+              styles.smallButton,
+              {
+                backgroundColor: c.surfaceAlt,
+                borderColor: c.border,
+              },
+            ]}
+            onPress={onEdit}
+          >
+            <Feather name="edit-3" size={15} color={c.text} />
+          </AnimatedPressable>
+
+          <AnimatedPressable
+            style={[
+              styles.smallButton,
+              {
+                borderColor: `${c.danger}30`,
+                backgroundColor: `${c.danger}10`,
+              },
+            ]}
+            onPress={onDelete}
+          >
+            <Feather name="trash-2" size={15} color={c.danger} />
+          </AnimatedPressable>
+        </View>
+      </AppCard>
+    </Animated.View>
   );
 }
 
 function CompactPill({ icon = null, text, color = null, highlight = false }) {
-  const pillColor = color || colors.textMuted;
+  const { theme } = useTheme();
+  const c = theme.colors;
+
+  const pillColor = color || c.textMuted || c.muted;
 
   return (
     <View
       style={[
         styles.compactPill,
         {
-          backgroundColor: highlight ? `${pillColor}12` : colors.surfaceAlt,
-          borderColor: highlight ? pillColor : colors.border,
+          backgroundColor: highlight ? `${pillColor}12` : c.surfaceAlt,
+          borderColor: highlight ? pillColor : c.border,
         },
       ]}
     >
@@ -404,7 +560,7 @@ function CompactPill({ icon = null, text, color = null, highlight = false }) {
         style={[
           styles.compactPillText,
           {
-            color: highlight ? pillColor : colors.textSecondary,
+            color: highlight ? pillColor : c.textSecondary,
           },
         ]}
       >
@@ -414,31 +570,31 @@ function CompactPill({ icon = null, text, color = null, highlight = false }) {
   );
 }
 
-function getRewardTier(cost = 0) {
+function getRewardTier(cost = 0, c) {
   if (cost >= 500) {
     return {
       label: "Legendary",
-      color: colors.gold,
+      color: c.gold,
     };
   }
 
   if (cost >= 250) {
     return {
       label: "Epic",
-      color: colors.blue,
+      color: c.blue || c.primary,
     };
   }
 
   if (cost >= 100) {
     return {
       label: "Rare",
-      color: colors.success,
+      color: c.success,
     };
   }
 
   return {
     label: "Common",
-    color: colors.textMuted,
+    color: c.textMuted || c.muted,
   };
 }
 
@@ -460,34 +616,124 @@ function AnimatedCard({ children, index = 0 }) {
 }
 
 function RewardToast({ message }) {
+  const { theme } = useTheme();
+  const c = theme.colors;
+
+  const scale = useSharedValue(0.9);
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (message) {
+      opacity.value = withTiming(1, { duration: 180 });
+      scale.value = withSequence(withSpring(1.08), withSpring(1));
+    } else {
+      opacity.value = withTiming(0, { duration: 150 });
+      scale.value = withTiming(0.9, { duration: 150 });
+    }
+  }, [message]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: scale.value }],
+  }));
+
   if (!message) return null;
 
   return (
-    <View style={styles.toast}>
-      <Text style={styles.toastText}>{message}</Text>
-    </View>
+    <Animated.View
+      style={[
+        styles.toast,
+        {
+          backgroundColor: `${c.success}12`,
+          borderColor: c.success,
+        },
+        animatedStyle,
+      ]}
+    >
+      <Text style={[styles.toastText, { color: c.success }]}>{message}</Text>
+    </Animated.View>
   );
 }
 
 function RedeemCelebration({ reward }) {
+  const { theme } = useTheme();
+  const c = theme.colors;
+
+  const scale = useSharedValue(0.55);
+  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(28);
+  const glowScale = useSharedValue(0.8);
+
+  useEffect(() => {
+    if (reward) {
+      opacity.value = withTiming(1, { duration: 160 });
+      translateY.value = withSpring(0);
+      scale.value = withSequence(withSpring(1.12), withSpring(1));
+      glowScale.value = withSequence(
+        withTiming(1.08, { duration: 260 }),
+        withTiming(1, { duration: 260 })
+      );
+    } else {
+      opacity.value = withTiming(0, { duration: 160 });
+      translateY.value = withTiming(28, { duration: 160 });
+      scale.value = withTiming(0.55, { duration: 160 });
+      glowScale.value = withTiming(0.8, { duration: 160 });
+    }
+  }, [reward]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }, { scale: scale.value }],
+  }));
+
+  const glowAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: glowScale.value }],
+  }));
+
   if (!reward) return null;
 
   return (
-    <Modal visible transparent animationType="fade">
+    <Modal visible transparent animationType="none">
       <View style={styles.celebrationOverlay}>
-        <View style={styles.celebrationCard}>
-          <View style={styles.celebrationIconCircle}>
-            <Feather name="gift" size={38} color={colors.white} />
+        <Animated.View
+          style={[
+            styles.celebrationCard,
+            {
+              borderColor: c.success,
+              backgroundColor: c.surface,
+            },
+            animatedStyle,
+          ]}
+        >
+          <Animated.View
+            style={[
+              styles.celebrationGlow,
+              { backgroundColor: `${c.success}16` },
+              glowAnimatedStyle,
+            ]}
+          />
+
+          <View
+            style={[
+              styles.celebrationIconCircle,
+              { backgroundColor: c.success },
+            ]}
+          >
+            <Feather name="gift" size={38} color="#FFFFFF" />
           </View>
 
-          <Text style={styles.celebrationEyebrow}>Reward Redeemed</Text>
+          <Text style={[styles.celebrationEyebrow, { color: c.success }]}>
+            Reward Redeemed
+          </Text>
 
-          <Text style={styles.celebrationTitle}>{reward.name}</Text>
+          <Text style={[styles.celebrationTitle, { color: c.text }]}>
+            {reward.name}
+          </Text>
 
-          <Text style={styles.celebrationText}>
+          <Text style={[styles.celebrationText, { color: c.textSecondary }]}>
             Nice work. You earned this.
           </Text>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -496,26 +742,12 @@ function RedeemCelebration({ reward }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.xl,
   },
 
   listContent: {
     paddingBottom: 120,
-  },
-
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: colors.background,
-  },
-
-  loadingText: {
-    ...typography.body,
-    color: colors.textSecondary,
-    marginTop: spacing.sm,
   },
 
   heroCard: {
@@ -529,7 +761,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     top: -130,
     right: -90,
-    backgroundColor: `${colors.gold}18`,
   },
 
   heroGlowCoral: {
@@ -539,7 +770,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     bottom: -100,
     left: -70,
-    backgroundColor: `${colors.coral}10`,
   },
 
   heroTop: {
@@ -554,7 +784,6 @@ const styles = StyleSheet.create({
 
   heroEyebrow: {
     ...typography.caption,
-    color: colors.textSecondary,
     textTransform: "uppercase",
     letterSpacing: 0.8,
   },
@@ -562,13 +791,11 @@ const styles = StyleSheet.create({
   heroValue: {
     fontSize: 42,
     fontWeight: "900",
-    color: colors.text,
     marginTop: spacing.xs,
   },
 
   heroSubtitle: {
     ...typography.bodyBold,
-    color: colors.textSecondary,
     marginTop: spacing.sm,
   },
 
@@ -578,9 +805,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: `${colors.gold}18`,
     borderWidth: 1,
-    borderColor: colors.border,
   },
 
   heroActions: {
@@ -598,23 +823,20 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: radii.md,
     alignItems: "center",
-    backgroundColor: `${colors.success}12`,
-    borderColor: colors.success,
   },
 
   toastText: {
     ...typography.bodyBold,
-    color: colors.success,
-  },
-
-  sectionHint: {
-    ...typography.caption,
-    color: colors.textMuted,
+    textAlign: "center",
   },
 
   emptyCard: {
     marginTop: spacing.xl,
     alignItems: "center",
+  },
+
+  lockedRewardWrap: {
+    opacity: 0.84,
   },
 
   card: {
@@ -629,10 +851,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     top: -110,
     right: -70,
-  },
-
-  lockedCard: {
-    opacity: 0.72,
   },
 
   cardTop: {
@@ -664,12 +882,10 @@ const styles = StyleSheet.create({
   name: {
     flex: 1,
     ...typography.h3,
-    color: colors.text,
   },
 
   description: {
     ...typography.body,
-    color: colors.textSecondary,
     marginTop: spacing.sm,
   },
 
@@ -678,6 +894,22 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: spacing.sm,
     marginTop: spacing.lg,
+  },
+
+  unlockProgress: {
+    marginTop: spacing.lg,
+    gap: spacing.sm,
+  },
+
+  unlockProgressTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+
+  unlockText: {
+    ...typography.caption,
+    fontWeight: "800",
   },
 
   compactPill: {
@@ -724,13 +956,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    backgroundColor: colors.surfaceAlt,
-    borderColor: colors.border,
-  },
-
-  dangerSmallButton: {
-    borderColor: `${colors.danger}30`,
-    backgroundColor: `${colors.danger}10`,
   },
 
   celebrationOverlay: {
@@ -746,9 +971,16 @@ const styles = StyleSheet.create({
     borderRadius: radii.xl,
     padding: spacing.xl,
     borderWidth: 1,
-    borderColor: colors.success,
-    backgroundColor: colors.surface,
     alignItems: "center",
+    overflow: "hidden",
+  },
+
+  celebrationGlow: {
+    position: "absolute",
+    width: 280,
+    height: 280,
+    borderRadius: 999,
+    top: -150,
   },
 
   celebrationIconCircle: {
@@ -758,26 +990,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginBottom: spacing.lg,
-    backgroundColor: colors.success,
   },
 
   celebrationEyebrow: {
     ...typography.caption,
-    color: colors.success,
     textTransform: "uppercase",
     letterSpacing: 1,
   },
 
   celebrationTitle: {
     ...typography.h1,
-    color: colors.text,
     marginTop: spacing.sm,
     textAlign: "center",
   },
 
   celebrationText: {
     ...typography.bodyBold,
-    color: colors.textSecondary,
     marginTop: spacing.sm,
     textAlign: "center",
   },

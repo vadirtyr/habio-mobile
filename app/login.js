@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { useState } from "react";
@@ -14,20 +15,43 @@ import {
 import { AppButton } from "../components/AppButton";
 import { AppCard } from "../components/AppCard";
 import { AppInput } from "../components/AppInput";
+import { BrandHeader } from "../components/BrandMark";
+
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../hooks/useTheme";
+
 import { api } from "../lib/api";
-import { colors, spacing, typography } from "../lib/theme";
+
+import {
+  radii,
+  shadows,
+  spacing,
+  typography,
+} from "../lib/theme";
 
 export default function LoginScreen() {
   const { login } = useAuth();
+  const { theme } = useTheme();
+  const c = theme.colors;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [submitting, setSubmitting] =
+    useState(false);
 
   async function handleLogin() {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert("Missing fields", "Please enter your email and password.");
+    const cleanEmail =
+      email.trim().toLowerCase();
+
+    if (
+      !cleanEmail ||
+      !password.trim()
+    ) {
+      Alert.alert(
+        "Missing fields",
+        "Please enter your email and password."
+      );
+
       return;
     }
 
@@ -36,29 +60,57 @@ export default function LoginScreen() {
     setSubmitting(true);
 
     try {
-      const data = await api.post("/auth/login", {
-        email: email.trim().toLowerCase(),
-        password,
-      });
+      const data = await api.post(
+        "/auth/login",
+        {
+          email: cleanEmail,
+          password,
+        }
+      );
 
       if (!data?.token) {
-        throw new Error("Invalid login response.");
+        throw new Error(
+          "Invalid login response."
+        );
       }
 
       await login(data.token);
 
-      const hasCompletedOnboarding = await SecureStore.getItemAsync(
-        "hasCompletedOnboarding"
+      await SecureStore.setItemAsync(
+        "currentUserEmail",
+        cleanEmail
       );
 
-      if (!hasCompletedOnboarding) {
-        router.replace("/onboarding");
+      const onboardingKey =
+        `onboarding_${cleanEmail.replace(
+          /[^a-zA-Z0-9]/g,
+          "_"
+        )}`;
+
+      const hasCompletedOnboarding =
+        await SecureStore.getItemAsync(
+          onboardingKey
+        );
+
+      if (
+        !hasCompletedOnboarding
+      ) {
+        router.replace(
+          "/onboarding"
+        );
+
         return;
       }
 
-      router.replace("/(tabs)/dashboard");
+      router.replace(
+        "/(tabs)/dashboard"
+      );
     } catch (error) {
-      Alert.alert("Login failed", error?.message || "Unable to log in.");
+      Alert.alert(
+        "Login failed",
+        error?.message ||
+          "Unable to log in."
+      );
     } finally {
       setSubmitting(false);
     }
@@ -66,21 +118,123 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.screen}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      style={[
+        styles.screen,
+        {
+          backgroundColor:
+            c.background,
+        },
+      ]}
+      behavior={
+        Platform.OS === "ios"
+          ? "padding"
+          : undefined
+      }
     >
-      <View style={styles.content}>
-        <View style={styles.brandBlock}>
-          <Text style={styles.eyebrow}>Welcome back</Text>
-          <Text style={styles.title}>OurOrbit</Text>
-          <Text style={styles.subtitle}>
-            Small actions shape your orbit.
-          </Text>
-        </View>
+      <View
+        style={[
+          styles.glowOne,
+          {
+            backgroundColor:
+              `${
+                c.cyan ||
+                c.primary
+              }16`,
+          },
+        ]}
+      />
 
-        <AppCard>
-          <View style={styles.section}>
-            <Text style={styles.label}>Email</Text>
+      <View
+        style={[
+          styles.glowTwo,
+          {
+            backgroundColor:
+              `${
+                c.coral ||
+                c.primary
+              }12`,
+          },
+        ]}
+      />
+
+      <View style={styles.content}>
+        <BrandHeader
+          centered
+          title="OurOrbit"
+          subtitle="Build better days with habits, tasks, streaks, and rewards."
+        />
+
+        <AppCard style={styles.card}>
+          <View
+            style={
+              styles.cardHeader
+            }
+          >
+            <View>
+              <Text
+                style={[
+                  styles.cardEyebrow,
+                  {
+                    color:
+                      c.cyan ||
+                      c.primary,
+                  },
+                ]}
+              >
+                Welcome back
+              </Text>
+
+              <Text
+                style={[
+                  styles.cardTitle,
+                  {
+                    color:
+                      c.text,
+                  },
+                ]}
+              >
+                Log in to continue
+              </Text>
+            </View>
+
+            <View
+              style={[
+                styles.iconBadge,
+                {
+                  backgroundColor:
+                    `${
+                      c.cyan ||
+                      c.primary
+                    }14`,
+
+                  borderColor:
+                    c.border,
+                },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="orbit"
+                size={26}
+                color={
+                  c.cyan ||
+                  c.primary
+                }
+              />
+            </View>
+          </View>
+
+          <View style={styles.field}>
+            <Text
+              style={[
+                styles.label,
+                {
+                  color:
+                    c.text,
+                },
+              ]}
+            >
+              Email
+            </Text>
 
             <AppInput
               value={email}
@@ -92,8 +246,18 @@ export default function LoginScreen() {
             />
           </View>
 
-          <View style={styles.section}>
-            <Text style={styles.label}>Password</Text>
+          <View style={styles.field}>
+            <Text
+              style={[
+                styles.label,
+                {
+                  color:
+                    c.text,
+                },
+              ]}
+            >
+              Password
+            </Text>
 
             <AppInput
               value={password}
@@ -104,18 +268,60 @@ export default function LoginScreen() {
           </View>
 
           <AppButton
-            title={submitting ? "Logging in..." : "Log In"}
+            title={
+              submitting
+                ? "Logging in..."
+                : "Log In"
+            }
             onPress={handleLogin}
             disabled={submitting}
+            style={
+              styles.button
+            }
           />
         </AppCard>
 
         <Pressable
-          style={styles.registerButton}
-          onPress={() => router.push("/register")}
+          onPress={() =>
+            router.push(
+              "/register"
+            )
+          }
         >
-          <Text style={styles.registerText}>
-            Don&apos;t have an account? Create one
+          <Text
+            style={[
+              styles.registerText,
+              {
+                color:
+                  c.cyan ||
+                  c.primary,
+              },
+            ]}
+          >
+            Don&apos;t have an account?
+            {" "}
+            Create one
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() =>
+            router.push(
+              "/privacy"
+            )
+          }
+        >
+          <Text
+            style={[
+              styles.privacyText,
+              {
+                color:
+                  c.textMuted ||
+                  c.muted,
+              },
+            ]}
+          >
+            Privacy Policy
           </Text>
         </Pressable>
       </View>
@@ -126,55 +332,92 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
+  },
+
+  glowOne: {
+    position: "absolute",
+    width: 260,
+    height: 260,
+    borderRadius: 999,
+    top: -110,
+    right: -90,
+  },
+
+  glowTwo: {
+    position: "absolute",
+    width: 220,
+    height: 220,
+    borderRadius: 999,
+    bottom: -100,
+    left: -80,
   },
 
   content: {
     flex: 1,
     justifyContent: "center",
-    padding: spacing.xl,
+    padding: spacing.lg,
   },
 
-  brandBlock: {
-    marginBottom: spacing.xl,
+  card: {
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+    ...shadows.card,
   },
 
-  eyebrow: {
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+  },
+
+  cardEyebrow: {
     ...typography.caption,
-    color: colors.textSecondary,
+    fontWeight: "900",
     textTransform: "uppercase",
     letterSpacing: 1,
+    marginBottom: 5,
   },
 
-  title: {
-    ...typography.h1,
-    color: colors.text,
-    marginTop: spacing.xs,
+  cardTitle: {
+    ...typography.h2,
+    fontWeight: "900",
+    letterSpacing: -0.4,
   },
 
-  subtitle: {
-    ...typography.body,
-    color: colors.textSecondary,
-    marginTop: spacing.sm,
+  iconBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: radii.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
   },
 
-  section: {
-    marginBottom: spacing.lg,
+  field: {
+    marginBottom: spacing.md,
   },
 
   label: {
     ...typography.bodyBold,
-    color: colors.text,
     marginBottom: spacing.sm,
   },
 
-  registerButton: {
-    alignItems: "center",
-    paddingVertical: spacing.lg,
+  button: {
+    marginTop: spacing.sm,
   },
 
   registerText: {
-    ...typography.bodyBold,
-    color: colors.cyan,
+    textAlign: "center",
+    fontWeight: "800",
+    marginTop: spacing.sm,
+  },
+
+  privacyText: {
+    textAlign: "center",
+    fontWeight: "700",
+    marginTop: spacing.md,
+    fontSize: 13,
   },
 });

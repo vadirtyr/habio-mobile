@@ -1,7 +1,7 @@
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, FlatList, Modal, StyleSheet, Text, View } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
 import Animated, {
@@ -16,27 +16,59 @@ import Animated, {
 import { AnimatedPressable } from "../../components/AnimatedPressable";
 import { AppButton } from "../../components/AppButton";
 import { AppCard } from "../../components/AppCard";
+import { BrandHeader } from "../../components/BrandMark";
 import { EmptyState } from "../../components/EmptyState";
+import { ErrorState } from "../../components/ErrorState";
 import { LevelUpModal } from "../../components/LevelUpModal";
 import { OrbitProgressBar } from "../../components/OrbitProgressBar";
-import { ScreenHeader } from "../../components/ScreenHeader";
 import { SectionTitle } from "../../components/SectionTitle";
 import { SkeletonCard } from "../../components/SkeletonCard";
 import { XPGainToast } from "../../components/XPGainToast";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../hooks/useTheme";
 import { api } from "../../lib/api";
-import { colors, radii, spacing, typography } from "../../lib/theme";
+import { radii, spacing, typography } from "../../lib/theme";
 
 export default function HabitsScreen() {
   const { token } = useAuth();
+  const { theme } = useTheme();
+  const c = theme.colors;
 
   const [habits, setHabits] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
   const [balance, setBalance] = useState(0);
   const [streakCelebration, setStreakCelebration] = useState(null);
   const [levelUp, setLevelUp] = useState(null);
   const [xpToast, setXpToast] = useState(0);
+
+  const firstBalanceLoad = useRef(true);
+  const coinScale = useSharedValue(1);
+
+  const coinAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: coinScale.value }],
+  }));
+
+  useEffect(() => {
+    if (firstBalanceLoad.current) {
+      firstBalanceLoad.current = false;
+      return;
+    }
+
+    coinScale.value = withSequence(
+      withSpring(1.1, { damping: 12, stiffness: 260 }),
+      withSpring(1, { damping: 14, stiffness: 240 })
+    );
+  }, [balance]);
+
+  const sortedHabits = useMemo(() => {
+    return [...habits].sort((a, b) => {
+      if (!!a.completed_today === !!b.completed_today) return 0;
+      return a.completed_today ? 1 : -1;
+    });
+  }, [habits]);
 
   const completedToday = useMemo(
     () => habits.filter((habit) => habit.completed_today).length,
@@ -44,13 +76,18 @@ export default function HabitsScreen() {
   );
 
   const activeToday = Math.max(habits.length - completedToday, 0);
+
   const progressPercent =
     habits.length === 0
       ? 0
       : Math.round((completedToday / habits.length) * 100);
 
+  const orbitComplete = habits.length > 0 && completedToday === habits.length;
+
   async function fetchHabits() {
     if (!token) return;
+
+    setError(null);
 
     try {
       const statsData = await api.get("/stats", token);
@@ -59,10 +96,16 @@ export default function HabitsScreen() {
       const data = await api.get("/habits", token);
       setHabits(Array.isArray(data) ? data : []);
     } catch (error) {
-      Alert.alert("Error", error.message);
+      setError(error?.message || "Unable to load habits.");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  }
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    await fetchHabits();
   }
 
   async function completeHabit(habitId) {
@@ -90,10 +133,7 @@ export default function HabitsScreen() {
       }
 
       setXpToast(data.xp_earned || 0);
-
-      setTimeout(() => {
-        setXpToast(0);
-      }, 900);
+      setTimeout(() => setXpToast(0), 900);
 
       await Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Success
@@ -126,7 +166,7 @@ export default function HabitsScreen() {
       setTimeout(() => setMessage(null), 2200);
     } catch (error) {
       fetchHabits();
-      Alert.alert("Error", error.message);
+      Alert.alert("Could not complete habit", error.message);
     }
   }
 
@@ -161,13 +201,9 @@ export default function HabitsScreen() {
       setTimeout(() => setMessage(null), 1600);
     } catch (error) {
       setHabits(previous);
-      Alert.alert("Error", error.message);
+      Alert.alert("Could not delete habit", error.message);
     }
   }
-
-  useEffect(() => {
-    fetchHabits();
-  }, [token]);
 
   useFocusEffect(
     useCallback(() => {
@@ -177,8 +213,13 @@ export default function HabitsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <ScreenHeader title="Habits" subtitle="Loading your orbit..." />
+      <View style={[styles.container, { backgroundColor: c.background }]}>
+        <BrandHeader
+          eyebrow="OurOrbit"
+          title="Habits"
+          subtitle="Loading your orbit..."
+          compact
+        />
 
         <SkeletonCard lines={2} />
         <SkeletonCard />
@@ -188,8 +229,27 @@ export default function HabitsScreen() {
     );
   }
 
+  if (error) {
+    return (
+      <View style={[styles.container, { backgroundColor: c.background }]}>
+        <BrandHeader
+          eyebrow="OurOrbit"
+          title="Habits"
+          subtitle="Keep your daily orbit moving."
+          compact
+        />
+
+        <ErrorState
+          title="Habits unavailable"
+          description={error}
+          onRetry={fetchHabits}
+        />
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: c.background }]}>
       <StreakCelebration data={streakCelebration} />
 
       <LevelUpModal
@@ -202,53 +262,83 @@ export default function HabitsScreen() {
       <XPGainToast xp={xpToast} />
 
       <FlatList
-        data={habits}
+        data={sortedHabits}
         keyExtractor={(item) => item.id}
-        refreshing={loading}
-        onRefresh={fetchHabits}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View>
-            <ScreenHeader
+            <BrandHeader
+              eyebrow="OurOrbit"
               title="Habits"
               subtitle="Keep your daily orbit moving."
+              compact
             />
 
             <AppCard style={styles.summaryCard}>
-              <View style={styles.summaryGlowCyan} />
-              <View style={styles.summaryGlowCoral} />
+              <View
+                style={[
+                  styles.summaryGlowCyan,
+                  {
+                    backgroundColor:
+                      c.surfaceGlow || `${c.cyan || c.primary}18`,
+                  },
+                ]}
+              />
+              <View
+                style={[
+                  styles.summaryGlowCoral,
+                  { backgroundColor: `${c.coral || c.primary}12` },
+                ]}
+              />
 
               <View style={styles.summaryTop}>
                 <View style={styles.summaryCopy}>
-                  <Text style={styles.summaryLabel}>Today</Text>
+                  <Text style={[styles.summaryLabel, { color: c.textSecondary }]}>
+                    Today
+                  </Text>
 
-                  <Text style={styles.summaryTitle}>
+                  <Text style={[styles.summaryTitle, { color: c.text }]}>
                     {completedToday} of {habits.length} complete
                   </Text>
 
-                  <Text style={styles.summarySubtitle}>
+                  <Text style={[styles.summarySubtitle, { color: c.textSecondary }]}>
                     {activeToday > 0
                       ? `${activeToday} still waiting for you`
-                      : habits.length > 0
-                      ? "All habits complete. Great work."
+                      : orbitComplete
+                      ? "Today’s orbit is complete."
                       : "Create your first habit to start."}
                   </Text>
                 </View>
 
-                <View style={styles.coinBadge}>
+                <Animated.View
+                  style={[
+                    styles.coinBadge,
+                    {
+                      backgroundColor: `${c.gold || c.primary}18`,
+                      borderColor: c.border,
+                    },
+                    coinAnimatedStyle,
+                  ]}
+                >
                   <MaterialCommunityIcons
                     name="circle-multiple"
                     size={24}
-                    color={colors.gold}
+                    color={c.gold || c.primary}
                   />
-                  <Text style={styles.coinValue}>{balance}</Text>
-                </View>
+
+                  <Text style={[styles.coinValue, { color: c.text }]}>
+                    {balance}
+                  </Text>
+                </Animated.View>
               </View>
 
               <OrbitProgressBar
                 percent={progressPercent}
                 style={styles.progressBar}
+                glow
               />
 
               <View style={styles.summaryActions}>
@@ -265,7 +355,12 @@ export default function HabitsScreen() {
             {habits.length > 0 ? (
               <SectionTitle
                 title="Today’s Habits"
-                action={<Text style={styles.sectionHint}>Swipe to manage</Text>}
+                subtitle="Tap or swipe to complete."
+                action={
+                  <Text style={[styles.sectionHint, { color: c.textMuted || c.muted }]}>
+                    Swipe to manage
+                  </Text>
+                }
               />
             ) : null}
           </View>
@@ -275,7 +370,13 @@ export default function HabitsScreen() {
             <EmptyState
               title="No habits yet"
               description="Start small. Pick one habit you can repeat every day."
-              icon={<Feather name="target" size={38} color={colors.cyan} />}
+              icon={
+                <Feather
+                  name="target"
+                  size={38}
+                  color={c.cyan || c.primary}
+                />
+              }
             />
 
             <AppButton
@@ -285,14 +386,14 @@ export default function HabitsScreen() {
           </AppCard>
         }
         renderItem={({ item, index }) => {
-          const tier = getStreakTier(item.streak || 0);
+          const tier = getStreakTier(item.streak || 0, c);
 
           return (
             <Swipeable
               renderLeftActions={() =>
                 item.completed_today ? null : (
                   <SwipeAction
-                    color={colors.success}
+                    color={c.success}
                     icon="check-circle"
                     label="Done"
                   />
@@ -300,7 +401,7 @@ export default function HabitsScreen() {
               }
               renderRightActions={() => (
                 <SwipeAction
-                  color={colors.danger}
+                  color={c.danger}
                   icon="trash-2"
                   label="Delete"
                   white
@@ -341,109 +442,184 @@ export default function HabitsScreen() {
 }
 
 function HabitCard({ item, tier, onComplete, onEdit }) {
+  const { theme } = useTheme();
+  const c = theme.colors;
+
+  const cardScale = useSharedValue(1);
+  const ringScale = useSharedValue(0.5);
+  const ringOpacity = useSharedValue(0);
+
+  const cardAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: cardScale.value }],
+  }));
+
+  const ringAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: ringOpacity.value,
+    transform: [{ scale: ringScale.value }],
+  }));
+
+  function handleComplete() {
+    if (item.completed_today) return;
+
+    cardScale.value = withSequence(
+      withSpring(1.025, { damping: 12, stiffness: 260 }),
+      withSpring(1, { damping: 15, stiffness: 240 })
+    );
+
+    ringOpacity.value = withSequence(
+      withTiming(1, { duration: 80 }),
+      withTiming(0, { duration: 360 })
+    );
+
+    ringScale.value = withSequence(
+      withTiming(0.55, { duration: 1 }),
+      withTiming(1.8, { duration: 420 })
+    );
+
+    onComplete();
+  }
+
   return (
-    <AppCard
+    <Animated.View
       style={[
-        styles.card,
-        item.completed_today && styles.completedCard,
-        tier.glow && { borderColor: tier.color },
+        cardAnimatedStyle,
+        item.completed_today && styles.completedHabitWrap,
       ]}
     >
-      <View style={styles.cardTop}>
-        <AnimatedPressable
-          style={[
-            styles.checkCircle,
-            {
-              backgroundColor: item.completed_today
-                ? colors.success
-                : colors.surfaceAlt,
-              borderColor: item.completed_today ? colors.success : colors.border,
-            },
-          ]}
-          onPress={onComplete}
-        >
-          <Feather
-            name={item.completed_today ? "check" : "circle"}
-            size={22}
-            color={item.completed_today ? colors.white : colors.textMuted}
-          />
-        </AnimatedPressable>
+      <AppCard
+        style={[
+          styles.card,
+          item.completed_today && {
+            borderColor: `${c.success}40`,
+            backgroundColor: `${c.success}08`,
+          },
+          tier.glow && { borderColor: tier.color },
+        ]}
+      >
+        <View style={styles.cardTop}>
+          <AnimatedPressable
+            style={[
+              styles.checkCircle,
+              {
+                backgroundColor: item.completed_today ? c.success : c.surfaceAlt,
+                borderColor: item.completed_today ? c.success : c.border,
+              },
+            ]}
+            onPress={handleComplete}
+            disabled={item.completed_today}
+            scaleTo={0.94}
+          >
+            <Animated.View
+              style={[
+                styles.completionRing,
+                { backgroundColor: `${c.success}35` },
+                ringAnimatedStyle,
+              ]}
+            />
 
-        <View style={styles.cardCopy}>
-          <View style={styles.nameRow}>
-            <Text
-              style={[styles.name, item.completed_today && styles.completedText]}
-            >
-              {item.name}
-            </Text>
+            <Feather
+              name={item.completed_today ? "check" : "circle"}
+              size={22}
+              color={item.completed_today ? "#FFFFFF" : c.textMuted || c.muted}
+            />
+          </AnimatedPressable>
 
-            <AnimatedPressable style={styles.iconButton} onPress={onEdit}>
-              <Feather name="edit-3" size={15} color={colors.text} />
-            </AnimatedPressable>
+          <View style={styles.cardCopy}>
+            <View style={styles.nameRow}>
+              <Text
+                style={[
+                  styles.name,
+                  { color: item.completed_today ? c.success : c.text },
+                ]}
+              >
+                {item.name}
+              </Text>
+
+              <AnimatedPressable
+                style={[
+                  styles.iconButton,
+                  {
+                    borderColor: c.border,
+                    backgroundColor: c.surfaceAlt,
+                  },
+                ]}
+                onPress={onEdit}
+              >
+                <Feather name="edit-3" size={15} color={c.text} />
+              </AnimatedPressable>
+            </View>
+
+            {!!item.description && (
+              <Text style={[styles.description, { color: c.textSecondary }]}>
+                {item.description}
+              </Text>
+            )}
           </View>
-
-          {!!item.description && (
-            <Text style={styles.description}>{item.description}</Text>
-          )}
         </View>
-      </View>
 
-      <View style={styles.cardFooter}>
-        <CompactPill
-          icon="trending-up"
-          text={`${item.streak || 0} day streak`}
-          color={getStreakColor(item.streak)}
-          highlight={(item.streak || 0) >= 3}
-        />
+        <View style={styles.cardFooter}>
+          <CompactPill
+            icon="trending-up"
+            text={`${item.streak || 0} day streak`}
+            color={getStreakColor(item.streak, c)}
+            highlight={(item.streak || 0) >= 3}
+          />
 
-        <CompactPill
-          icon={tier.icon}
-          text={tier.label}
-          color={tier.color}
-          highlight
-        />
+          <CompactPill
+            icon={tier.icon}
+            text={tier.label}
+            color={tier.color}
+            highlight
+          />
 
-        <CompactPill icon="award" text={getNextBonusText(item.streak || 0)} />
-      </View>
+          <CompactPill icon="award" text={getNextBonusText(item.streak || 0)} />
+        </View>
 
-      <View style={styles.statusRow}>
-        <Text
-          style={[
-            styles.status,
-            {
-              color: item.completed_today ? colors.success : colors.textMuted,
-            },
-          ]}
-        >
-          {item.completed_today ? "Completed today" : "Tap or swipe to complete"}
-        </Text>
+        <View style={styles.statusRow}>
+          <Text
+            style={[
+              styles.status,
+              {
+                color: item.completed_today ? c.success : c.textMuted || c.muted,
+              },
+            ]}
+          >
+            {item.completed_today
+              ? "Completed today"
+              : "Tap or swipe to complete"}
+          </Text>
 
-        <Text style={styles.coinText}>
-          +{item.coins_per_completion || 0} coins
-        </Text>
-      </View>
-    </AppCard>
+          <Text style={[styles.coinText, { color: c.textSecondary }]}>
+            +{item.coins_per_completion || 0} coins
+          </Text>
+        </View>
+      </AppCard>
+    </Animated.View>
   );
 }
 
 function CompactPill({ icon, text, color = null, highlight = false }) {
-  const pillColor = color || colors.textMuted;
+  const { theme } = useTheme();
+  const c = theme.colors;
+
+  const pillColor = color || c.textMuted || c.muted;
 
   return (
     <View
       style={[
         styles.compactPill,
         {
-          backgroundColor: highlight ? `${pillColor}12` : colors.surfaceAlt,
-          borderColor: highlight ? pillColor : colors.border,
+          backgroundColor: highlight ? `${pillColor}12` : c.surfaceAlt,
+          borderColor: highlight ? pillColor : c.border,
         },
       ]}
     >
       <Feather name={icon} size={13} color={pillColor} />
+
       <Text
         style={[
           styles.compactPillText,
-          { color: highlight ? pillColor : colors.textSecondary },
+          { color: highlight ? pillColor : c.textSecondary },
         ]}
       >
         {text}
@@ -453,17 +629,21 @@ function CompactPill({ icon, text, color = null, highlight = false }) {
 }
 
 function SwipeAction({ color, icon, label, white = false }) {
+  const { theme } = useTheme();
+  const c = theme.colors;
+
   return (
     <View style={[styles.swipeAction, { backgroundColor: color }]}>
       <Feather
         name={icon}
         size={22}
-        color={white ? colors.white : colors.primary}
+        color={white ? "#FFFFFF" : c.primaryText || c.primary}
       />
+
       <Text
         style={[
           styles.swipeText,
-          { color: white ? colors.white : colors.primary },
+          { color: white ? "#FFFFFF" : c.primaryText || c.primary },
         ]}
       >
         {label}
@@ -472,11 +652,11 @@ function SwipeAction({ color, icon, label, white = false }) {
   );
 }
 
-function getStreakTier(streak = 0) {
+function getStreakTier(streak = 0, c) {
   if (streak >= 30) {
     return {
       label: "Legendary",
-      color: colors.gold,
+      color: c.gold,
       icon: "award",
       glow: true,
     };
@@ -485,7 +665,7 @@ function getStreakTier(streak = 0) {
   if (streak >= 14) {
     return {
       label: "Elite",
-      color: colors.blue,
+      color: c.blue,
       icon: "zap",
       glow: true,
     };
@@ -494,7 +674,7 @@ function getStreakTier(streak = 0) {
   if (streak >= 7) {
     return {
       label: "On Fire",
-      color: colors.coral,
+      color: c.coral,
       icon: "zap",
       glow: false,
     };
@@ -503,7 +683,7 @@ function getStreakTier(streak = 0) {
   if (streak >= 3) {
     return {
       label: "Momentum",
-      color: colors.success,
+      color: c.success,
       icon: "trending-up",
       glow: false,
     };
@@ -511,16 +691,16 @@ function getStreakTier(streak = 0) {
 
   return {
     label: "Starter",
-    color: colors.textMuted,
+    color: c.textMuted || c.muted,
     icon: "circle",
     glow: false,
   };
 }
 
-function getStreakColor(streak = 0) {
-  if (streak >= 7) return colors.coral;
-  if (streak >= 3) return colors.success;
-  return colors.textMuted;
+function getStreakColor(streak = 0, c) {
+  if (streak >= 7) return c.coral;
+  if (streak >= 3) return c.success;
+  return c.textMuted || c.muted;
 }
 
 function getNextBonusText(streak = 0) {
@@ -549,6 +729,9 @@ function AnimatedCard({ children, index = 0 }) {
 }
 
 function RewardToast({ message }) {
+  const { theme } = useTheme();
+  const c = theme.colors;
+
   const scale = useSharedValue(0.9);
   const opacity = useSharedValue(0);
 
@@ -570,26 +753,44 @@ function RewardToast({ message }) {
   if (!message) return null;
 
   return (
-    <Animated.View style={[styles.toast, animatedStyle]}>
-      <Text style={styles.toastText}>{message}</Text>
+    <Animated.View
+      style={[
+        styles.toast,
+        {
+          backgroundColor: `${c.success}12`,
+          borderColor: c.success,
+        },
+        animatedStyle,
+      ]}
+    >
+      <Text style={[styles.toastText, { color: c.success }]}>{message}</Text>
     </Animated.View>
   );
 }
 
 function StreakCelebration({ data }) {
+  const { theme } = useTheme();
+  const c = theme.colors;
+
   const scale = useSharedValue(0.55);
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(28);
+  const glowScale = useSharedValue(0.8);
 
   useEffect(() => {
     if (data) {
       opacity.value = withTiming(1, { duration: 160 });
       translateY.value = withSpring(0);
       scale.value = withSequence(withSpring(1.12), withSpring(1));
+      glowScale.value = withSequence(
+        withTiming(1.08, { duration: 260 }),
+        withTiming(1, { duration: 260 })
+      );
     } else {
       opacity.value = withTiming(0, { duration: 160 });
       translateY.value = withTiming(28, { duration: 160 });
       scale.value = withTiming(0.55, { duration: 160 });
+      glowScale.value = withTiming(0.8, { duration: 160 });
     }
   }, [data]);
 
@@ -598,26 +799,74 @@ function StreakCelebration({ data }) {
     transform: [{ translateY: translateY.value }, { scale: scale.value }],
   }));
 
+  const glowAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: glowScale.value }],
+  }));
+
   if (!data) return null;
 
   return (
     <Modal visible transparent animationType="none">
       <View style={styles.celebrationOverlay}>
-        <Animated.View style={[styles.celebrationCard, animatedStyle]}>
-          <View style={styles.celebrationIconCircle}>
-            <Feather name="zap" size={38} color={colors.white} />
+        <Animated.View
+          style={[
+            styles.celebrationCard,
+            {
+              borderColor: c.success,
+              backgroundColor: c.surface,
+            },
+            animatedStyle,
+          ]}
+        >
+          <Animated.View
+            style={[
+              styles.celebrationGlow,
+              { backgroundColor: `${c.success}16` },
+              glowAnimatedStyle,
+            ]}
+          />
+
+          <View
+            style={[
+              styles.celebrationIconCircle,
+              { backgroundColor: c.success },
+            ]}
+          >
+            <Feather name="zap" size={38} color="#FFFFFF" />
           </View>
 
-          <Text style={styles.celebrationEyebrow}>Streak Bonus</Text>
+          <Text style={[styles.celebrationEyebrow, { color: c.success }]}>
+            Streak Bonus
+          </Text>
 
-          <Text style={styles.celebrationTitle}>{data.streak} days strong</Text>
+          <Text style={[styles.celebrationTitle, { color: c.text }]}>
+            {data.streak} days strong
+          </Text>
 
-          <Text style={styles.celebrationName}>{data.habitName}</Text>
+          <Text style={[styles.celebrationName, { color: c.textSecondary }]}>
+            {data.habitName}
+          </Text>
 
-          <View style={styles.bonusBreakdown}>
-            <Text style={styles.bonusLine}>Base coins: +{data.baseCoins}</Text>
-            <Text style={styles.bonusLine}>Bonus coins: +{data.bonus}</Text>
-            <Text style={styles.bonusTotal}>Total earned: +{data.total}</Text>
+          <View
+            style={[
+              styles.bonusBreakdown,
+              {
+                borderColor: c.border,
+                backgroundColor: c.surfaceAlt,
+              },
+            ]}
+          >
+            <Text style={[styles.bonusLine, { color: c.textSecondary }]}>
+              Base coins: +{data.baseCoins}
+            </Text>
+
+            <Text style={[styles.bonusLine, { color: c.textSecondary }]}>
+              Bonus coins: +{data.bonus}
+            </Text>
+
+            <Text style={[styles.bonusTotal, { color: c.success }]}>
+              Total earned: +{data.total}
+            </Text>
           </View>
         </Animated.View>
       </View>
@@ -628,7 +877,6 @@ function StreakCelebration({ data }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.xl,
   },
@@ -648,7 +896,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     top: -130,
     right: -90,
-    backgroundColor: `${colors.cyan}18`,
   },
 
   summaryGlowCoral: {
@@ -658,7 +905,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     bottom: -100,
     left: -70,
-    backgroundColor: `${colors.coral}12`,
   },
 
   summaryTop: {
@@ -673,20 +919,17 @@ const styles = StyleSheet.create({
 
   summaryLabel: {
     ...typography.caption,
-    color: colors.textSecondary,
     textTransform: "uppercase",
     letterSpacing: 0.8,
   },
 
   summaryTitle: {
     ...typography.h2,
-    color: colors.text,
     marginTop: spacing.xs,
   },
 
   summarySubtitle: {
     ...typography.bodyBold,
-    color: colors.textSecondary,
     marginTop: spacing.sm,
   },
 
@@ -697,14 +940,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     padding: spacing.md,
-    backgroundColor: `${colors.gold}18`,
     borderWidth: 1,
-    borderColor: colors.border,
   },
 
   coinValue: {
     ...typography.h3,
-    color: colors.text,
     marginTop: spacing.xs,
   },
 
@@ -727,19 +967,15 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: radii.md,
     alignItems: "center",
-    backgroundColor: `${colors.success}12`,
-    borderColor: colors.success,
   },
 
   toastText: {
     ...typography.bodyBold,
-    color: colors.success,
     textAlign: "center",
   },
 
   sectionHint: {
     ...typography.caption,
-    color: colors.textMuted,
   },
 
   emptyCard: {
@@ -747,12 +983,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  card: {
-    marginBottom: spacing.md,
+  completedHabitWrap: {
+    opacity: 0.84,
   },
 
-  completedCard: {
-    opacity: 0.62,
+  card: {
+    marginBottom: spacing.md,
   },
 
   cardTop: {
@@ -768,6 +1004,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
+    overflow: "hidden",
+  },
+
+  completionRing: {
+    position: "absolute",
+    width: 46,
+    height: 46,
+    borderRadius: radii.pill,
   },
 
   cardCopy: {
@@ -783,12 +1027,6 @@ const styles = StyleSheet.create({
   name: {
     flex: 1,
     ...typography.h3,
-    color: colors.text,
-  },
-
-  completedText: {
-    textDecorationLine: "line-through",
-    color: colors.textMuted,
   },
 
   iconButton: {
@@ -796,15 +1034,12 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: radii.pill,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
     alignItems: "center",
     justifyContent: "center",
   },
 
   description: {
     ...typography.body,
-    color: colors.textSecondary,
     marginTop: spacing.xs,
   },
 
@@ -845,7 +1080,6 @@ const styles = StyleSheet.create({
 
   coinText: {
     ...typography.caption,
-    color: colors.textSecondary,
   },
 
   swipeAction: {
@@ -874,9 +1108,16 @@ const styles = StyleSheet.create({
     borderRadius: radii.xl,
     padding: spacing.xl,
     borderWidth: 1,
-    borderColor: colors.success,
-    backgroundColor: colors.surface,
     alignItems: "center",
+    overflow: "hidden",
+  },
+
+  celebrationGlow: {
+    position: "absolute",
+    width: 280,
+    height: 280,
+    borderRadius: 999,
+    top: -150,
   },
 
   celebrationIconCircle: {
@@ -886,26 +1127,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginBottom: spacing.lg,
-    backgroundColor: colors.success,
   },
 
   celebrationEyebrow: {
     ...typography.caption,
-    color: colors.success,
     textTransform: "uppercase",
     letterSpacing: 1,
   },
 
   celebrationTitle: {
     ...typography.h1,
-    color: colors.text,
     marginTop: spacing.sm,
     textAlign: "center",
   },
 
   celebrationName: {
     ...typography.bodyBold,
-    color: colors.textSecondary,
     marginTop: spacing.xs,
     textAlign: "center",
   },
@@ -916,19 +1153,15 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     width: "100%",
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
   },
 
   bonusLine: {
     ...typography.bodyBold,
-    color: colors.textSecondary,
     marginBottom: spacing.sm,
   },
 
   bonusTotal: {
     ...typography.h3,
-    color: colors.success,
     marginTop: spacing.xs,
   },
 });

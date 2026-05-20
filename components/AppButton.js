@@ -1,6 +1,12 @@
-import { Pressable, StyleSheet, Text } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colors, radii, spacing, typography } from "../lib/theme";
+import { useTheme } from "../hooks/useTheme";
+import {
+    radii,
+    shadows,
+    spacing,
+    typography,
+} from "../lib/theme";
 
 export function AppButton({
   title,
@@ -9,64 +15,154 @@ export function AppButton({
   style,
   textStyle,
   disabled = false,
+  icon = null,
+  fullWidth = true,
 }) {
+  const { theme } = useTheme();
+  const c = theme.colors;
+
+  const variantStyles = getVariantStyles(
+    variant,
+    c,
+    theme
+  );
+
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [
         styles.button,
-        styles[variant],
-        pressed && !disabled && styles.pressed,
-        disabled && styles.disabled,
+
+        {
+          backgroundColor:
+            variantStyles.backgroundColor,
+
+          borderColor:
+            variantStyles.borderColor,
+
+          shadowColor:
+            variantStyles.shadowColor,
+        },
+
+        variantStyles.glow && shadows.glow,
+
+        fullWidth && styles.fullWidth,
+
+        pressed &&
+          !disabled &&
+          styles.pressed,
+
+        disabled &&
+          styles.disabled,
+
         style,
       ]}
     >
-      <Text style={[styles.text, styles[`${variant}Text`], textStyle]}>
-        {title}
-      </Text>
+      <View style={styles.content}>
+        {icon}
+
+        <Text
+          style={[
+            styles.text,
+            {
+              color:
+                variantStyles.textColor,
+            },
+            textStyle,
+          ]}
+        >
+          {title}
+        </Text>
+      </View>
     </Pressable>
   );
 }
 
+
+function getVariantStyles(variant, c, theme) {
+  switch (variant) {
+    case "secondary":
+      return {
+        backgroundColor: c.surface,
+        borderColor: c.border,
+        textColor: c.text,
+        shadowColor: "transparent",
+      };
+
+    case "coral":
+      return {
+        backgroundColor: c.coral,
+        borderColor: c.coral,
+        textColor: c.white || "#FFFFFF",
+        shadowColor: c.coral,
+      };
+
+    case "cyan":
+      return {
+        backgroundColor: c.cyan,
+        borderColor: c.cyan,
+        textColor: c.primaryText || "#FFFFFF",
+        shadowColor: c.cyan,
+      };
+
+    case "ghost":
+      return {
+        backgroundColor: "transparent",
+        borderColor: "transparent",
+        textColor: c.primary,
+        shadowColor: "transparent",
+      };
+
+    default:
+      return {
+        backgroundColor: c.primary,
+        borderColor: c.primary,
+        textColor: c.primaryText || "#FFFFFF",
+        shadowColor: theme.glow || c.primary,
+        glow: true,
+      };
+  }
+}
+
 const styles = StyleSheet.create({
   button: {
-    minHeight: 52,
-    borderRadius: radii.pill,
+    minHeight: 54,
+
+    borderRadius:
+      radii.pill,
+
     alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: spacing.xl,
+    justifyContent:
+      "center",
+
+    paddingHorizontal:
+      spacing.xl,
+
     borderWidth: 1,
+
+    ...shadows.soft,
   },
 
-  primary: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+  fullWidth: {
+    width: "100%",
   },
 
-  secondary: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-  },
-
-  coral: {
-    backgroundColor: colors.coral,
-    borderColor: colors.coral,
-  },
-
-  cyan: {
-    backgroundColor: colors.cyan,
-    borderColor: colors.cyan,
-  },
-
-  ghost: {
-    backgroundColor: "transparent",
-    borderColor: "transparent",
+  content: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent:
+      "center",
+    gap: spacing.sm,
   },
 
   pressed: {
-    opacity: 0.88,
-    transform: [{ scale: 0.98 }],
+    opacity: 0.92,
+    transform: [
+      {
+        scale: 0.985,
+      },
+    ],
   },
 
   disabled: {
@@ -75,25 +171,7 @@ const styles = StyleSheet.create({
 
   text: {
     ...typography.button,
-  },
-
-  primaryText: {
-    color: colors.white,
-  },
-
-  secondaryText: {
-    color: colors.text,
-  },
-
-  coralText: {
-    color: colors.white,
-  },
-
-  cyanText: {
-    color: colors.primary,
-  },
-
-  ghostText: {
-    color: colors.primary,
+    fontWeight: "900",
+    letterSpacing: 0.2,
   },
 });

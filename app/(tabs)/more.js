@@ -5,12 +5,16 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AppCard } from "../../components/AppCard";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { SectionTitle } from "../../components/SectionTitle";
-import { colors, radii, spacing, typography } from "../../lib/theme";
+import { useTheme } from "../../hooks/useTheme";
+import { radii, spacing, typography } from "../../lib/theme";
 
 export default function MoreScreen() {
+  const { theme } = useTheme();
+  const c = theme.colors;
+
   return (
     <ScrollView
-      style={styles.screen}
+      style={[styles.screen, { backgroundColor: c.background }]}
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}
     >
@@ -61,30 +65,48 @@ export default function MoreScreen() {
 }
 
 function MoreRow({ icon, label, description, onPress, last = false }) {
+  const { theme } = useTheme();
+  const c = theme.colors;
+
+  const accentColor = c.cyan || c.primary;
+
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,
-        !last && styles.rowBorder,
+        !last && {
+          borderBottomWidth: 1,
+          borderBottomColor: c.divider || c.border,
+        },
         pressed && styles.rowPressed,
       ]}
     >
       <View style={styles.rowLeft}>
-        <View style={styles.iconWrap}>
-          <MaterialCommunityIcons name={icon} size={22} color={colors.cyan} />
+        <View
+          style={[
+            styles.iconWrap,
+            {
+              backgroundColor: `${accentColor}12`,
+            },
+          ]}
+        >
+          <MaterialCommunityIcons name={icon} size={22} color={accentColor} />
         </View>
 
         <View style={styles.rowCopy}>
-          <Text style={styles.rowLabel}>{label}</Text>
-          <Text style={styles.rowDescription}>{description}</Text>
+          <Text style={[styles.rowLabel, { color: c.text }]}>{label}</Text>
+
+          <Text style={[styles.rowDescription, { color: c.textSecondary }]}>
+            {description}
+          </Text>
         </View>
       </View>
 
       <MaterialCommunityIcons
         name="chevron-right"
         size={22}
-        color={colors.textMuted}
+        color={c.textMuted || c.muted}
       />
     </Pressable>
   );
@@ -93,7 +115,6 @@ function MoreRow({ icon, label, description, onPress, last = false }) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
   },
 
   container: {
@@ -106,11 +127,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-  },
-
-  rowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.divider,
   },
 
   rowPressed: {
@@ -128,7 +144,6 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: radii.pill,
-    backgroundColor: `${colors.cyan}12`,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -139,12 +154,10 @@ const styles = StyleSheet.create({
 
   rowLabel: {
     ...typography.bodyBold,
-    color: colors.text,
   },
 
   rowDescription: {
     ...typography.caption,
-    color: colors.textSecondary,
     marginTop: spacing.xs,
     lineHeight: 18,
   },

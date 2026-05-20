@@ -1,6 +1,6 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, Image, StyleSheet, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -14,14 +14,42 @@ function AppShell() {
   if (!ready) {
     return (
       <View
-        style={{
-          flex: 1,
-          backgroundColor: theme.colors.background,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
+        style={[
+          styles.loadingScreen,
+          {
+            backgroundColor: theme.colors.background,
+          },
+        ]}
       >
-        <ActivityIndicator color={theme.colors.primary} />
+        <View
+          style={[
+            styles.loadingLogoWrap,
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.border,
+              shadowColor: theme.colors.text,
+            },
+          ]}
+        >
+          <Image
+            source={require("../assets/images/icon.png")}
+            style={styles.loadingLogo}
+            resizeMode="contain"
+          />
+        </View>
+
+        <Text style={[styles.loadingTitle, { color: theme.colors.text }]}>
+          OurOrbit
+        </Text>
+
+        <Text style={[styles.loadingSubtitle, { color: theme.colors.muted }]}>
+          Preparing your orbit...
+        </Text>
+
+        <ActivityIndicator
+          color={theme.colors.primary}
+          style={styles.loader}
+        />
       </View>
     );
   }
@@ -30,7 +58,15 @@ function AppShell() {
     <>
       <StatusBar style={themeName === "dark" ? "light" : "dark"} />
 
-      <Stack screenOptions={{ headerShown: false }}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: "fade_from_bottom",
+          contentStyle: {
+            backgroundColor: theme.colors.background,
+          },
+        }}
+      >
         <Stack.Screen name="index" />
 
         <Stack.Screen name="login" />
@@ -48,6 +84,9 @@ function AppShell() {
         <Stack.Screen name="edit-reward" />
 
         <Stack.Screen name="theme-store" />
+        <Stack.Screen name="change-password" />
+        <Stack.Screen name="delete-account" />
+        <Stack.Screen name="privacy" />
 
         <Stack.Screen name="(tabs)" />
       </Stack>
@@ -57,7 +96,7 @@ function AppShell() {
 
 export default function RootLayout() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
         <AuthProvider>
           <ThemeProvider>
@@ -68,3 +107,54 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+
+  loadingScreen: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+
+  loadingLogoWrap: {
+    width: 92,
+    height: 92,
+    borderRadius: 28,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 6,
+  },
+
+  loadingLogo: {
+    width: 72,
+    height: 72,
+  },
+
+  loadingTitle: {
+    marginTop: 18,
+    fontSize: 30,
+    fontWeight: "900",
+    letterSpacing: -0.8,
+  },
+
+  loadingSubtitle: {
+    marginTop: 8,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+
+  loader: {
+    marginTop: 22,
+  },
+});

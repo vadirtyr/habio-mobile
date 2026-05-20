@@ -2,44 +2,40 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Alert,
-  FlatList,
-  StyleSheet,
-  Text,
-  View
-} from "react-native";
+import { Alert, FlatList, Modal, StyleSheet, Text, View } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withDelay,
+  withRepeat,
   withSequence,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
 
 import { AnimatedPressable } from "../../components/AnimatedPressable";
+import { AnimatedScreen } from "../../components/AnimatedScreen";
 import { AppCard } from "../../components/AppCard";
+import { BrandHeader } from "../../components/BrandMark";
 import { EmptyState } from "../../components/EmptyState";
-import { ScreenHeader } from "../../components/ScreenHeader";
+import { OrbitProgressBar } from "../../components/OrbitProgressBar";
 import { SectionTitle } from "../../components/SectionTitle";
 import { SkeletonCard } from "../../components/SkeletonCard";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../hooks/useTheme";
 import { api } from "../../lib/api";
-
-import {
-  colors,
-  radii,
-  spacing,
-  typography,
-} from "../../lib/theme";
+import { radii, spacing, typography } from "../../lib/theme";
 
 export default function QuestsScreen() {
   const { token } = useAuth();
+  const { theme } = useTheme();
+  const c = theme.colors;
 
   const [quests, setQuests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState(null);
+  const [claimedQuest, setClaimedQuest] = useState(null);
 
   async function fetchQuests() {
     if (!token) return;
@@ -54,35 +50,37 @@ export default function QuestsScreen() {
     }
   }
 
+  async function handleRefresh() {
+    setRefreshing(true);
+    await fetchQuests();
+    setRefreshing(false);
+  }
+
   async function claimQuest(quest) {
     if (!token) return;
 
     try {
-      const data = await api.post(
-        `/quests/${quest.id}/claim`,
-        {},
-        token
-      );
+      const data = await api.post(`/quests/${quest.id}/claim`, {}, token);
 
       await Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Success
       );
 
+      setClaimedQuest({
+        ...quest,
+        coins_earned: data.coins_earned,
+      });
+
       setMessage(`+${data.coins_earned} coins claimed`);
 
-      fetchQuests();
+      await fetchQuests();
 
-      setTimeout(() => {
-        setMessage(null);
-      }, 2200);
+      setTimeout(() => setMessage(null), 2200);
+      setTimeout(() => setClaimedQuest(null), 2200);
     } catch (error) {
       Alert.alert("Error", error.message);
     }
   }
-
-  useEffect(() => {
-    fetchQuests();
-  }, [token]);
 
   useFocusEffect(
     useCallback(() => {
@@ -90,150 +88,220 @@ export default function QuestsScreen() {
     }, [token])
   );
 
+  const sortedQuests = useMemo(() => {
+    return [...quests].sort((a, b) => {
+      const aClaimable = a.claimable && !a.claimed;
+      const bClaimable = b.claimable && !b.claimed;
+
+      if (aClaimable === bClaimable) {
+        return (b.percent || 0) - (a.percent || 0);
+      }
+
+      return aClaimable ? -1 : 1;
+    });
+  }, [quests]);
+
   const claimableCount = useMemo(
-    () =>
-      quests.filter(
-        (q) => q.claimable && !q.claimed
-      ).length,
+    () => quests.filter((q) => q.claimable && !q.claimed).length,
     [quests]
   );
 
-  if (loading) {
-  return (
-    <View style={styles.container}>
-      <ScreenHeader
-        title="Quests"
-        subtitle="Loading quests..."
-      />
-
-      <SkeletonCard lines={2} />
-      <SkeletonCard />
-      <SkeletonCard />
-      <SkeletonCard compact />
-    </View>
+  const completedCount = useMemo(
+    () => quests.filter((q) => q.completed || q.claimed).length,
+    [quests]
   );
-}
+
+  const questMessage =
+    claimableCount > 0
+      ? `${claimableCount} reward${claimableCount === 1 ? "" : "s"} ready`
+      : quests.length > 0 && completedCount === quests.length
+      ? "All quests completed"
+      : "Keep building momentum";
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { backgroundColor: c.background }]}>
+        <BrandHeader
+          eyebrow="OurOrbit"
+          title="Quests"
+          subtitle="Loading quests..."
+          compact
+        />
+
+        <SkeletonCard lines={2} />
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonCard compact />
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: c.background }]}>
+      <QuestCelebrationModal quest={claimedQuest} />
+
       <FlatList
-        data={quests}
+        data={sortedQuests}
         keyExtractor={(item) => item.id}
-        refreshing={loading}
-        onRefresh={fetchQuests}
-        contentContainerStyle={
-          styles.listContent
-        }
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
+        contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View>
-            <ScreenHeader
-              title="Quests"
-              subtitle="Complete challenges and earn bonus rewards."
-            />
-
-            <AppCard
-              style={styles.summaryCard}
-            >
-              <View
-                style={
-                  styles.summaryGlowPrimary
-                }
+            <AnimatedScreen delay={40}>
+              <BrandHeader
+                eyebrow="OurOrbit"
+                title="Quests"
+                subtitle="Complete challenges and earn bonus rewards."
+                compact
               />
+            </AnimatedScreen>
 
-              <View
-                style={
-                  styles.summaryGlowSecondary
-                }
-              />
+            <AnimatedScreen delay={80}>
+              <AppCard style={styles.summaryCard}>
+                <View
+                  style={[
+                    styles.summaryGlowPrimary,
+                    {
+                      backgroundColor:
+                        c.surfaceGlow || `${c.cyan || c.primary}16`,
+                    },
+                  ]}
+                />
 
-              <View
-                style={styles.summaryTop}
-              >
-                <View>
-                  <Text
-                    style={
-                      styles.summaryLabel
-                    }
+                <View
+                  style={[
+                    styles.summaryGlowSecondary,
+                    {
+                      backgroundColor: `${c.success || c.primary}10`,
+                    },
+                  ]}
+                />
+
+                <View style={styles.summaryTop}>
+                  <View style={styles.summaryCopy}>
+                    <Text style={[styles.summaryLabel, { color: c.textSecondary }]}>
+                      Quest Momentum
+                    </Text>
+
+                    <Text style={[styles.summaryValue, { color: c.text }]}>
+                      {claimableCount}
+                    </Text>
+
+                    <Text style={[styles.summarySub, { color: c.textSecondary }]}>
+                      {questMessage}
+                    </Text>
+                  </View>
+
+                  <View
+                    style={[
+                      styles.summaryIcon,
+                      {
+                        backgroundColor: `${c.cyan || c.primary}16`,
+                        borderColor: c.border,
+                      },
+                    ]}
                   >
-                    Ready to Claim
-                  </Text>
-
-                  <Text
-                    style={
-                      styles.summaryValue
-                    }
-                  >
-                    {claimableCount}
-                  </Text>
+                    <MaterialCommunityIcons
+                      name="sword-cross"
+                      size={34}
+                      color={c.cyan || c.primary}
+                    />
+                  </View>
                 </View>
 
                 <View
-                  style={
-                    styles.summaryIcon
-                  }
+                  style={[
+                    styles.summaryStats,
+                    {
+                      borderTopColor: c.divider || c.border,
+                    },
+                  ]}
                 >
-                  <MaterialCommunityIcons
-                    name="flag-checkered"
-                    size={34}
-                    color={colors.cyan}
+                  <View style={styles.summaryStat}>
+                    <Text style={[styles.summaryStatValue, { color: c.text }]}>
+                      {completedCount}
+                    </Text>
+
+                    <Text
+                      style={[
+                        styles.summaryStatLabel,
+                        { color: c.textMuted || c.muted },
+                      ]}
+                    >
+                      Completed
+                    </Text>
+                  </View>
+
+                  <View
+                    style={[
+                      styles.summaryDivider,
+                      {
+                        backgroundColor: c.divider || c.border,
+                      },
+                    ]}
                   />
+
+                  <View style={styles.summaryStat}>
+                    <Text style={[styles.summaryStatValue, { color: c.text }]}>
+                      {quests.length}
+                    </Text>
+
+                    <Text
+                      style={[
+                        styles.summaryStatLabel,
+                        { color: c.textMuted || c.muted },
+                      ]}
+                    >
+                      Total Quests
+                    </Text>
+                  </View>
                 </View>
-              </View>
+              </AppCard>
+            </AnimatedScreen>
 
-              <Text
-                style={styles.summarySub}
-              >
-                Complete quests to
-                accelerate your orbit.
-              </Text>
-            </AppCard>
-
-            <RewardToast
-              message={message}
-            />
+            <RewardToast message={message} />
 
             {quests.length > 0 ? (
-              <SectionTitle
-                title="Active Quests"
-                action={
-                  <Text
-                    style={
-                      styles.sectionHint
-                    }
-                  >
-                    Daily & Weekly
-                  </Text>
-                }
-              />
+              <AnimatedScreen delay={120}>
+                <SectionTitle
+                  title="Active Quests"
+                  action={
+                    <Text
+                      style={[
+                        styles.sectionHint,
+                        { color: c.textMuted || c.muted },
+                      ]}
+                    >
+                      Daily & Weekly
+                    </Text>
+                  }
+                />
+              </AnimatedScreen>
             ) : null}
           </View>
         }
         ListEmptyComponent={
-          <AppCard
-            style={styles.emptyCard}
-          >
-            <EmptyState
-              title="No quests available"
-              description="Complete habits and tasks to unlock challenges."
-              icon={
-                <Feather
-                  name="flag"
-                  size={42}
-                  color={colors.cyan}
-                />
-              }
-            />
-          </AppCard>
+          <AnimatedScreen delay={120}>
+            <AppCard style={styles.emptyCard}>
+              <EmptyState
+                title="No quests available"
+                description="Complete habits and tasks to unlock challenges."
+                icon={
+                  <Feather
+                    name="flag"
+                    size={42}
+                    color={c.cyan || c.primary}
+                  />
+                }
+              />
+            </AppCard>
+          </AnimatedScreen>
         }
         renderItem={({ item, index }) => (
           <AnimatedCard index={index}>
-            <QuestCard
-              item={item}
-              onClaim={() =>
-                claimQuest(item)
-              }
-            />
+            <QuestCard item={item} onClaim={() => claimQuest(item)} />
           </AnimatedCard>
         )}
       />
@@ -242,298 +310,344 @@ export default function QuestsScreen() {
 }
 
 function QuestCard({ item, onClaim }) {
-  const completed =
-    item.completed ||
-    item.claimed;
+  const { theme } = useTheme();
+  const c = theme.colors;
 
-  const claimable =
-    item.claimable &&
-    !item.claimed;
+  const completed = item.completed || item.claimed;
+  const claimable = item.claimable && !item.claimed;
+  const rarity = getQuestTier(item.reward, c);
+
+  const pulseScale = useSharedValue(1);
+
+  useEffect(() => {
+    if (claimable) {
+      pulseScale.value = withRepeat(
+        withSequence(
+          withTiming(1.015, { duration: 900 }),
+          withTiming(1, { duration: 900 })
+        ),
+        -1,
+        true
+      );
+    } else {
+      pulseScale.value = withTiming(1, { duration: 180 });
+    }
+  }, [claimable]);
+
+  const pulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseScale.value }],
+  }));
 
   return (
-    <AppCard
-      style={[
-        styles.card,
-        claimable && {
-          borderColor:
-            colors.success,
-        },
-      ]}
-    >
-      <View
-        style={styles.cardGlow}
-      />
-
-      <View style={styles.cardTop}>
+    <Animated.View style={[pulseStyle, completed && styles.completedQuestWrap]}>
+      <AppCard
+        style={[
+          styles.card,
+          claimable && {
+            borderColor: rarity.color,
+          },
+        ]}
+      >
         <View
           style={[
-            styles.iconCircle,
+            styles.cardGlow,
             {
-              backgroundColor:
-                completed
-                  ? `${colors.success}16`
-                  : colors.surfaceAlt,
-
-              borderColor:
-                completed
-                  ? colors.success
-                  : colors.border,
+              backgroundColor: claimable
+                ? `${rarity.color}18`
+                : `${rarity.color}12`,
             },
           ]}
-        >
-          <Feather
-            name={
-              item.claimed
-                ? "check-circle"
-                : claimable
-                ? "target"
-                : "flag"
-            }
-            size={22}
-            color={
-              completed
-                ? colors.success
-                : colors.textMuted
-            }
-          />
+        />
+
+        <View style={styles.cardTop}>
+          <View
+            style={[
+              styles.iconCircle,
+              {
+                backgroundColor: completed
+                  ? `${c.success}16`
+                  : `${rarity.color}14`,
+                borderColor: completed ? c.success : rarity.color,
+              },
+            ]}
+          >
+            <Feather
+              name={item.claimed ? "check-circle" : claimable ? "target" : "flag"}
+              size={22}
+              color={completed ? c.success : rarity.color}
+            />
+          </View>
+
+          <View style={styles.cardText}>
+            <View style={styles.titleRow}>
+              <Text style={[styles.name, { color: c.text }]}>{item.name}</Text>
+
+              <QuestTierPill rarity={rarity} />
+            </View>
+
+            <Text style={[styles.description, { color: c.textSecondary }]}>
+              {item.description}
+            </Text>
+          </View>
         </View>
 
-        <View style={styles.cardText}>
-          <Text style={styles.name}>
-            {item.name}
+        <View style={styles.progressTop}>
+          <Text style={[styles.progressLabel, { color: c.textSecondary }]}>
+            {item.progress || 0} / {item.target}
           </Text>
 
           <Text
-            style={styles.description}
+            style={[
+              styles.progressLabel,
+              {
+                color: completed ? c.success : rarity.color,
+              },
+            ]}
           >
-            {item.description}
+            {completed ? "Completed" : `${item.percent || 0}%`}
           </Text>
         </View>
-      </View>
 
-      <View
-        style={styles.progressOuter}
-      >
-        <View
+        <OrbitProgressBar percent={item.percent || 0} color={rarity.color} />
+
+        <View style={styles.metaRow}>
+          <MetaPill
+            icon="gift"
+            text={`${item.reward} coins`}
+            highlight
+            color={rarity.color}
+          />
+
+          <MetaPill
+            icon="calendar"
+            text={item.period === "daily" ? "Daily" : "Weekly"}
+          />
+
+          <MetaPill
+            icon="zap"
+            text={claimable ? "Ready" : item.claimed ? "Claimed" : "Progress"}
+            highlight={claimable}
+            color={claimable ? c.success : c.textMuted || c.muted}
+          />
+        </View>
+
+        <AnimatedPressable
           style={[
-            styles.progressInner,
+            styles.claimButton,
             {
-              width: `${
-                item.percent || 0
-              }%`,
-
-              backgroundColor:
-                completed
-                  ? colors.success
-                  : colors.cyan,
+              backgroundColor: claimable ? rarity.color : c.surfaceAlt,
+              borderColor: claimable ? rarity.color : c.border,
+              opacity: !claimable || item.claimed ? 0.78 : 1,
             },
           ]}
-        />
-      </View>
-
-      <View style={styles.metaRow}>
-        <MetaPill
-          icon={
-            <Feather
-              name="trending-up"
-              size={14}
-              color={
-                colors.textMuted
-              }
-            />
-          }
-          text={`${
-            item.progress || 0
-          } / ${item.target}`}
-        />
-
-        <MetaPill
-          icon={
-            <Feather
-              name="gift"
-              size={14}
-              color={
-                colors.textMuted
-              }
-            />
-          }
-          text={`${item.reward} coins`}
-        />
-
-        <MetaPill
-          icon={
-            <Feather
-              name="calendar"
-              size={14}
-              color={
-                colors.textMuted
-              }
-            />
-          }
-          text={
-            item.period === "daily"
-              ? "Daily"
-              : "Weekly"
-          }
-        />
-      </View>
-
-      <AnimatedPressable
-        style={[
-          styles.claimButton,
-          {
-            backgroundColor:
-              claimable
-                ? colors.success
-                : colors.surfaceAlt,
-
-            borderColor:
-              claimable
-                ? colors.success
-                : colors.border,
-
-            opacity:
-              !claimable ||
-              item.claimed
-                ? 0.75
-                : 1,
-          },
-        ]}
-        disabled={
-          !claimable || item.claimed
-        }
-        onPress={onClaim}
-      >
-        <Feather
-          name={
-            item.claimed
-              ? "check-circle"
-              : claimable
-              ? "gift"
-              : "clock"
-          }
-          size={17}
-          color={
-            claimable
-              ? colors.white
-              : colors.textMuted
-          }
-        />
-
-        <Text
-          style={[
-            styles.claimButtonText,
-            {
-              color: claimable
-                ? colors.white
-                : colors.textMuted,
-            },
-          ]}
+          disabled={!claimable || item.claimed}
+          onPress={onClaim}
         >
-          {item.claimed
-            ? "Claimed"
-            : claimable
-            ? "Claim Reward"
-            : "In Progress"}
-        </Text>
-      </AnimatedPressable>
-    </AppCard>
+          <Feather
+            name={item.claimed ? "check-circle" : claimable ? "gift" : "clock"}
+            size={17}
+            color={claimable ? "#FFFFFF" : c.textMuted || c.muted}
+          />
+
+          <Text
+            style={[
+              styles.claimButtonText,
+              {
+                color: claimable ? "#FFFFFF" : c.textMuted || c.muted,
+              },
+            ]}
+          >
+            {item.claimed
+              ? "Claimed"
+              : claimable
+              ? "Claim Reward"
+              : "In Progress"}
+          </Text>
+        </AnimatedPressable>
+      </AppCard>
+    </Animated.View>
   );
 }
 
-function MetaPill({ icon, text }) {
+function QuestTierPill({ rarity }) {
   return (
-    <View style={styles.metaPill}>
-      {icon}
+    <View
+      style={[
+        styles.tierPill,
+        {
+          backgroundColor: `${rarity.color}12`,
+          borderColor: rarity.color,
+        },
+      ]}
+    >
+      <Text style={[styles.tierPillText, { color: rarity.color }]}>
+        {rarity.label}
+      </Text>
+    </View>
+  );
+}
 
-      <Text style={styles.metaText}>
+function MetaPill({ icon, text, highlight = false, color = null }) {
+  const { theme } = useTheme();
+  const c = theme.colors;
+
+  const pillColor = color || c.textMuted || c.muted;
+
+  return (
+    <View
+      style={[
+        styles.metaPill,
+        {
+          backgroundColor: highlight ? `${pillColor}12` : c.surfaceAlt,
+          borderColor: highlight ? pillColor : c.border,
+        },
+      ]}
+    >
+      <Feather
+        name={icon}
+        size={13}
+        color={highlight ? pillColor : c.textMuted || c.muted}
+      />
+
+      <Text
+        style={[
+          styles.metaText,
+          {
+            color: highlight ? pillColor : c.textSecondary,
+          },
+        ]}
+      >
         {text}
       </Text>
     </View>
   );
 }
 
-function AnimatedCard({
-  children,
-  index = 0,
-}) {
-  const opacity = useSharedValue(0);
-  const translateY =
-    useSharedValue(18);
+function QuestCelebrationModal({ quest }) {
+  const { theme } = useTheme();
+  const c = theme.colors;
 
-  useEffect(() => {
-    opacity.value = withDelay(
-      index * 55,
-      withTiming(1, {
-        duration: 260,
-      })
-    );
-
-    translateY.value = withDelay(
-      index * 55,
-      withTiming(0, {
-        duration: 260,
-      })
-    );
-  }, []);
-
-  const animatedStyle =
-    useAnimatedStyle(() => ({
-      opacity: opacity.value,
-      transform: [
-        {
-          translateY:
-            translateY.value,
-        },
-      ],
-    }));
+  if (!quest) return null;
 
   return (
-    <Animated.View
-      style={animatedStyle}
-    >
-      {children}
-    </Animated.View>
+    <Modal visible transparent animationType="fade">
+      <View style={styles.modalOverlay}>
+        <Animated.View
+          style={[
+            styles.modalCard,
+            {
+              borderColor: c.success,
+              backgroundColor: c.surface,
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.modalGlow,
+              {
+                backgroundColor: `${c.success}14`,
+              },
+            ]}
+          />
+
+          <View
+            style={[
+              styles.modalIconCircle,
+              {
+                backgroundColor: c.success,
+              },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name="sword-cross"
+              size={40}
+              color="#FFFFFF"
+            />
+          </View>
+
+          <Text style={[styles.modalEyebrow, { color: c.success }]}>
+            Quest Complete
+          </Text>
+
+          <Text style={[styles.modalTitle, { color: c.text }]}>
+            {quest.name}
+          </Text>
+
+          <Text style={[styles.modalText, { color: c.textSecondary }]}>
+            +{quest.coins_earned} coins earned
+          </Text>
+        </Animated.View>
+      </View>
+    </Modal>
   );
 }
 
-function RewardToast({ message }) {
-  const scale =
-    useSharedValue(0.9);
+function getQuestTier(reward = 0, c) {
+  if (reward >= 250) {
+    return {
+      label: "Legendary",
+      color: c.gold,
+    };
+  }
 
-  const opacity =
-    useSharedValue(0);
+  if (reward >= 100) {
+    return {
+      label: "Epic",
+      color: c.coral || c.warning,
+    };
+  }
+
+  if (reward >= 50) {
+    return {
+      label: "Rare",
+      color: c.cyan || c.primary,
+    };
+  }
+
+  return {
+    label: "Common",
+    color: c.textMuted || c.muted,
+  };
+}
+
+function AnimatedCard({ children, index = 0 }) {
+  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(18);
+
+  useEffect(() => {
+    opacity.value = withDelay(index * 55, withTiming(1, { duration: 260 }));
+    translateY.value = withDelay(index * 55, withTiming(0, { duration: 260 }));
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  return <Animated.View style={animatedStyle}>{children}</Animated.View>;
+}
+
+function RewardToast({ message }) {
+  const { theme } = useTheme();
+  const c = theme.colors;
+
+  const scale = useSharedValue(0.9);
+  const opacity = useSharedValue(0);
 
   useEffect(() => {
     if (message) {
-      opacity.value = withTiming(1, {
-        duration: 180,
-      });
-
-      scale.value = withSequence(
-        withSpring(1.08),
-        withSpring(1)
-      );
+      opacity.value = withTiming(1, { duration: 180 });
+      scale.value = withSequence(withSpring(1.08), withSpring(1));
     } else {
-      opacity.value = withTiming(0, {
-        duration: 150,
-      });
-
-      scale.value = withTiming(0.9, {
-        duration: 150,
-      });
+      opacity.value = withTiming(0, { duration: 150 });
+      scale.value = withTiming(0.9, { duration: 150 });
     }
   }, [message]);
 
-  const animatedStyle =
-    useAnimatedStyle(() => ({
-      opacity: opacity.value,
-      transform: [
-        {
-          scale: scale.value,
-        },
-      ],
-    }));
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: scale.value }],
+  }));
 
   if (!message) return null;
 
@@ -541,12 +655,14 @@ function RewardToast({ message }) {
     <Animated.View
       style={[
         styles.toast,
+        {
+          backgroundColor: `${c.success}12`,
+          borderColor: c.success,
+        },
         animatedStyle,
       ]}
     >
-      <Text style={styles.toastText}>
-        {message}
-      </Text>
+      <Text style={[styles.toastText, { color: c.success }]}>{message}</Text>
     </Animated.View>
   );
 }
@@ -554,29 +670,12 @@ function RewardToast({ message }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor:
-      colors.background,
-    paddingHorizontal:
-      spacing.xl,
+    paddingHorizontal: spacing.xl,
     paddingTop: spacing.xl,
   },
 
   listContent: {
     paddingBottom: 120,
-  },
-
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor:
-      colors.background,
-  },
-
-  loadingText: {
-    ...typography.body,
-    color: colors.textSecondary,
-    marginTop: spacing.sm,
   },
 
   summaryCard: {
@@ -587,97 +686,107 @@ const styles = StyleSheet.create({
     position: "absolute",
     width: 220,
     height: 220,
-    borderRadius:
-      radii.pill,
+    borderRadius: radii.pill,
     top: -130,
     right: -90,
-    backgroundColor:
-      `${colors.cyan}16`,
   },
 
   summaryGlowSecondary: {
     position: "absolute",
     width: 160,
     height: 160,
-    borderRadius:
-      radii.pill,
+    borderRadius: radii.pill,
     bottom: -100,
     left: -70,
-    backgroundColor:
-      `${colors.success}10`,
   },
 
   summaryTop: {
     flexDirection: "row",
-    justifyContent:
-      "space-between",
+    justifyContent: "space-between",
     alignItems: "center",
+  },
+
+  summaryCopy: {
+    flex: 1,
   },
 
   summaryLabel: {
     ...typography.caption,
-    color:
-      colors.textSecondary,
-    textTransform:
-      "uppercase",
+    textTransform: "uppercase",
     letterSpacing: 0.8,
   },
 
   summaryValue: {
     fontSize: 42,
     fontWeight: "900",
-    color: colors.text,
     marginTop: spacing.xs,
   },
 
   summarySub: {
     ...typography.bodyBold,
-    color:
-      colors.textSecondary,
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
+  },
+
+  summaryStats: {
+    marginTop: spacing.xl,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    borderTopWidth: 1,
+    paddingTop: spacing.lg,
+  },
+
+  summaryStat: {
+    alignItems: "center",
+  },
+
+  summaryStatValue: {
+    fontSize: 22,
+    fontWeight: "900",
+  },
+
+  summaryStatLabel: {
+    ...typography.caption,
+    marginTop: spacing.xs,
+  },
+
+  summaryDivider: {
+    width: 1,
+    height: 36,
   },
 
   summaryIcon: {
-    width: 72,
-    height: 72,
-    borderRadius:
-      radii.pill,
+    width: 74,
+    height: 74,
+    borderRadius: radii.pill,
     alignItems: "center",
-    justifyContent:
-      "center",
-    backgroundColor:
-      `${colors.cyan}16`,
+    justifyContent: "center",
     borderWidth: 1,
-    borderColor:
-      colors.border,
   },
 
   sectionHint: {
     ...typography.caption,
-    color: colors.textMuted,
   },
 
   toast: {
     marginTop: spacing.md,
     borderWidth: 1,
     padding: spacing.md,
-    borderRadius:
-      radii.lg,
+    borderRadius: radii.lg,
     alignItems: "center",
-    backgroundColor:
-      `${colors.success}12`,
-    borderColor:
-      colors.success,
   },
 
   toastText: {
     ...typography.bodyBold,
-    color: colors.success,
   },
 
   emptyCard: {
     marginTop: spacing.xl,
     alignItems: "center",
+  },
+
+  completedQuestWrap: {
+    opacity: 0.82,
   },
 
   card: {
@@ -687,14 +796,11 @@ const styles = StyleSheet.create({
 
   cardGlow: {
     position: "absolute",
-    width: 160,
-    height: 160,
-    borderRadius:
-      radii.pill,
+    width: 170,
+    height: 170,
+    borderRadius: radii.pill,
     top: -100,
     right: -70,
-    backgroundColor:
-      `${colors.cyan}08`,
   },
 
   cardTop: {
@@ -704,12 +810,10 @@ const styles = StyleSheet.create({
   },
 
   iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius:
-      radii.pill,
-    justifyContent:
-      "center",
+    width: 52,
+    height: 52,
+    borderRadius: radii.pill,
+    justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
   },
@@ -718,32 +822,45 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+
   name: {
+    flex: 1,
     ...typography.h3,
-    color: colors.text,
   },
 
   description: {
     ...typography.body,
-    color:
-      colors.textSecondary,
     marginTop: spacing.xs,
   },
 
-  progressOuter: {
-    marginTop: spacing.lg,
-    height: 10,
-    borderRadius:
-      radii.pill,
-    overflow: "hidden",
-    backgroundColor:
-      colors.surfaceAlt,
+  tierPill: {
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    paddingVertical: 5,
+    paddingHorizontal: spacing.sm,
   },
 
-  progressInner: {
-    height: "100%",
-    borderRadius:
-      radii.pill,
+  tierPillText: {
+    fontSize: 11,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+
+  progressTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+
+  progressLabel: {
+    ...typography.caption,
+    fontWeight: "900",
   },
 
   metaRow: {
@@ -754,36 +871,26 @@ const styles = StyleSheet.create({
   },
 
   metaPill: {
-    borderRadius:
-      radii.pill,
+    borderRadius: radii.pill,
     paddingVertical: 7,
-    paddingHorizontal:
-      spacing.md,
+    paddingHorizontal: spacing.md,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
     borderWidth: 1,
-    backgroundColor:
-      colors.surfaceAlt,
-    borderColor:
-      colors.border,
   },
 
   metaText: {
     fontWeight: "900",
     fontSize: 12,
-    color:
-      colors.textSecondary,
   },
 
   claimButton: {
     marginTop: spacing.lg,
     padding: spacing.lg,
-    borderRadius:
-      radii.lg,
+    borderRadius: radii.lg,
     alignItems: "center",
-    justifyContent:
-      "center",
+    justifyContent: "center",
     borderWidth: 1,
     flexDirection: "row",
     gap: spacing.sm,
@@ -791,5 +898,56 @@ const styles = StyleSheet.create({
 
   claimButtonText: {
     ...typography.bodyBold,
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15,23,42,0.76)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.xl,
+  },
+
+  modalCard: {
+    width: "100%",
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    padding: spacing.xl,
+    alignItems: "center",
+    overflow: "hidden",
+  },
+
+  modalGlow: {
+    position: "absolute",
+    width: 260,
+    height: 260,
+    borderRadius: 999,
+    top: -140,
+  },
+
+  modalIconCircle: {
+    width: 84,
+    height: 84,
+    borderRadius: radii.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.lg,
+  },
+
+  modalEyebrow: {
+    ...typography.caption,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+
+  modalTitle: {
+    ...typography.h1,
+    textAlign: "center",
+    marginTop: spacing.sm,
+  },
+
+  modalText: {
+    ...typography.bodyBold,
+    marginTop: spacing.sm,
   },
 });

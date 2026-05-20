@@ -15,11 +15,14 @@ import { AppCard } from "../components/AppCard";
 import { AppInput } from "../components/AppInput";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
-import { colors, radii, spacing, typography } from "../lib/theme";
+import { radii, spacing, typography } from "../lib/theme";
 
 export default function CreateRewardScreen() {
   const { token } = useAuth();
+  const { theme } = useTheme();
+  const c = theme.colors;
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -67,7 +70,7 @@ export default function CreateRewardScreen() {
 
   return (
     <ScrollView
-      style={styles.screen}
+      style={[styles.screen, { backgroundColor: c.background }]}
       contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
@@ -79,7 +82,10 @@ export default function CreateRewardScreen() {
 
       <AppCard>
         <View style={styles.section}>
-          <Text style={styles.label}>Reward name</Text>
+          <Text style={[styles.label, { color: c.text }]}>
+            Reward name
+          </Text>
+
           <AppInput
             placeholder="e.g. Movie night"
             value={name}
@@ -88,7 +94,10 @@ export default function CreateRewardScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>Description</Text>
+          <Text style={[styles.label, { color: c.text }]}>
+            Description
+          </Text>
+
           <AppInput
             placeholder="Optional notes"
             value={description}
@@ -98,7 +107,10 @@ export default function CreateRewardScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>Coin cost</Text>
+          <Text style={[styles.label, { color: c.text }]}>
+            Coin cost
+          </Text>
+
           <AppInput
             placeholder="e.g. 50"
             value={cost}
@@ -107,28 +119,68 @@ export default function CreateRewardScreen() {
           />
         </View>
 
-        <View style={styles.previewBox}>
-          <View style={styles.previewGlow} />
+        <View
+          style={[
+            styles.previewBox,
+            {
+              borderColor: c.border,
+              backgroundColor: c.surfaceAlt,
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.previewGlow,
+              {
+                backgroundColor: `${c.gold || c.primary}16`,
+              },
+            ]}
+          />
 
           <View style={styles.previewTop}>
-            <View style={styles.iconCircle}>
+            <View
+              style={[
+                styles.iconCircle,
+                {
+                  backgroundColor: c.surface,
+                  borderColor: c.border,
+                },
+              ]}
+            >
               <Text style={styles.iconText}>🎁</Text>
             </View>
 
             <View style={styles.previewText}>
-              <Text style={styles.previewTitle}>
+              <Text style={[styles.previewTitle, { color: c.text }]}>
                 {name.trim() || "Your reward"}
               </Text>
 
-              <Text style={styles.previewSubtitle}>
+              <Text
+                style={[
+                  styles.previewSubtitle,
+                  { color: c.textSecondary },
+                ]}
+              >
                 {cost ? `${cost} coins` : "Set a coin cost"}
               </Text>
             </View>
           </View>
 
           <View style={styles.previewFooter}>
-            <Feather name="gift" size={16} color={colors.gold} />
-            <Text style={styles.previewHint}>Make progress feel real.</Text>
+            <Feather
+              name="gift"
+              size={16}
+              color={c.gold || c.primary}
+            />
+
+            <Text
+              style={[
+                styles.previewHint,
+                { color: c.textSecondary },
+              ]}
+            >
+              Make progress feel real.
+            </Text>
           </View>
         </View>
       </AppCard>
@@ -144,7 +196,14 @@ export default function CreateRewardScreen() {
         style={styles.cancelButton}
         onPress={() => router.replace("/(tabs)/rewards")}
       >
-        <Text style={styles.cancelText}>Cancel</Text>
+        <Text
+          style={[
+            styles.cancelText,
+            { color: c.textMuted || c.muted },
+          ]}
+        >
+          Cancel
+        </Text>
       </Pressable>
     </ScrollView>
   );
@@ -153,7 +212,6 @@ export default function CreateRewardScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
   },
 
   container: {
@@ -167,7 +225,6 @@ const styles = StyleSheet.create({
 
   label: {
     ...typography.bodyBold,
-    color: colors.text,
     marginBottom: spacing.sm,
   },
 
@@ -175,8 +232,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderRadius: radii.xl,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
     padding: spacing.lg,
   },
 
@@ -187,7 +242,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     top: -100,
     right: -80,
-    backgroundColor: `${colors.gold}16`,
   },
 
   previewTop: {
@@ -202,9 +256,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
   },
 
   iconText: {
@@ -217,12 +269,10 @@ const styles = StyleSheet.create({
 
   previewTitle: {
     ...typography.h3,
-    color: colors.text,
   },
 
   previewSubtitle: {
     ...typography.bodyBold,
-    color: colors.textSecondary,
     marginTop: spacing.xs,
   },
 
@@ -235,7 +285,6 @@ const styles = StyleSheet.create({
 
   previewHint: {
     ...typography.caption,
-    color: colors.textSecondary,
   },
 
   button: {
@@ -249,6 +298,5 @@ const styles = StyleSheet.create({
 
   cancelText: {
     ...typography.bodyBold,
-    color: colors.textMuted,
   },
 });

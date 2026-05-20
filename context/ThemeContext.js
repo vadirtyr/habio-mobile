@@ -7,7 +7,7 @@ import { useAuth } from "./AuthContext";
 
 export const ThemeContext = createContext(null);
 
-const THEME_KEY = "habio_theme";
+const THEME_KEY = "OurOrbit_theme";
 const DEFAULT_OWNED_THEMES = ["light", "dark", "nature", "focus"];
 
 export function ThemeProvider({ children }) {

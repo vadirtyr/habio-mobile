@@ -2,27 +2,39 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { colors } from "../../lib/theme";
+import { useTheme } from "../../hooks/useTheme";
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+  const c = theme.colors;
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textMuted,
+        tabBarActiveTintColor: c.primary,
+        tabBarInactiveTintColor: c.textMuted || c.muted,
         tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
+          backgroundColor: c.tabBar || c.surface,
+          borderTopColor: c.border,
           height: 68 + insets.bottom,
           paddingBottom: Math.max(insets.bottom, 10),
           paddingTop: 8,
+
+          shadowColor: theme.glow || c.primary,
+          shadowOffset: {
+            width: 0,
+            height: -6,
+          },
+          shadowOpacity: 0.08,
+          shadowRadius: 16,
+          elevation: 10,
         },
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: "800",
+          fontWeight: "900",
+          letterSpacing: 0.2,
         },
       }}
     >
@@ -31,7 +43,11 @@ export default function TabsLayout() {
         options={{
           title: "Home",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="home-outline" color={color} size={size} />
+            <MaterialCommunityIcons
+              name="home-outline"
+              color={color}
+              size={size}
+            />
           ),
         }}
       />
@@ -41,7 +57,11 @@ export default function TabsLayout() {
         options={{
           title: "Habits",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="repeat" color={color} size={size} />
+            <MaterialCommunityIcons
+              name="repeat"
+              color={color}
+              size={size}
+            />
           ),
         }}
       />
@@ -65,7 +85,11 @@ export default function TabsLayout() {
         options={{
           title: "Rewards",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="gift-outline" color={color} size={size} />
+            <MaterialCommunityIcons
+              name="gift-outline"
+              color={color}
+              size={size}
+            />
           ),
         }}
       />
