@@ -2,7 +2,7 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, FlatList, Modal, StyleSheet, Text, View } from "react-native";
+import { FlatList, Modal, StyleSheet, Text, View } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -12,12 +12,12 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
-
 import { AnimatedPressable } from "../../components/AnimatedPressable";
 import { AnimatedScreen } from "../../components/AnimatedScreen";
 import { AppCard } from "../../components/AppCard";
 import { BrandHeader } from "../../components/BrandMark";
 import { EmptyState } from "../../components/EmptyState";
+import { ErrorState } from "../../components/ErrorState";
 import { OrbitProgressBar } from "../../components/OrbitProgressBar";
 import { SectionTitle } from "../../components/SectionTitle";
 import { SkeletonCard } from "../../components/SkeletonCard";
@@ -34,26 +34,29 @@ export default function QuestsScreen() {
   const [quests, setQuests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
   const [claimedQuest, setClaimedQuest] = useState(null);
 
   async function fetchQuests() {
-    if (!token) return;
+  if (!token) return;
 
-    try {
-      const data = await api.get("/quests", token);
-      setQuests(data.items || []);
-    } catch (error) {
-      Alert.alert("Error", error.message);
-    } finally {
-      setLoading(false);
-    }
+  setError(null);
+
+  try {
+    const data = await api.get("/quests", token);
+    setQuests(data.items || []);
+  } catch (error) {
+    setError(error?.message || "Unable to load quests.");
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
   }
+}
 
   async function handleRefresh() {
     setRefreshing(true);
     await fetchQuests();
-    setRefreshing(false);
   }
 
   async function claimQuest(quest) {
@@ -119,25 +122,44 @@ export default function QuestsScreen() {
       : "Keep building momentum";
 
   if (loading) {
-    return (
-      <View style={[styles.container, { backgroundColor: c.background }]}>
-        <BrandHeader
-          eyebrow="OurOrbit"
-          title="Quests"
-          subtitle="Loading quests..."
-          compact
-        />
-
-        <SkeletonCard lines={2} />
-        <SkeletonCard />
-        <SkeletonCard />
-        <SkeletonCard compact />
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
+      <BrandHeader
+        eyebrow="OurOrbit"
+        title="Quests"
+        subtitle="Loading quests..."
+        compact
+      />
+
+      <SkeletonCard lines={2} />
+      <SkeletonCard />
+      <SkeletonCard />
+      <SkeletonCard compact />
+    </View>
+  );
+}
+
+if (error) {
+  return (
+    <View style={[styles.container, { backgroundColor: c.background }]}>
+      <BrandHeader
+        eyebrow="OurOrbit"
+        title="Quests"
+        subtitle="Complete challenges and earn bonus rewards."
+        compact
+      />
+
+      <ErrorState
+        title="Quests unavailable"
+        description={error}
+        onRetry={fetchQuests}
+      />
+    </View>
+  );
+}
+
+return (
+  <View style={[styles.container, { backgroundColor: c.background }]}>
       <QuestCelebrationModal quest={claimedQuest} />
 
       <FlatList

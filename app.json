@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "OurOrbit",
-    "slug": "habio-mobile",
+    "slug": "OurOrbit",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -13,7 +13,7 @@
       "bundleIdentifier": "co.ourorbit.app"
     },
     "android": {
-      "package": "com.habio.app",
+      "package": "com.OurOrbit.app",
       "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-icon-foreground.png",

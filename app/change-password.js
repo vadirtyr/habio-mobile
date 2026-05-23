@@ -63,7 +63,7 @@ export default function ChangePasswordScreen() {
         </Pressable>
 
         <View style={styles.header}>
-          <Text style={[styles.title, { color: c.text }]}>Change Password</Text>
+          <Text style={[styles.title, { color: c.text }]}>Change password</Text>
           <Text style={[styles.subtitle, { color: c.textSecondary }]}>
             Enter your current password, then choose a new one.
           </Text>
@@ -92,7 +92,7 @@ export default function ChangePasswordScreen() {
           />
 
           <AppButton
-            title={saving ? "Saving..." : "Change Password"}
+            title={saving ? "Saving..." : "Change password"}
             onPress={handleChangePassword}
             disabled={saving}
             style={styles.primaryButton}

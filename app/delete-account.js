@@ -71,8 +71,8 @@ export default function DeleteAccountScreen() {
     >
       <ScrollView contentContainerStyle={styles.container}>
         <ScreenHeader
-          title="Delete Account"
-          subtitle="This permanently removes your orbit, habits, rewards, streaks, and progress."
+          title="Delete account"
+          subtitle="This permanently removes your account, habits, rewards, streaks, and progress."
         />
 
         <AppCard
@@ -111,7 +111,7 @@ export default function DeleteAccountScreen() {
         </AppCard>
 
         <AppButton
-          title={submitting ? "Deleting..." : "Delete Account"}
+          title={submitting ? "Deleting..." : "Delete account"}
           onPress={handleDelete}
           disabled={submitting}
           variant="coral"

@@ -61,10 +61,10 @@ export default function RegisterScreen() {
       return;
     }
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       Alert.alert(
         "Password too short",
-        "Use at least 6 characters."
+        "Use at least 8 characters."
       );
 
       return;
@@ -273,7 +273,7 @@ export default function RegisterScreen() {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
-              placeholder="At least 6 characters"
+              placeholder="At least 8 characters"
             />
           </View>
 
@@ -341,8 +341,7 @@ export default function RegisterScreen() {
               },
             ]}
           >
-            Already have an
-            account? Log in
+            Already have an account? Log in
           </Text>
         </Pressable>
 

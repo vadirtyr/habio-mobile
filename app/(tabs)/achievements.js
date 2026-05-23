@@ -2,7 +2,6 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Alert,
   FlatList,
   Text,
   View
@@ -13,9 +12,9 @@ import { AnimatedScreen } from "../../components/AnimatedScreen";
 import { AppCard } from "../../components/AppCard";
 import { BrandHeader } from "../../components/BrandMark";
 import { EmptyState } from "../../components/EmptyState";
+import { ErrorState } from "../../components/ErrorState";
 import { OrbitProgressBar } from "../../components/OrbitProgressBar";
 import { SkeletonCard } from "../../components/SkeletonCard";
-
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../hooks/useTheme";
 
@@ -66,47 +65,38 @@ export default function AchievementsScreen() {
     useState(0);
 
   const [loading, setLoading] =
-    useState(true);
+  useState(true);
 
-  const [
-    celebrationTarget,
-    setCelebrationTarget,
-  ] = useState(null);
+const [refreshing, setRefreshing] =
+  useState(false);
+
+const [error, setError] =
+  useState(null);
+
+const [
+  celebrationTarget,
+  setCelebrationTarget,
+] = useState(null);
 
   async function fetchAchievements() {
-    if (!token) return;
+  if (!token) return;
 
-    try {
-      const data =
-        await api.get(
-          "/achievements",
-          token
-        );
+  setError(null);
 
-      setAchievements(
-        data.items || []
-      );
+  try {
+    const data = await api.get("/achievements", token);
 
-      setEarnedCount(
-        data.earned_count || 0
-      );
-
-      setTotal(
-        data.total || 0
-      );
-    } catch (error) {
-      Alert.alert(
-        "Error",
-        error.message
-      );
-    } finally {
-      setLoading(false);
-    }
+    setAchievements(data.items || []);
+    setEarnedCount(data.earned_count || 0);
+    setTotal(data.total || 0);
+  } catch (error) {
+    setError(error?.message || "Unable to load achievements.");
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
   }
+}
 
-  useEffect(() => {
-    fetchAchievements();
-  }, [token]);
 
   useFocusEffect(
     useCallback(() => {
@@ -239,39 +229,52 @@ export default function AchievementsScreen() {
     );
   }
 
+  if (error) {
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          backgroundColor:
-            c.background,
-        },
-      ]}
-    >
-      <AchievementCelebrationModal
-        visible={
-          !!celebrationTarget
-        }
-        achievement={
-          celebrationTarget
-        }
-        onClose={() =>
-          setCelebrationTarget(
-            null
-          )
-        }
+    <View style={[styles.container, { backgroundColor: c.background }]}>
+      <BrandHeader
+        eyebrow="OurOrbit"
+        title="Achievements"
+        subtitle="Track milestones and unlock exclusive rewards."
+        compact
       />
 
-      <FlatList
+      <ErrorState
+        title="Achievements unavailable"
+        description={error}
+        onRetry={fetchAchievements}
+      />
+    </View>
+  );
+}
+
+return (
+  <View
+    style={[
+      styles.container,
+      {
+        backgroundColor: c.background,
+      },
+    ]}
+  >
+    <AchievementCelebrationModal
+      visible={!!celebrationTarget}
+      achievement={celebrationTarget}
+      onClose={() =>
+        setCelebrationTarget(null)
+      }
+    />
+
+    <FlatList
         data={listData}
         keyExtractor={(row) =>
           row.id
         }
-        refreshing={loading}
-        onRefresh={
-          fetchAchievements
-        }
+        refreshing={refreshing}
+        onRefresh={async () => {
+        setRefreshing(true);
+        await fetchAchievements();
+        }}
         contentContainerStyle={
           styles.listContent
         }
@@ -473,11 +476,10 @@ export default function AchievementsScreen() {
             </AnimatedCard>
           );
         }}
-      />
-    </View>
-  );
+    />
+  </View>
+);
 }
-
 function CategoryHeader({
   category,
 }) {

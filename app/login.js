@@ -161,7 +161,7 @@ export default function LoginScreen() {
         <BrandHeader
           centered
           title="OurOrbit"
-          subtitle="Build better days with habits, tasks, streaks, and rewards."
+          subtitle="Build better days through habits, streaks, and momentum."
         />
 
         <AppCard style={styles.card}>
@@ -266,12 +266,19 @@ export default function LoginScreen() {
               placeholder="Password"
             />
           </View>
-
+          <Pressable
+            onPress={() => router.push("/forgot-password")}
+            style={styles.forgotButton}
+          >
+          <Text style={[styles.forgotText, { color: c.primary }]}>
+            Forgot password?
+          </Text>
+          </Pressable>
           <AppButton
             title={
               submitting
                 ? "Logging in..."
-                : "Log In"
+                : "Log in"
             }
             onPress={handleLogin}
             disabled={submitting}
@@ -420,4 +427,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     fontSize: 13,
   },
+  forgotButton: {
+  alignSelf: "flex-end",
+  marginTop: spacing.xs,
+  marginBottom: spacing.lg,
+},
+
+forgotText: {
+  ...typography.caption,
+  fontWeight: "900",
+},
 });

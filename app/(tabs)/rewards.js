@@ -18,6 +18,7 @@ import { AppButton } from "../../components/AppButton";
 import { AppCard } from "../../components/AppCard";
 import { BrandHeader } from "../../components/BrandMark";
 import { EmptyState } from "../../components/EmptyState";
+import { ErrorState } from "../../components/ErrorState";
 import { OrbitProgressBar } from "../../components/OrbitProgressBar";
 import { SectionTitle } from "../../components/SectionTitle";
 import { SkeletonCard } from "../../components/SkeletonCard";
@@ -35,6 +36,7 @@ export default function RewardsScreen() {
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
   const [redeemedReward, setRedeemedReward] = useState(null);
 
@@ -76,19 +78,22 @@ export default function RewardsScreen() {
   );
 
   async function fetchRewards() {
-    if (!token) return;
+  if (!token) return;
 
-    try {
+  setError(null);
+
+  try {
       const statsData = await api.get("/stats", token);
       setBalance(statsData.coin_balance || 0);
 
       const data = await api.get("/rewards", token);
       setRewards(Array.isArray(data) ? data : []);
     } catch (error) {
-      Alert.alert("Error", error.message);
-    } finally {
-      setLoading(false);
-    }
+  setError(error?.message || "Unable to load rewards.");
+} finally {
+  setLoading(false);
+  setRefreshing(false);
+}
   }
 
   async function handleRefresh() {
@@ -181,7 +186,24 @@ export default function RewardsScreen() {
       </View>
     );
   }
+  if (error) {
+  return (
+    <View style={[styles.container, { backgroundColor: c.background }]}>
+      <BrandHeader
+        eyebrow="OurOrbit"
+        title="Rewards"
+        subtitle="Spend coins on things worth earning."
+        compact
+      />
 
+      <ErrorState
+        title="Rewards unavailable"
+        description={error}
+        onRetry={fetchRewards}
+      />
+    </View>
+  );
+}
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
       <RedeemCelebration reward={redeemedReward} />

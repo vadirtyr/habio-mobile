@@ -2,9 +2,6 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
-import { AnimatedScreen } from "../components/AnimatedScreen";
-import { ScreenHeader } from "../components/ScreenHeader";
-import { SkeletonCard } from "../components/SkeletonCard";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     Alert,
@@ -21,6 +18,9 @@ import Animated, {
     withSequence,
     withSpring,
 } from "react-native-reanimated";
+import { AnimatedScreen } from "../components/AnimatedScreen";
+import { ScreenHeader } from "../components/ScreenHeader";
+import { SkeletonCard } from "../components/SkeletonCard";
 
 import { AppButton } from "../components/AppButton";
 import { AppCard } from "../components/AppCard";
@@ -81,7 +81,7 @@ export default function ThemeStoreScreen() {
   const [unlockTarget, setUnlockTarget] = useState(null);
   const [purchasing, setPurchasing] = useState(false);
   const [equippedMessage, setEquippedMessage] = useState(null);
-if (loadingBalance || syncing)
+if (loadingBalance || syncing) {
   return (
     <View
       style={[
