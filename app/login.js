@@ -1,4 +1,8 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import {
+  GoogleSignin,
+  statusCodes,
+} from "@react-native-google-signin/google-signin";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { useState } from "react";
@@ -29,6 +33,14 @@ import {
   typography,
 } from "../lib/theme";
 
+GoogleSignin.configure({
+  webClientId:
+    "492365850026-7kom0bgo08pmpbnqto19r1ibkel4n56i.apps.googleusercontent.com",
+  iosClientId:
+    "492365850026-q5lqeuuf2nntalar82bocakdalsk4n68.apps.googleusercontent.com",
+  offlineAccess: true,
+});
+
 export default function LoginScreen() {
   const { login } = useAuth();
   const { theme } = useTheme();
@@ -36,22 +48,108 @@ export default function LoginScreen() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [submitting, setSubmitting] =
-    useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function finishLogin(data, fallbackEmail) {
+    if (!data?.token) {
+      throw new Error("Invalid login response.");
+    }
+
+    await login(data.token);
+
+    const cleanEmail =
+      data?.user?.email?.trim()?.toLowerCase() ||
+      fallbackEmail?.trim()?.toLowerCase();
+
+    if (cleanEmail) {
+      await SecureStore.setItemAsync(
+        "currentUserEmail",
+        cleanEmail
+      );
+
+      const onboardingKey = `onboarding_${cleanEmail.replace(
+        /[^a-zA-Z0-9]/g,
+        "_"
+      )}`;
+
+      const hasCompletedOnboarding =
+        await SecureStore.getItemAsync(onboardingKey);
+
+      if (!hasCompletedOnboarding) {
+        router.replace("/onboarding");
+        return;
+      }
+    }
+
+    router.replace("/(tabs)/dashboard");
+  }
+
+  async function handleGoogleLogin() {
+    if (submitting) return;
+
+    try {
+      setSubmitting(true);
+
+      if (Platform.OS === "android") {
+        await GoogleSignin.hasPlayServices({
+          showPlayServicesUpdateDialog: true,
+        });
+      }
+
+      const signInResult = await GoogleSignin.signIn();
+
+      const idToken =
+        signInResult?.data?.idToken ||
+        signInResult?.idToken;
+
+      if (!idToken) {
+        throw new Error(
+          "Google login did not return a token."
+        );
+      }
+
+      const data = await api.post("/auth/google", {
+        id_token: idToken,
+      });
+
+      await finishLogin(data);
+    } catch (error) {
+      if (
+        error?.code === statusCodes.SIGN_IN_CANCELLED ||
+        error?.code === statusCodes.IN_PROGRESS
+      ) {
+        return;
+      }
+
+      if (
+        error?.code ===
+        statusCodes.PLAY_SERVICES_NOT_AVAILABLE
+      ) {
+        Alert.alert(
+          "Google Play Services missing",
+          "Google login requires Google Play Services."
+        );
+        return;
+      }
+
+      Alert.alert(
+        "Google login failed",
+        error?.message ||
+          "Unable to sign in with Google."
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   async function handleLogin() {
-    const cleanEmail =
-      email.trim().toLowerCase();
+    const cleanEmail = email.trim().toLowerCase();
 
-    if (
-      !cleanEmail ||
-      !password.trim()
-    ) {
+    if (!cleanEmail || !password.trim()) {
       Alert.alert(
         "Missing fields",
         "Please enter your email and password."
       );
-
       return;
     }
 
@@ -60,56 +158,16 @@ export default function LoginScreen() {
     setSubmitting(true);
 
     try {
-      const data = await api.post(
-        "/auth/login",
-        {
-          email: cleanEmail,
-          password,
-        }
-      );
+      const data = await api.post("/auth/login", {
+        email: cleanEmail,
+        password,
+      });
 
-      if (!data?.token) {
-        throw new Error(
-          "Invalid login response."
-        );
-      }
-
-      await login(data.token);
-
-      await SecureStore.setItemAsync(
-        "currentUserEmail",
-        cleanEmail
-      );
-
-      const onboardingKey =
-        `onboarding_${cleanEmail.replace(
-          /[^a-zA-Z0-9]/g,
-          "_"
-        )}`;
-
-      const hasCompletedOnboarding =
-        await SecureStore.getItemAsync(
-          onboardingKey
-        );
-
-      if (
-        !hasCompletedOnboarding
-      ) {
-        router.replace(
-          "/onboarding"
-        );
-
-        return;
-      }
-
-      router.replace(
-        "/(tabs)/dashboard"
-      );
+      await finishLogin(data, cleanEmail);
     } catch (error) {
       Alert.alert(
         "Login failed",
-        error?.message ||
-          "Unable to log in."
+        error?.message || "Unable to log in."
       );
     } finally {
       setSubmitting(false);
@@ -121,25 +179,16 @@ export default function LoginScreen() {
       style={[
         styles.screen,
         {
-          backgroundColor:
-            c.background,
+          backgroundColor: c.background,
         },
       ]}
-      behavior={
-        Platform.OS === "ios"
-          ? "padding"
-          : undefined
-      }
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <View
         style={[
           styles.glowOne,
           {
-            backgroundColor:
-              `${
-                c.cyan ||
-                c.primary
-              }16`,
+            backgroundColor: `${c.cyan || c.primary}16`,
           },
         ]}
       />
@@ -148,11 +197,7 @@ export default function LoginScreen() {
         style={[
           styles.glowTwo,
           {
-            backgroundColor:
-              `${
-                c.coral ||
-                c.primary
-              }12`,
+            backgroundColor: `${c.coral || c.primary}12`,
           },
         ]}
       />
@@ -165,19 +210,13 @@ export default function LoginScreen() {
         />
 
         <AppCard style={styles.card}>
-          <View
-            style={
-              styles.cardHeader
-            }
-          >
+          <View style={styles.cardHeader}>
             <View>
               <Text
                 style={[
                   styles.cardEyebrow,
                   {
-                    color:
-                      c.cyan ||
-                      c.primary,
+                    color: c.cyan || c.primary,
                   },
                 ]}
               >
@@ -188,8 +227,7 @@ export default function LoginScreen() {
                 style={[
                   styles.cardTitle,
                   {
-                    color:
-                      c.text,
+                    color: c.text,
                   },
                 ]}
               >
@@ -201,24 +239,15 @@ export default function LoginScreen() {
               style={[
                 styles.iconBadge,
                 {
-                  backgroundColor:
-                    `${
-                      c.cyan ||
-                      c.primary
-                    }14`,
-
-                  borderColor:
-                    c.border,
+                  backgroundColor: `${c.cyan || c.primary}14`,
+                  borderColor: c.border,
                 },
               ]}
             >
               <MaterialCommunityIcons
                 name="orbit"
                 size={26}
-                color={
-                  c.cyan ||
-                  c.primary
-                }
+                color={c.cyan || c.primary}
               />
             </View>
           </View>
@@ -228,8 +257,7 @@ export default function LoginScreen() {
               style={[
                 styles.label,
                 {
-                  color:
-                    c.text,
+                  color: c.text,
                 },
               ]}
             >
@@ -251,8 +279,7 @@ export default function LoginScreen() {
               style={[
                 styles.label,
                 {
-                  color:
-                    c.text,
+                  color: c.text,
                 },
               ]}
             >
@@ -266,65 +293,57 @@ export default function LoginScreen() {
               placeholder="Password"
             />
           </View>
+
           <Pressable
             onPress={() => router.push("/forgot-password")}
             style={styles.forgotButton}
           >
-          <Text style={[styles.forgotText, { color: c.primary }]}>
-            Forgot password?
-          </Text>
+            <Text
+              style={[
+                styles.forgotText,
+                {
+                  color: c.primary,
+                },
+              ]}
+            >
+              Forgot password?
+            </Text>
           </Pressable>
+
           <AppButton
-            title={
-              submitting
-                ? "Logging in..."
-                : "Log in"
-            }
+            title={submitting ? "Logging in..." : "Log in"}
             onPress={handleLogin}
             disabled={submitting}
-            style={
-              styles.button
-            }
+            style={styles.button}
+          />
+
+          <AppButton
+            title="Continue with Google"
+            onPress={handleGoogleLogin}
+            disabled={submitting}
+            style={styles.googleButton}
           />
         </AppCard>
 
-        <Pressable
-          onPress={() =>
-            router.push(
-              "/register"
-            )
-          }
-        >
+        <Pressable onPress={() => router.push("/register")}>
           <Text
             style={[
               styles.registerText,
               {
-                color:
-                  c.cyan ||
-                  c.primary,
+                color: c.cyan || c.primary,
               },
             ]}
           >
-            Don&apos;t have an account?
-            {" "}
-            Create one
+            Don&apos;t have an account? Create one
           </Text>
         </Pressable>
 
-        <Pressable
-          onPress={() =>
-            router.push(
-              "/privacy"
-            )
-          }
-        >
+        <Pressable onPress={() => router.push("/privacy")}>
           <Text
             style={[
               styles.privacyText,
               {
-                color:
-                  c.textMuted ||
-                  c.muted,
+                color: c.textMuted || c.muted,
               },
             ]}
           >
@@ -415,6 +434,10 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
 
+  googleButton: {
+    marginTop: spacing.md,
+  },
+
   registerText: {
     textAlign: "center",
     fontWeight: "800",
@@ -427,14 +450,15 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     fontSize: 13,
   },
-  forgotButton: {
-  alignSelf: "flex-end",
-  marginTop: spacing.xs,
-  marginBottom: spacing.lg,
-},
 
-forgotText: {
-  ...typography.caption,
-  fontWeight: "900",
-},
+  forgotButton: {
+    alignSelf: "flex-end",
+    marginTop: spacing.xs,
+    marginBottom: spacing.lg,
+  },
+
+  forgotText: {
+    ...typography.caption,
+    fontWeight: "900",
+  },
 });
