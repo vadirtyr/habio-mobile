@@ -218,6 +218,12 @@ export default function SettingsScreen() {
 
           <AppCard>
             <SettingsRow
+              label="Reset App Data"
+              subtitle="Clear habits, tasks, rewards, coins, streaks, quests, achievements, and history"
+              onPress={handleResetData}
+              destructive
+            />
+            <SettingsRow
               icon="delete-outline"
               label="Delete Account"
               subtitle="Permanently remove your account"
@@ -313,7 +319,40 @@ function SettingsRow({
     </Pressable>
   );
 }
+async function handleResetData() {
+  Alert.alert(
+    "Reset App Data?",
+    "This will permanently delete your habits, tasks, rewards, coins, streaks, quests, achievements, and history. Your account will remain active.",
+    [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Reset Data",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await api.resetAccountData();
 
+            Alert.alert(
+              "Data Reset",
+              "Your app data has been reset.",
+              [
+                {
+                  text: "OK",
+                  onPress: () => router.replace("/onboarding"),
+                },
+              ]
+            );
+          } catch (error) {
+            Alert.alert(
+              "Reset Failed",
+              error?.message || "Unable to reset account data."
+            );
+          }
+        },
+      },
+    ]
+  );
+}
 function ThemeChip({ label, active, onPress }) {
   const { theme } = useTheme();
   const c = theme.colors;

@@ -36,7 +36,7 @@
       "iosUrlScheme": "com.googleusercontent.apps.YOUR_IOS_REVERSED_CLIENT_ID"
     }
   ]
-]
+  ],
     "experiments": {
       "typedRoutes": true
     },
