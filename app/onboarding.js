@@ -189,10 +189,7 @@ export default function OnboardingScreen() {
     if (!email && token) {
       try {
         const me =
-          await api.get(
-            "/auth/me",
-            token
-          );
+          await api.get("/auth/me");
 
         email =
           me?.email?.toLowerCase() ||
@@ -228,27 +225,23 @@ export default function OnboardingScreen() {
         selectedHabits.length > 0
       ) {
         for (const habit of selectedHabits) {
-          await api.post(
-            "/habits",
-            {
-              name: habit.name,
-              description:
-                habit.description,
+          await api.post("/habits", {
+            name: habit.name,
+            description:
+              habit.description,
 
-              frequency: "daily",
+            frequency: "daily",
 
-              difficulty: "easy",
+            difficulty: "easy",
 
-              icon:
-                habit.icon ||
-                "flame",
+            icon:
+              habit.icon ||
+              "flame",
 
-              category:
-                selectedCategory?.title ||
-                "Starter",
-            },
-            token
-          );
+            category:
+              selectedCategory?.title ||
+              "Starter",
+          });
         }
       }
 
@@ -712,11 +705,13 @@ function CategoryStep({
           title="Back"
           variant="secondary"
           onPress={onBack}
+          style={styles.actionButton}
         />
 
         <AppButton
           title="Next"
           onPress={onNext}
+          style={styles.actionButton}
         />
       </View>
     </View>
@@ -874,6 +869,7 @@ function HabitStep({
           title="Back"
           variant="secondary"
           onPress={onBack}
+          style={styles.actionButton}
         />
 
         <AppButton
@@ -884,6 +880,7 @@ function HabitStep({
           }
           onPress={onFinish}
           disabled={submitting}
+          style={styles.actionButton}
         />
       </View>
 
@@ -1042,6 +1039,11 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     flexDirection: "row",
     gap: spacing.sm,
+    width: "100%",
+  },
+
+  actionButton: {
+    flex: 1,
   },
 
   button: {

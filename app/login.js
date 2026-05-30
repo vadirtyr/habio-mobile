@@ -1,8 +1,4 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import {
-  GoogleSignin,
-  statusCodes,
-} from "@react-native-google-signin/google-signin";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { useState } from "react";
@@ -32,14 +28,6 @@ import {
   spacing,
   typography,
 } from "../lib/theme";
-
-GoogleSignin.configure({
-  webClientId:
-    "492365850026-7kom0bgo08pmpbnqto19r1ibkel4n56i.apps.googleusercontent.com",
-  iosClientId:
-    "492365850026-q5lqeuuf2nntalar82bocakdalsk4n68.apps.googleusercontent.com",
-  offlineAccess: true,
-});
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -85,61 +73,10 @@ export default function LoginScreen() {
   }
 
   async function handleGoogleLogin() {
-    if (submitting) return;
-
-    try {
-      setSubmitting(true);
-
-      if (Platform.OS === "android") {
-        await GoogleSignin.hasPlayServices({
-          showPlayServicesUpdateDialog: true,
-        });
-      }
-
-      const signInResult = await GoogleSignin.signIn();
-
-      const idToken =
-        signInResult?.data?.idToken ||
-        signInResult?.idToken;
-
-      if (!idToken) {
-        throw new Error(
-          "Google login did not return a token."
-        );
-      }
-
-      const data = await api.post("/auth/google", {
-        id_token: idToken,
-      });
-
-      await finishLogin(data);
-    } catch (error) {
-      if (
-        error?.code === statusCodes.SIGN_IN_CANCELLED ||
-        error?.code === statusCodes.IN_PROGRESS
-      ) {
-        return;
-      }
-
-      if (
-        error?.code ===
-        statusCodes.PLAY_SERVICES_NOT_AVAILABLE
-      ) {
-        Alert.alert(
-          "Google Play Services missing",
-          "Google login requires Google Play Services."
-        );
-        return;
-      }
-
-      Alert.alert(
-        "Google login failed",
-        error?.message ||
-          "Unable to sign in with Google."
-      );
-    } finally {
-      setSubmitting(false);
-    }
+    Alert.alert(
+      "Google Login Disabled",
+      "Google Sign-In is temporarily disabled while testing in Expo Go."
+    );
   }
 
   async function handleLogin() {

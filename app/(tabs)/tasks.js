@@ -16,6 +16,7 @@ import Animated, {
 import { AnimatedPressable } from "../../components/AnimatedPressable";
 import { AppButton } from "../../components/AppButton";
 import { AppCard } from "../../components/AppCard";
+import { AvatarUnlockModal } from "../../components/AvatarUnlockModal";
 import { BrandHeader } from "../../components/BrandMark";
 import { EmptyState } from "../../components/EmptyState";
 import { ErrorState } from "../../components/ErrorState";
@@ -43,6 +44,7 @@ export default function TasksScreen() {
   const [completionCelebration, setCompletionCelebration] = useState(null);
   const [levelUp, setLevelUp] = useState(null);
   const [xpToast, setXpToast] = useState(0);
+  const [avatarUnlock, setAvatarUnlock] = useState(null);
 
   const firstBalanceLoad = useRef(true);
   const coinScale = useSharedValue(1);
@@ -122,6 +124,12 @@ export default function TasksScreen() {
 
     try {
       const data = await api.post(`/tasks/${taskId}/complete`, {}, token);
+      if (data?.new_avatars?.length > 0) {
+      const avatar = data.new_avatars[0];
+
+      
+     setAvatarUnlock(avatar);
+    }
 
       if (data.leveled_up) {
         setLevelUp({
@@ -275,7 +283,11 @@ export default function TasksScreen() {
       />
 
       <XPGainToast xp={xpToast} />
-
+      <AvatarUnlockModal
+      visible={!!avatarUnlock}
+      avatar={avatarUnlock}
+      onClose={() => setAvatarUnlock(null)}
+      />
       <FlatList
         data={sortedTasks}
         keyExtractor={(item) => item.id}

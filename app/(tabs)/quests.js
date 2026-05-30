@@ -2,7 +2,7 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FlatList, Modal, StyleSheet, Text, View } from "react-native";
+import { Alert, FlatList, Modal, StyleSheet, Text, View } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -15,6 +15,7 @@ import Animated, {
 import { AnimatedPressable } from "../../components/AnimatedPressable";
 import { AnimatedScreen } from "../../components/AnimatedScreen";
 import { AppCard } from "../../components/AppCard";
+import { AvatarUnlockModal } from "../../components/AvatarUnlockModal";
 import { BrandHeader } from "../../components/BrandMark";
 import { EmptyState } from "../../components/EmptyState";
 import { ErrorState } from "../../components/ErrorState";
@@ -35,6 +36,7 @@ export default function QuestsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [avatarUnlock, setAvatarUnlock] = useState(null);
   const [message, setMessage] = useState(null);
   const [claimedQuest, setClaimedQuest] = useState(null);
 
@@ -64,7 +66,11 @@ export default function QuestsScreen() {
 
     try {
       const data = await api.post(`/quests/${quest.id}/claim`, {}, token);
+      if (data?.new_avatars?.length > 0) {
+      const avatar = data.new_avatars[0];
 
+      setAvatarUnlock(avatar);
+      }
       await Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Success
       );
@@ -160,9 +166,15 @@ if (error) {
 
 return (
   <View style={[styles.container, { backgroundColor: c.background }]}>
-      <QuestCelebrationModal quest={claimedQuest} />
+  <QuestCelebrationModal quest={claimedQuest} />
 
-      <FlatList
+  <AvatarUnlockModal
+    visible={!!avatarUnlock}
+    avatar={avatarUnlock}
+    onClose={() => setAvatarUnlock(null)}
+  />
+
+  <FlatList
         data={sortedQuests}
         keyExtractor={(item) => item.id}
         refreshing={refreshing}

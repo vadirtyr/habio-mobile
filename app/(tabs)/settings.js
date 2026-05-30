@@ -2,6 +2,8 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
+import * as SecureStore from "expo-secure-store";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -16,28 +18,54 @@ import { AppButton } from "../../components/AppButton";
 import { AppCard } from "../../components/AppCard";
 import { BrandBadge, BrandHeader } from "../../components/BrandMark";
 import { SectionTitle } from "../../components/SectionTitle";
+
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../hooks/useTheme";
-import { radii, shadows, spacing, typography } from "../../lib/theme";
+
+import { resetAccountData } from "../../lib/api";
+//import {
+//  cancelDailyOrbitReminder,
+//  getScheduledNotifications,
+//  scheduleDailyOrbitReminder,
+// } from "../../lib/notifications";
+
+import {
+  radii,
+  shadows,
+  spacing,
+  typography,
+} from "../../lib/theme";
 
 const QUICK_THEMES = ["light", "dark", "nature", "focus"];
 
 export default function SettingsScreen() {
   const { logout } = useAuth();
   const { themeName, themes, setThemeName } = useTheme();
+  const [dailyReminderEnabled, setDailyReminderEnabled] = useState(false);
 
   const activeTheme = themes[themeName];
   const c = activeTheme.colors;
+
+  useEffect(() => {
+    async function checkReminder() {
+      const scheduled = await getScheduledNotifications();
+
+      setDailyReminderEnabled(
+        scheduled.some(
+          (item) => item.identifier === "daily_orbit_reminder"
+        )
+      );
+    }
+
+    checkReminder();
+  }, []);
 
   function confirmLogout() {
     Alert.alert(
       "Log out?",
       "You’ll need to sign in again to access your orbit.",
       [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
+        { text: "Cancel", style: "cancel" },
         {
           text: "Log Out",
           style: "destructive",
@@ -50,6 +78,86 @@ export default function SettingsScreen() {
   async function handleThemeChange(key) {
     await Haptics.selectionAsync();
     await setThemeName(key);
+  }
+
+  async function handleDailyReminderToggle() {
+    try {
+      if (dailyReminderEnabled) {
+        await cancelDailyOrbitReminder();
+        setDailyReminderEnabled(false);
+
+        Alert.alert(
+          "Reminder Disabled",
+          "Daily orbit reminders have been turned off."
+        );
+
+        return;
+      }
+
+      await scheduleDailyOrbitReminder({
+        hour: 20,
+        minute: 0,
+      });
+
+      setDailyReminderEnabled(true);
+
+      Alert.alert(
+        "Reminder Enabled",
+        "We'll remind you every day at 8:00 PM."
+      );
+    } catch (error) {
+      Alert.alert(
+        "Notification Error",
+        error?.message || "Unable to update reminders."
+      );
+    }
+  }
+
+  async function handleResetData() {
+    Alert.alert(
+      "Reset App Data?",
+      "This will permanently delete your habits, tasks, rewards, coins, streaks, quests, achievements, and history. Your account will remain active.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Reset Data",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await resetAccountData();
+
+              const currentEmail =
+                await SecureStore.getItemAsync("currentUserEmail");
+
+              if (currentEmail) {
+                const onboardingKey = `onboarding_${currentEmail.replace(
+                  /[^a-zA-Z0-9]/g,
+                  "_"
+                )}`;
+
+                await SecureStore.deleteItemAsync(onboardingKey);
+              }
+
+              Alert.alert(
+                "Data Reset",
+                "Your app data has been reset.",
+                [
+                  {
+                    text: "OK",
+                    onPress: () => router.replace("/onboarding"),
+                  },
+                ]
+              );
+            } catch (error) {
+              Alert.alert(
+                "Reset Failed",
+                error?.message || "Unable to reset account data."
+              );
+            }
+          },
+        },
+      ]
+    );
   }
 
   return (
@@ -106,6 +214,7 @@ export default function SettingsScreen() {
             <View style={styles.quickThemes}>
               {QUICK_THEMES.map((key) => {
                 const item = themes[key];
+
                 if (!item) return null;
 
                 return (
@@ -172,18 +281,47 @@ export default function SettingsScreen() {
           <SectionTitle title="Personalization" />
 
           <AppCard>
+          <SettingsRow
+            icon="timeline-clock-outline"
+            label="Activity"
+            subtitle="View your recent orbit history"
+            onPress={() => router.push("/activity")}
+          />
             <SettingsRow
               icon="palette-outline"
               label="Theme Store"
               subtitle="Unlock and equip new themes"
               onPress={() => router.push("/theme-store")}
             />
-
+            <SettingsRow
+            icon="account-circle-outline"
+            label="Profile"
+            subtitle="View and customize your public profile"
+            onPress={() => router.push("/profile")}
+            />
             <SettingsRow
               icon="refresh"
               label="Restart Onboarding"
               subtitle="Go through the setup flow again"
               onPress={() => router.push("/onboarding")}
+              last
+            />
+          </AppCard>
+        </AnimatedScreen>
+
+        <AnimatedScreen delay={140}>
+          <SectionTitle title="Reminders" />
+
+          <AppCard>
+            <SettingsRow
+              icon="bell-outline"
+              label="Daily Reminder"
+              subtitle={
+                dailyReminderEnabled
+                  ? "Enabled for 8:00 PM"
+                  : "Remind me to keep my orbit moving"
+              }
+              onPress={handleDailyReminderToggle}
               last
             />
           </AppCard>
@@ -218,11 +356,12 @@ export default function SettingsScreen() {
 
           <AppCard>
             <SettingsRow
+              icon="refresh"
               label="Reset App Data"
               subtitle="Clear habits, tasks, rewards, coins, streaks, quests, achievements, and history"
               onPress={handleResetData}
-              destructive
             />
+
             <SettingsRow
               icon="delete-outline"
               label="Delete Account"
@@ -247,9 +386,7 @@ export default function SettingsScreen() {
               Built with momentum in mind.
             </Text>
 
-            <Text
-              style={[styles.versionText, { color: c.textMuted || c.muted }]}
-            >
+            <Text style={[styles.versionText, { color: c.textMuted || c.muted }]}>
               OurOrbit v1.0
             </Text>
           </View>
@@ -294,7 +431,11 @@ function SettingsRow({
             },
           ]}
         >
-          <MaterialCommunityIcons name={icon} size={20} color={accentColor} />
+          <MaterialCommunityIcons
+            name={icon}
+            size={20}
+            color={accentColor}
+          />
         </View>
 
         <View style={styles.rowCopy}>
@@ -319,40 +460,7 @@ function SettingsRow({
     </Pressable>
   );
 }
-async function handleResetData() {
-  Alert.alert(
-    "Reset App Data?",
-    "This will permanently delete your habits, tasks, rewards, coins, streaks, quests, achievements, and history. Your account will remain active.",
-    [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Reset Data",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await api.resetAccountData();
 
-            Alert.alert(
-              "Data Reset",
-              "Your app data has been reset.",
-              [
-                {
-                  text: "OK",
-                  onPress: () => router.replace("/onboarding"),
-                },
-              ]
-            );
-          } catch (error) {
-            Alert.alert(
-              "Reset Failed",
-              error?.message || "Unable to reset account data."
-            );
-          }
-        },
-      },
-    ]
-  );
-}
 function ThemeChip({ label, active, onPress }) {
   const { theme } = useTheme();
   const c = theme.colors;
@@ -479,12 +587,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     borderRadius: radii.pill,
     borderWidth: 1,
-
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.xs,
-
     ...shadows.soft,
   },
 

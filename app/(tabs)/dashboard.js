@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   RefreshControl,
   ScrollView,
@@ -12,16 +12,18 @@ import {
 import { AnimatedScreen } from "../../components/AnimatedScreen";
 import { AppButton } from "../../components/AppButton";
 import { AppCard } from "../../components/AppCard";
-import { BrandBadge, BrandHeader } from "../../components/BrandMark";
+import { BrandHeader } from "../../components/BrandMark";
+import { AchievementStrip } from "../../components/dashboard/AchievementStrip";
+import { ActiveQuestCard } from "../../components/dashboard/ActiveQuestCard";
+import { DashboardStatsGrid } from "../../components/dashboard/DashboardStatsGrid";
+import { EncouragementCard } from "../../components/dashboard/EncouragementCard";
+import { MomentumCard } from "../../components/dashboard/MomentumCard";
+import { TodayOrbitCard } from "../../components/dashboard/TodayOrbitCard";
 import { EmptyState } from "../../components/EmptyState";
 import { ErrorState } from "../../components/ErrorState";
-import { MomentumBadge } from "../../components/MomentumBadge";
-import { OrbitProgressBar } from "../../components/OrbitProgressBar";
-import { OrbitRing } from "../../components/OrbitRing";
 import { SectionTitle } from "../../components/SectionTitle";
 import { SkeletonCard } from "../../components/SkeletonCard";
-import { StatPill } from "../../components/StatPill";
-import { WeeklyOrbitChart } from "../../components/WeeklyOrbitChart";
+
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../hooks/useTheme";
 import { api } from "../../lib/api";
@@ -36,12 +38,16 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
+  const [quests, setQuests] = useState([]);
+  const [achievements, setAchievements] = useState([]);
+
   const [stats, setStats] = useState({
     coin_balance: 0,
     completed_today: 0,
     streak_days: 0,
     total_habits: 0,
     total_tasks: 0,
+    tasks_done: 0,
     xp: 0,
     level_data: {
       level: 1,
@@ -55,12 +61,6 @@ export default function DashboardScreen() {
   const [todayHabits, setTodayHabits] = useState([]);
   const [todayTasks, setTodayTasks] = useState([]);
 
-  const [achievementSummary, setAchievementSummary] = useState({
-    earnedCount: 0,
-    total: 0,
-    nextUnlock: null,
-  });
-
   const totalTodayItems = todayHabits.length + todayTasks.length;
   const dailyGoal = Math.max(totalTodayItems, stats.completed_today, 1);
 
@@ -68,9 +68,6 @@ export default function DashboardScreen() {
     100,
     Math.round((stats.completed_today / dailyGoal) * 100)
   );
-
-  const completedAllToday =
-    totalTodayItems > 0 && stats.completed_today >= totalTodayItems;
 
   const momentumScore = Math.min(
     100,
@@ -81,29 +78,11 @@ export default function DashboardScreen() {
     )
   );
 
-  const heroMessage =
-    momentumScore >= 90
-      ? "You’re on fire right now."
-      : momentumScore >= 75
-      ? "Momentum is building fast."
-      : momentumScore >= 55
-      ? "Your orbit is stabilizing."
-      : momentumScore >= 35
-      ? "Small wins are stacking up."
-      : "Start with one small action today.";
-
-  const xpRemaining = Math.max(
-    0,
-    (stats.level_data.needed || 100) - (stats.level_data.progress || 0)
-  );
-
-  const greeting = useMemo(() => {
-    const hour = new Date().getHours();
-
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
-  }, []);
+  const activeQuest =
+    quests.find((q) => q.claimable) ||
+    quests.find((q) => !q.claimed) ||
+    quests[0] ||
+    null;
 
   async function loadDashboard() {
     if (!token) return;
@@ -111,19 +90,26 @@ export default function DashboardScreen() {
     setError(null);
 
     try {
-      const [statsData, achievementData, habitsData, tasksData] =
-        await Promise.allSettled([
-          api.get("/stats", token),
-          api.get("/achievements", token),
-          api.get("/habits", token),
-          api.get("/tasks", token),
-        ]);
+      const [
+        statsData,
+        achievementData,
+        habitsData,
+        tasksData,
+        questsData,
+      ] = await Promise.allSettled([
+        api.get("/stats"),
+        api.get("/achievements"),
+        api.get("/habits"),
+        api.get("/tasks"),
+        api.get("/quests"),
+      ]);
 
       const failed =
         statsData.status === "rejected" &&
         achievementData.status === "rejected" &&
         habitsData.status === "rejected" &&
-        tasksData.status === "rejected";
+        tasksData.status === "rejected" &&
+        questsData.status === "rejected";
 
       if (failed) {
         throw new Error("Unable to load your dashboard right now.");
@@ -138,6 +124,7 @@ export default function DashboardScreen() {
           streak_days: data.streak_days || data.current_max_streak || 0,
           total_habits: data.total_habits || data.habits_count || 0,
           total_tasks: data.total_tasks || data.tasks_total || 0,
+          tasks_done: data.tasks_done || 0,
           xp: data.xp || 0,
           level_data: data.level_data || {
             level: 1,
@@ -151,12 +138,7 @@ export default function DashboardScreen() {
 
       if (achievementData.status === "fulfilled") {
         const data = achievementData.value || {};
-
-        setAchievementSummary({
-          earnedCount: data.earned_count || 0,
-          total: data.total || 0,
-          nextUnlock: data.next_unlock || null,
-        });
+        setAchievements(data.items || []);
       }
 
       if (habitsData.status === "fulfilled") {
@@ -173,6 +155,11 @@ export default function DashboardScreen() {
           .slice(0, 3);
 
         setTodayTasks(tasks);
+      }
+
+      if (questsData.status === "fulfilled") {
+        const data = questsData.value || {};
+        setQuests(Array.isArray(data) ? data : data.items || []);
       }
     } catch (error) {
       setError(error?.message || "Unable to load dashboard.");
@@ -259,153 +246,38 @@ export default function DashboardScreen() {
             compact
           />
 
-          <AnimatedScreen delay={40}>
-            <AppCard style={styles.heroCard}>
-              <View
-                style={[
-                  styles.heroGlowCyan,
-                  {
-                    backgroundColor:
-                      c.surfaceGlow || `${c.cyan || c.primary}18`,
-                  },
-                ]}
-              />
+          <MomentumCard
+            name="Explorer"
+            level={stats?.level_data?.level || 1}
+            xp={stats?.level_data?.progress || stats?.xp || 0}
+            xpToNextLevel={stats?.level_data?.needed || 100}
+            streak={stats?.streak_days || 0}
+            completedToday={stats?.completed_today || 0}
+            totalToday={
+              (stats?.total_habits || 0) +
+              (stats?.total_tasks || 0)
+            }
+          />
 
-              <View
-                style={[
-                  styles.heroGlowCoral,
-                  {
-                    backgroundColor: `${c.coral || c.primary}12`,
-                  },
-                ]}
-              />
+          <TodayOrbitCard
+            habitsCompleted={stats?.completed_today || 0}
+            habitsTotal={stats?.total_habits || 0}
+            tasksCompleted={stats?.tasks_done || 0}
+            tasksTotal={stats?.total_tasks || 0}
+          />
 
-              <View style={styles.heroTop}>
-                <View style={styles.heroCopy}>
-                  <View style={styles.heroGreetingRow}>
-                    <Text
-                      style={[styles.heroGreeting, { color: c.textSecondary }]}
-                    >
-                      {greeting}
-                    </Text>
+          <DashboardStatsGrid
+            coins={stats?.coin_balance || 0}
+            xp={stats?.xp || 0}
+            streak={stats?.streak_days || 0}
+            completedToday={stats?.completed_today || 0}
+          />
 
-                    <BrandBadge
-                      label={completedAllToday ? "Orbit Complete" : "In Motion"}
-                    />
-                  </View>
+          <ActiveQuestCard quest={activeQuest} />
 
-                  <Text style={[styles.heroTitle, { color: c.text }]}>
-                    {heroMessage}
-                  </Text>
+          <AchievementStrip achievements={achievements} />
 
-                  <Text style={[styles.heroSubtitle, { color: c.textSecondary }]}>
-                    {completedAllToday
-                      ? "Today’s orbit is complete."
-                      : `${stats.completed_today} completed today`}
-                  </Text>
-
-                  <View style={styles.momentumBadgeWrap}>
-                    <MomentumBadge score={momentumScore} compact />
-                  </View>
-                </View>
-
-                <OrbitRing
-                  percent={todayPercent}
-                  value={`${todayPercent}%`}
-                  label="Today"
-                  size={108}
-                  strokeWidth={10}
-                  color={c.cyan || c.primary}
-                />
-              </View>
-
-              <OrbitProgressBar
-                percent={todayPercent}
-                style={styles.progressBar}
-                glow
-              />
-
-              <View style={styles.progressFooter}>
-                <Text style={[styles.progressText, { color: c.textSecondary }]}>
-                  Daily progress
-                </Text>
-
-                <Text style={[styles.progressPercent, { color: c.text }]}>
-                  {todayPercent}%
-                </Text>
-              </View>
-            </AppCard>
-          </AnimatedScreen>
-
-          <AnimatedScreen delay={70}>
-            <WeeklyOrbitChart />
-          </AnimatedScreen>
-
-          <AnimatedScreen delay={90}>
-            <AppCard style={styles.levelCard}>
-              <View
-                style={[
-                  styles.levelGlow,
-                  {
-                    backgroundColor: `${c.cyan || c.primary}10`,
-                  },
-                ]}
-              />
-
-              <View style={styles.levelTop}>
-                <View style={styles.levelCopyWrap}>
-                  <Text style={[styles.levelEyebrow, { color: c.textSecondary }]}>
-                    Orbit Level
-                  </Text>
-
-                  <Text style={[styles.levelTitle, { color: c.text }]}>
-                    Level {stats.level_data.level}
-                  </Text>
-
-                  <Text style={[styles.levelCopy, { color: c.textSecondary }]}>
-                    Keep showing up to unlock new themes and rewards.
-                  </Text>
-                </View>
-
-                <View
-                  style={[
-                    styles.levelBadge,
-                    {
-                      backgroundColor: `${c.cyan || c.primary}14`,
-                      borderColor: c.border,
-                    },
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    name="orbit"
-                    size={30}
-                    color={c.cyan || c.primary}
-                  />
-                </View>
-              </View>
-
-              <OrbitProgressBar
-                percent={stats.level_data.percent || 0}
-                style={styles.progressBar}
-                glow
-              />
-
-              <View style={styles.progressFooter}>
-                <Text style={[styles.progressText, { color: c.textSecondary }]}>
-                  {stats.level_data.progress || 0} /{" "}
-                  {stats.level_data.needed || 100} XP
-                </Text>
-
-                <Text style={[styles.progressPercent, { color: c.text }]}>
-                  {stats.level_data.percent || 0}%
-                </Text>
-              </View>
-
-              <Text style={[styles.xpHint, { color: c.textSecondary }]}>
-                {xpRemaining} XP until next orbit level
-              </Text>
-            </AppCard>
-          </AnimatedScreen>
+          <EncouragementCard momentum={momentumScore} />
 
           <AnimatedScreen delay={120}>
             <SectionTitle
@@ -438,7 +310,9 @@ export default function DashboardScreen() {
 
                     {todayTasks.map((task) => (
                       <PreviewItem
-                        key={`task-${task.id || task._id || task.name || task.title}`}
+                        key={`task-${
+                          task.id || task._id || task.name || task.title
+                        }`}
                         icon="checkbox-marked-circle-outline"
                         label={task.title || task.name || "Task"}
                         accent="coral"
@@ -491,125 +365,6 @@ export default function DashboardScreen() {
                     />
                   </View>
                 </>
-              )}
-            </AppCard>
-          </AnimatedScreen>
-
-          <AnimatedScreen delay={160}>
-            <SectionTitle
-              title="Progress Snapshot"
-              subtitle="A quick look at your current momentum."
-            />
-
-            <View style={styles.statsGrid}>
-              <StatPill
-                label="Coins"
-                value={stats.coin_balance}
-                icon="circle-multiple"
-                accent="gold"
-              />
-
-              <StatPill
-                label="Streak"
-                value={stats.streak_days}
-                icon="fire"
-                accent="coral"
-              />
-
-              <StatPill
-                label="Habits"
-                value={stats.total_habits}
-                icon="repeat"
-                accent="cyan"
-              />
-
-              <StatPill
-                label="Tasks"
-                value={stats.total_tasks}
-                icon="clipboard-check-outline"
-                accent="blue"
-              />
-            </View>
-
-            {stats.streak_days >= 7 ? (
-              <Text
-                style={[
-                  styles.streakCallout,
-                  { color: c.coral || c.primary },
-                ]}
-              >
-                Your consistency is compounding.
-              </Text>
-            ) : null}
-          </AnimatedScreen>
-
-          <AnimatedScreen delay={200}>
-            <SectionTitle
-              title="Achievements"
-              subtitle="Track your long-term wins."
-            />
-
-            <AppCard>
-              <View style={styles.achievementTop}>
-                <View>
-                  <Text
-                    style={[
-                      styles.achievementLabel,
-                      { color: c.textSecondary },
-                    ]}
-                  >
-                    Earned
-                  </Text>
-
-                  <Text style={[styles.achievementValue, { color: c.text }]}>
-                    {achievementSummary.earnedCount} /{" "}
-                    {achievementSummary.total}
-                  </Text>
-                </View>
-
-                <View
-                  style={[
-                    styles.achievementIconWrap,
-                    {
-                      borderColor: c.border,
-                      backgroundColor: `${c.gold || c.primary}18`,
-                    },
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    name="trophy-outline"
-                    size={30}
-                    color={c.gold || c.primary}
-                  />
-                </View>
-              </View>
-
-              {achievementSummary.nextUnlock ? (
-                <View style={styles.nextUnlockBox}>
-                  <View style={styles.nextUnlockHeader}>
-                    <Text style={[styles.nextUnlockName, { color: c.text }]}>
-                      {achievementSummary.nextUnlock.name}
-                    </Text>
-
-                    <Text
-                      style={[
-                        styles.nextUnlockPercent,
-                        { color: c.textSecondary },
-                      ]}
-                    >
-                      {achievementSummary.nextUnlock.percent || 0}%
-                    </Text>
-                  </View>
-
-                  <OrbitProgressBar
-                    percent={achievementSummary.nextUnlock.percent || 0}
-                    glow
-                  />
-                </View>
-              ) : (
-                <Text style={[styles.completeText, { color: c.textSecondary }]}>
-                  All achievements unlocked. Beast mode.
-                </Text>
               )}
             </AppCard>
           </AnimatedScreen>
@@ -669,139 +424,6 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
 
-  heroCard: {
-    overflow: "hidden",
-  },
-
-  heroGlowCyan: {
-    position: "absolute",
-    width: 220,
-    height: 220,
-    borderRadius: radii.pill,
-    top: -130,
-    right: -80,
-  },
-
-  heroGlowCoral: {
-    position: "absolute",
-    width: 160,
-    height: 160,
-    borderRadius: radii.pill,
-    bottom: -100,
-    left: -70,
-  },
-
-  heroTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: spacing.lg,
-  },
-
-  heroCopy: {
-    flex: 1,
-  },
-
-  heroGreetingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-  },
-
-  heroGreeting: {
-    ...typography.caption,
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-  },
-
-  heroTitle: {
-    ...typography.h1,
-    marginTop: spacing.sm,
-  },
-
-  heroSubtitle: {
-    ...typography.bodyBold,
-    marginTop: spacing.sm,
-  },
-
-  momentumBadgeWrap: {
-    marginTop: spacing.lg,
-  },
-
-  progressBar: {
-    marginTop: spacing.xl,
-  },
-
-  progressFooter: {
-    marginTop: spacing.sm,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  progressText: {
-    ...typography.caption,
-  },
-
-  progressPercent: {
-    ...typography.bodyBold,
-  },
-
-  levelCard: {
-    marginTop: spacing.xl,
-    overflow: "hidden",
-  },
-
-  levelGlow: {
-    position: "absolute",
-    width: 180,
-    height: 180,
-    borderRadius: radii.pill,
-    top: -110,
-    right: -80,
-  },
-
-  levelTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: spacing.lg,
-  },
-
-  levelCopyWrap: {
-    flex: 1,
-  },
-
-  levelEyebrow: {
-    ...typography.caption,
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-  },
-
-  levelTitle: {
-    ...typography.h2,
-    marginTop: spacing.xs,
-  },
-
-  levelCopy: {
-    ...typography.body,
-    marginTop: spacing.xs,
-  },
-
-  levelBadge: {
-    width: 64,
-    height: 64,
-    borderRadius: radii.pill,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-  },
-
-  xpHint: {
-    ...typography.caption,
-    marginTop: spacing.sm,
-  },
-
   todayTitle: {
     ...typography.h3,
   },
@@ -847,66 +469,5 @@ const styles = StyleSheet.create({
 
   actionButton: {
     flex: 1,
-  },
-
-  statsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.md,
-  },
-
-  streakCallout: {
-    ...typography.bodyBold,
-    marginTop: spacing.md,
-  },
-
-  achievementTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  achievementLabel: {
-    ...typography.caption,
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-  },
-
-  achievementValue: {
-    ...typography.h1,
-    marginTop: spacing.xs,
-  },
-
-  achievementIconWrap: {
-    width: 62,
-    height: 62,
-    borderRadius: radii.pill,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-  },
-
-  nextUnlockBox: {
-    marginTop: spacing.lg,
-  },
-
-  nextUnlockHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  nextUnlockName: {
-    flex: 1,
-    ...typography.bodyBold,
-  },
-
-  nextUnlockPercent: {
-    ...typography.bodyBold,
-  },
-
-  completeText: {
-    ...typography.bodyBold,
-    marginTop: spacing.lg,
   },
 });

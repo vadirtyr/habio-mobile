@@ -16,6 +16,7 @@ import Animated, {
 import { AnimatedPressable } from "../../components/AnimatedPressable";
 import { AppButton } from "../../components/AppButton";
 import { AppCard } from "../../components/AppCard";
+import { AvatarUnlockModal } from "../../components/AvatarUnlockModal";
 import { BrandHeader } from "../../components/BrandMark";
 import { EmptyState } from "../../components/EmptyState";
 import { ErrorState } from "../../components/ErrorState";
@@ -46,7 +47,7 @@ export default function HabitsScreen() {
 
   const firstBalanceLoad = useRef(true);
   const coinScale = useSharedValue(1);
-
+  const [avatarUnlock, setAvatarUnlock] = useState(null);
   const coinAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: coinScale.value }],
   }));
@@ -124,7 +125,12 @@ export default function HabitsScreen() {
 
     try {
       const data = await api.post(`/habits/${habitId}/complete`, {}, token);
+      if (data?.new_avatars?.length > 0) {
+      const avatar = data.new_avatars[0];
 
+      setAvatarUnlock(avatar);
+
+      }
       if (data.leveled_up) {
         setLevelUp({
           oldLevel: data.old_level,
@@ -260,7 +266,11 @@ export default function HabitsScreen() {
       />
 
       <XPGainToast xp={xpToast} />
-
+      <AvatarUnlockModal
+      visible={!!avatarUnlock}
+      avatar={avatarUnlock}
+      onClose={() => setAvatarUnlock(null)}
+      />
       <FlatList
         data={sortedHabits}
         keyExtractor={(item) => item.id}
