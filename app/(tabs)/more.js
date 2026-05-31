@@ -23,6 +23,32 @@ export default function MoreScreen() {
         subtitle="Manage progress, preferences, and your orbit."
       />
 
+      <SectionTitle title="Community" />
+
+      <AppCard>
+        <MoreRow
+          icon="account-group-outline"
+          label="Friend Feed"
+          description="See progress from people in your orbit."
+          onPress={() => router.push("/social-feed")}
+        />
+
+        <MoreRow
+          icon="timeline-outline"
+          label="My Activity"
+          description="View your recent OurOrbit progress."
+          onPress={() => router.push("/activity-feed")}
+        />
+
+        <MoreRow
+          icon="account-search-outline"
+          label="Find People"
+          description="Search public OurOrbit profiles."
+          onPress={() => router.push("/user-search")}
+          last
+        />
+      </AppCard>
+
       <SectionTitle title="Progress" />
 
       <AppCard>

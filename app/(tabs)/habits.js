@@ -44,10 +44,11 @@ export default function HabitsScreen() {
   const [streakCelebration, setStreakCelebration] = useState(null);
   const [levelUp, setLevelUp] = useState(null);
   const [xpToast, setXpToast] = useState(0);
+  const [avatarUnlock, setAvatarUnlock] = useState(null);
 
   const firstBalanceLoad = useRef(true);
   const coinScale = useSharedValue(1);
-  const [avatarUnlock, setAvatarUnlock] = useState(null);
+
   const coinAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: coinScale.value }],
   }));
@@ -125,12 +126,11 @@ export default function HabitsScreen() {
 
     try {
       const data = await api.post(`/habits/${habitId}/complete`, {}, token);
+
       if (data?.new_avatars?.length > 0) {
-      const avatar = data.new_avatars[0];
-
-      setAvatarUnlock(avatar);
-
+        setAvatarUnlock(data.new_avatars[0]);
       }
+
       if (data.leveled_up) {
         setLevelUp({
           oldLevel: data.old_level,
@@ -266,11 +266,13 @@ export default function HabitsScreen() {
       />
 
       <XPGainToast xp={xpToast} />
+
       <AvatarUnlockModal
-      visible={!!avatarUnlock}
-      avatar={avatarUnlock}
-      onClose={() => setAvatarUnlock(null)}
+        visible={!!avatarUnlock}
+        avatar={avatarUnlock}
+        onClose={() => setAvatarUnlock(null)}
       />
+
       <FlatList
         data={sortedHabits}
         keyExtractor={(item) => item.id}
@@ -437,7 +439,8 @@ export default function HabitsScreen() {
                         frequency: item.frequency || "daily",
                         difficulty: item.difficulty || "medium",
                         custom_coins: item.custom_coins || "",
-                        icon: item.icon || "flame",
+                        icon: item.icon || "fire",
+                        category: item.category || "custom",
                       },
                     })
                   }
@@ -454,6 +457,8 @@ export default function HabitsScreen() {
 function HabitCard({ item, tier, onComplete, onEdit }) {
   const { theme } = useTheme();
   const c = theme.colors;
+
+  const isMaintenance = item.category === "maintenance";
 
   const cardScale = useSharedValue(1);
   const ringScale = useSharedValue(0.5);
@@ -568,6 +573,15 @@ function HabitCard({ item, tier, onComplete, onEdit }) {
         </View>
 
         <View style={styles.cardFooter}>
+          {isMaintenance ? (
+            <CompactPill
+              icon="bell"
+              text="Maintenance"
+              color={c.cyan || c.primary}
+              highlight
+            />
+          ) : null}
+
           <CompactPill
             icon="trending-up"
             text={`${item.streak || 0} day streak`}
@@ -575,14 +589,27 @@ function HabitCard({ item, tier, onComplete, onEdit }) {
             highlight={(item.streak || 0) >= 3}
           />
 
-          <CompactPill
-            icon={tier.icon}
-            text={tier.label}
-            color={tier.color}
-            highlight
-          />
+          {!isMaintenance ? (
+            <>
+              <CompactPill
+                icon={tier.icon}
+                text={tier.label}
+                color={tier.color}
+                highlight
+              />
 
-          <CompactPill icon="award" text={getNextBonusText(item.streak || 0)} />
+              <CompactPill
+                icon="award"
+                text={getNextBonusText(item.streak || 0)}
+              />
+            </>
+          ) : (
+            <CompactPill
+              icon="circle"
+              text="Low reward"
+              color={c.textMuted || c.muted}
+            />
+          )}
         </View>
 
         <View style={styles.statusRow}>
@@ -596,6 +623,8 @@ function HabitCard({ item, tier, onComplete, onEdit }) {
           >
             {item.completed_today
               ? "Completed today"
+              : isMaintenance
+              ? "Reminder habit"
               : "Tap or swipe to complete"}
           </Text>
 

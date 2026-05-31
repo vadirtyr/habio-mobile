@@ -21,6 +21,19 @@ import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
 import { radii, spacing, typography } from "../lib/theme";
 
+const HABIT_TYPES = [
+  {
+    id: "standard",
+    label: "Standard",
+    description: "Earn normal rewards",
+  },
+  {
+    id: "maintenance",
+    label: "Maintenance",
+    description: "Reminder-style habit",
+  },
+];
+
 const DIFFICULTIES = [
   { key: "easy", label: "Easy", coins: 5 },
   { key: "medium", label: "Medium", coins: 10 },
@@ -28,12 +41,38 @@ const DIFFICULTIES = [
 ];
 
 const ICONS = [
-  "flame",
+  "fire",
   "water",
   "walk",
   "book-open-page-variant",
   "meditation",
   "broom",
+  "pill",
+  "bell-outline",
+  "heart-pulse",
+];
+
+const MAINTENANCE_PRESETS = [
+  {
+    name: "Take Medication",
+    description: "A low-reward maintenance reminder.",
+    icon: "pill",
+  },
+  {
+    name: "Take Vitamins",
+    description: "Quick daily wellness reminder.",
+    icon: "pill",
+  },
+  {
+    name: "Check Blood Pressure",
+    description: "Simple health maintenance check.",
+    icon: "heart-pulse",
+  },
+  {
+    name: "Water Plants",
+    description: "Small recurring care reminder.",
+    icon: "water",
+  },
 ];
 
 export default function CreateHabitScreen() {
@@ -44,8 +83,26 @@ export default function CreateHabitScreen() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [difficulty, setDifficulty] = useState("medium");
-  const [icon, setIcon] = useState("flame");
+  const [icon, setIcon] = useState("fire");
+  const [habitType, setHabitType] = useState("standard");
   const [submitting, setSubmitting] = useState(false);
+
+  function chooseHabitType(typeId) {
+    setHabitType(typeId);
+
+    if (typeId === "maintenance") {
+      setDifficulty("easy");
+      setIcon("pill");
+    }
+  }
+
+  function applyPreset(preset) {
+    setName(preset.name);
+    setDescription(preset.description);
+    setIcon(preset.icon);
+    setHabitType("maintenance");
+    setDifficulty("easy");
+  }
 
   async function handleCreate() {
     const cleanName = name.trim();
@@ -67,9 +124,13 @@ export default function CreateHabitScreen() {
           name: cleanName,
           description: cleanDescription,
           frequency: "daily",
-          difficulty,
+          difficulty: habitType === "maintenance" ? "easy" : difficulty,
+          custom_coins: habitType === "maintenance" ? 1 : null,
           icon,
-          category: "Custom",
+          category:
+            habitType === "maintenance"
+              ? "maintenance"
+              : "custom",
         },
         token
       );
@@ -104,7 +165,11 @@ export default function CreateHabitScreen() {
           <TextInput
             value={name}
             onChangeText={setName}
-            placeholder="Example: Drink water"
+            placeholder={
+              habitType === "maintenance"
+                ? "Example: Take medication"
+                : "Example: Drink water"
+            }
             placeholderTextColor={c.textMuted || c.muted}
             style={[
               styles.input,
@@ -116,6 +181,118 @@ export default function CreateHabitScreen() {
             ]}
             maxLength={80}
           />
+
+          <Text style={[styles.label, { color: c.textSecondary }]}>
+            Habit Type
+          </Text>
+
+          <View style={styles.typeRow}>
+            {HABIT_TYPES.map((type) => {
+              const selected = habitType === type.id;
+              const accentColor = c.cyan || c.primary;
+
+              return (
+                <AnimatedPressable
+                  key={type.id}
+                  style={[
+                    styles.typeCard,
+                    {
+                      borderColor: selected ? accentColor : c.border,
+                      backgroundColor: selected
+                        ? `${accentColor}12`
+                        : c.surfaceAlt,
+                    },
+                  ]}
+                  onPress={() => chooseHabitType(type.id)}
+                >
+                  <Text
+                    style={[
+                      styles.typeTitle,
+                      {
+                        color: selected ? accentColor : c.text,
+                      },
+                    ]}
+                  >
+                    {type.label}
+                  </Text>
+
+                  <Text
+                    style={[
+                      styles.typeDescription,
+                      { color: c.textSecondary },
+                    ]}
+                  >
+                    {type.description}
+                  </Text>
+                </AnimatedPressable>
+              );
+            })}
+          </View>
+
+          {habitType === "maintenance" ? (
+            <>
+              <Text style={[styles.label, { color: c.textSecondary }]}>
+                Quick Maintenance Presets
+              </Text>
+
+              <View style={styles.presetGrid}>
+                {MAINTENANCE_PRESETS.map((preset) => (
+                  <AnimatedPressable
+                    key={preset.name}
+                    style={[
+                      styles.presetButton,
+                      {
+                        borderColor: c.border,
+                        backgroundColor: c.surfaceAlt,
+                      },
+                    ]}
+                    onPress={() => applyPreset(preset)}
+                  >
+                    <MaterialCommunityIcons
+                      name={preset.icon}
+                      size={20}
+                      color={c.cyan || c.primary}
+                    />
+
+                    <Text
+                      style={[
+                        styles.presetText,
+                        { color: c.text },
+                      ]}
+                    >
+                      {preset.name}
+                    </Text>
+                  </AnimatedPressable>
+                ))}
+              </View>
+
+              <View
+                style={[
+                  styles.maintenanceNote,
+                  {
+                    borderColor: c.border,
+                    backgroundColor: `${c.cyan || c.primary}10`,
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="bell-outline"
+                  size={22}
+                  color={c.cyan || c.primary}
+                />
+
+                <Text
+                  style={[
+                    styles.maintenanceText,
+                    { color: c.textSecondary },
+                  ]}
+                >
+                  Maintenance habits are reminder-style habits and always award
+                  1 coin.
+                </Text>
+              </View>
+            </>
+          ) : null}
 
           <Text style={[styles.label, { color: c.textSecondary }]}>
             Description
@@ -139,52 +316,56 @@ export default function CreateHabitScreen() {
             maxLength={300}
           />
 
-          <Text style={[styles.label, { color: c.textSecondary }]}>
-            Difficulty
-          </Text>
+          {habitType === "standard" ? (
+            <>
+              <Text style={[styles.label, { color: c.textSecondary }]}>
+                Difficulty
+              </Text>
 
-          <View style={styles.optionsRow}>
-            {DIFFICULTIES.map((item) => {
-              const selected = difficulty === item.key;
-              const accentColor = c.cyan || c.primary;
+              <View style={styles.optionsRow}>
+                {DIFFICULTIES.map((item) => {
+                  const selected = difficulty === item.key;
+                  const accentColor = c.cyan || c.primary;
 
-              return (
-                <AnimatedPressable
-                  key={item.key}
-                  style={[
-                    styles.option,
-                    {
-                      borderColor: selected ? accentColor : c.border,
-                      backgroundColor: selected
-                        ? `${accentColor}12`
-                        : c.surfaceAlt,
-                    },
-                  ]}
-                  onPress={() => setDifficulty(item.key)}
-                >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      {
-                        color: selected ? accentColor : c.text,
-                      },
-                    ]}
-                  >
-                    {item.label}
-                  </Text>
+                  return (
+                    <AnimatedPressable
+                      key={item.key}
+                      style={[
+                        styles.option,
+                        {
+                          borderColor: selected ? accentColor : c.border,
+                          backgroundColor: selected
+                            ? `${accentColor}12`
+                            : c.surfaceAlt,
+                        },
+                      ]}
+                      onPress={() => setDifficulty(item.key)}
+                    >
+                      <Text
+                        style={[
+                          styles.optionText,
+                          {
+                            color: selected ? accentColor : c.text,
+                          },
+                        ]}
+                      >
+                        {item.label}
+                      </Text>
 
-                  <Text
-                    style={[
-                      styles.optionSub,
-                      { color: c.textSecondary },
-                    ]}
-                  >
-                    +{item.coins} coins
-                  </Text>
-                </AnimatedPressable>
-              );
-            })}
-          </View>
+                      <Text
+                        style={[
+                          styles.optionSub,
+                          { color: c.textSecondary },
+                        ]}
+                      >
+                        +{item.coins} coins
+                      </Text>
+                    </AnimatedPressable>
+                  );
+                })}
+              </View>
+            </>
+          ) : null}
 
           <Text style={[styles.label, { color: c.textSecondary }]}>
             Icon
@@ -275,6 +456,62 @@ const styles = StyleSheet.create({
   textArea: {
     minHeight: 100,
     textAlignVertical: "top",
+  },
+
+  typeRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+
+  typeCard: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+  },
+
+  typeTitle: {
+    ...typography.bodyBold,
+  },
+
+  typeDescription: {
+    ...typography.caption,
+    marginTop: spacing.xs,
+    lineHeight: 17,
+  },
+
+  presetGrid: {
+    gap: spacing.sm,
+  },
+
+  presetButton: {
+    borderWidth: 1,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+
+  presetText: {
+    ...typography.bodyBold,
+  },
+
+  maintenanceNote: {
+    marginTop: spacing.md,
+    borderWidth: 1,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+
+  maintenanceText: {
+    flex: 1,
+    ...typography.caption,
+    lineHeight: 18,
+    fontWeight: "700",
   },
 
   optionsRow: {

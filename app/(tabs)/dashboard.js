@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -37,6 +38,7 @@ export default function DashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [notificationCount, setNotificationCount] = useState(0);
 
   const [quests, setQuests] = useState([]);
   const [achievements, setAchievements] = useState([]);
@@ -84,6 +86,17 @@ export default function DashboardScreen() {
     quests[0] ||
     null;
 
+  async function loadNotificationCount() {
+    if (!token) return;
+
+    try {
+      const response = await api.getUnreadNotificationCount();
+      setNotificationCount(response.count || 0);
+    } catch (error) {
+      console.log("Unable to load notification count", error);
+    }
+  }
+
   async function loadDashboard() {
     if (!token) return;
 
@@ -103,6 +116,14 @@ export default function DashboardScreen() {
         api.get("/tasks"),
         api.get("/quests"),
       ]);
+
+
+      try {
+      await api.generateWeeklyRecap();
+      } catch (error) {
+        // recap already exists for this week
+      }
+      await loadNotificationCount();
 
       const failed =
         statsData.status === "rejected" &&
@@ -184,16 +205,51 @@ export default function DashboardScreen() {
     await loadDashboard();
   }
 
+  function HeaderWithBell({ subtitle }) {
+    return (
+      <View style={styles.headerRow}>
+        <View style={styles.headerContent}>
+          <BrandHeader
+            eyebrow="OurOrbit"
+            title="Your Orbit Today"
+            subtitle={subtitle}
+            compact
+          />
+        </View>
+
+        <Pressable
+          style={[
+            styles.notificationButton,
+            {
+              backgroundColor: c.surfaceAlt,
+              borderColor: c.border,
+            },
+          ]}
+          onPress={() => router.push("/notifications")}
+        >
+          <MaterialCommunityIcons
+            name="bell-outline"
+            size={24}
+            color={c.text}
+          />
+
+          {notificationCount > 0 && (
+            <View style={styles.notificationBadge}>
+              <Text style={styles.notificationBadgeText}>
+                {notificationCount > 99 ? "99+" : notificationCount}
+              </Text>
+            </View>
+          )}
+        </Pressable>
+      </View>
+    );
+  }
+
   if (loading) {
     return (
       <View style={[styles.screen, { backgroundColor: c.background }]}>
         <View style={styles.container}>
-          <BrandHeader
-            eyebrow="OurOrbit"
-            title="Your Orbit Today"
-            subtitle="Preparing your progress..."
-            compact
-          />
+          <HeaderWithBell subtitle="Preparing your progress..." />
 
           <SkeletonCard lines={2} />
           <SkeletonCard />
@@ -208,12 +264,7 @@ export default function DashboardScreen() {
     return (
       <View style={[styles.screen, { backgroundColor: c.background }]}>
         <View style={styles.container}>
-          <BrandHeader
-            eyebrow="OurOrbit"
-            title="Your Orbit Today"
-            subtitle="Your momentum hub."
-            compact
-          />
+          <HeaderWithBell subtitle="Your momentum hub." />
 
           <ErrorState
             title="Dashboard unavailable"
@@ -239,12 +290,7 @@ export default function DashboardScreen() {
             />
           }
         >
-          <BrandHeader
-            eyebrow="OurOrbit"
-            title="Your Orbit Today"
-            subtitle="Small actions compound into real progress."
-            compact
-          />
+          <HeaderWithBell subtitle="Small actions compound into real progress." />
 
           <MomentumCard
             name="Explorer"
@@ -253,10 +299,7 @@ export default function DashboardScreen() {
             xpToNextLevel={stats?.level_data?.needed || 100}
             streak={stats?.streak_days || 0}
             completedToday={stats?.completed_today || 0}
-            totalToday={
-              (stats?.total_habits || 0) +
-              (stats?.total_tasks || 0)
-            }
+            totalToday={(stats?.total_habits || 0) + (stats?.total_tasks || 0)}
           />
 
           <TodayOrbitCard
@@ -272,7 +315,40 @@ export default function DashboardScreen() {
             streak={stats?.streak_days || 0}
             completedToday={stats?.completed_today || 0}
           />
+          <Pressable
+  style={[
+    styles.recapCard,
+    {
+      backgroundColor: c.surface,
+      borderColor: c.border,
+    },
+  ]}
+  onPress={() => router.push("/weekly-recap")}
+>
+  <View style={styles.recapIcon}>
+    <MaterialCommunityIcons
+      name="chart-line"
+      size={26}
+      color={c.primary}
+    />
+  </View>
 
+  <View style={styles.recapText}>
+    <Text style={[styles.recapTitle, { color: c.text }]}>
+      Weekly Recap
+    </Text>
+
+    <Text style={[styles.recapSubtitle, { color: c.textSecondary }]}>
+      See how your orbit grew this week.
+    </Text>
+  </View>
+
+  <MaterialCommunityIcons
+    name="chevron-right"
+    size={24}
+    color={c.textSecondary}
+  />
+</Pressable>
           <ActiveQuestCard quest={activeQuest} />
 
           <AchievementStrip achievements={achievements} />
@@ -424,6 +500,47 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
 
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+
+  headerContent: {
+    flex: 1,
+  },
+
+  notificationButton: {
+    position: "relative",
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
+  },
+
+  notificationBadge: {
+    position: "absolute",
+    top: -3,
+    right: -3,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#ef4444",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+
+  notificationBadgeText: {
+    color: "#ffffff",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+
   todayTitle: {
     ...typography.h3,
   },
@@ -466,7 +583,37 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginTop: spacing.lg,
   },
+ recapCard: {
+  borderWidth: 1,
+  borderRadius: radii.lg,
+  padding: spacing.lg,
+  marginTop: spacing.md,
+  marginBottom: spacing.md,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.md,
+},
 
+recapIcon: {
+  width: 44,
+  height: 44,
+  borderRadius: 22,
+  alignItems: "center",
+  justifyContent: "center",
+},
+
+recapText: {
+  flex: 1,
+},
+
+recapTitle: {
+  ...typography.h3,
+},
+
+recapSubtitle: {
+  ...typography.body,
+  marginTop: spacing.xs,
+},
   actionButton: {
     flex: 1,
   },

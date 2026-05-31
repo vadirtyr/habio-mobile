@@ -37,26 +37,39 @@ const CATEGORIES = [
     id: "health",
     title: "Health",
     icon: "heart",
-    description:
-      "Energy, movement, hydration, and sleep.",
+    description: "Energy, movement, hydration, and sleep.",
     habits: [
       {
         name: "Drink water",
-        description:
-          "Drink a full glass of water.",
+        description: "Drink a full glass of water.",
         icon: "cup-water",
+        category: "Starter",
+      },
+      {
+        name: "Take medication",
+        description: "A low-reward maintenance reminder.",
+        icon: "pill",
+        category: "maintenance",
+        custom_coins: 1,
+      },
+      {
+        name: "Take vitamins",
+        description: "Quick daily wellness reminder.",
+        icon: "pill",
+        category: "maintenance",
+        custom_coins: 1,
       },
       {
         name: "Take a walk",
-        description:
-          "Walk for at least 10 minutes.",
+        description: "Walk for at least 10 minutes.",
         icon: "walk",
+        category: "Starter",
       },
       {
         name: "Stretch",
-        description:
-          "Do a short stretch session.",
+        description: "Do a short stretch session.",
         icon: "human-handsup",
+        category: "Starter",
       },
     ],
   },
@@ -65,26 +78,25 @@ const CATEGORIES = [
     id: "mind",
     title: "Mind",
     icon: "brain",
-    description:
-      "Focus, reflection, and mental reset.",
+    description: "Focus, reflection, and mental reset.",
     habits: [
       {
         name: "Journal",
-        description:
-          "Write a few thoughts for the day.",
+        description: "Write a few thoughts for the day.",
         icon: "notebook-outline",
+        category: "Starter",
       },
       {
         name: "Meditate",
-        description:
-          "Take 5 quiet minutes.",
+        description: "Take 5 quiet minutes.",
         icon: "meditation",
+        category: "Starter",
       },
       {
         name: "Read",
-        description:
-          "Read for 10 minutes.",
+        description: "Read for 10 minutes.",
         icon: "book-open-page-variant",
+        category: "Starter",
       },
     ],
   },
@@ -93,26 +105,32 @@ const CATEGORIES = [
     id: "productivity",
     title: "Productivity",
     icon: "rocket-launch",
-    description:
-      "Small actions that move your day forward.",
+    description: "Small actions that move your day forward.",
     habits: [
       {
         name: "Plan tomorrow",
-        description:
-          "Pick your top priorities.",
+        description: "Pick your top priorities.",
         icon: "calendar-check",
+        category: "Starter",
       },
       {
         name: "Clean one area",
-        description:
-          "Tidy one small space.",
+        description: "Tidy one small space.",
         icon: "broom",
+        category: "Starter",
+      },
+      {
+        name: "Water plants",
+        description: "Small recurring care reminder.",
+        icon: "water",
+        category: "maintenance",
+        custom_coins: 1,
       },
       {
         name: "No-phone focus",
-        description:
-          "Do one focused work block.",
+        description: "Do one focused work block.",
         icon: "cellphone-off",
+        category: "Starter",
       },
     ],
   },
@@ -125,91 +143,51 @@ export default function OnboardingScreen() {
   const c = theme.colors;
 
   const [step, setStep] = useState(0);
-
-  const [selectedCategoryId, setSelectedCategoryId] =
-    useState(null);
-
-  const [selectedHabits, setSelectedHabits] =
-    useState([]);
-
-  const [submitting, setSubmitting] =
-    useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+  const [selectedHabits, setSelectedHabits] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
 
   const selectedCategory = useMemo(
     () =>
       CATEGORIES.find(
-        (category) =>
-          category.id ===
-          selectedCategoryId
+        (category) => category.id === selectedCategoryId
       ),
     [selectedCategoryId]
   );
 
-  const progress =
-    step === 0
-      ? 33
-      : step === 1
-      ? 66
-      : 100;
+  const progress = step === 0 ? 33 : step === 1 ? 66 : 100;
 
   function toggleHabit(habit) {
-    const exists =
-      selectedHabits.some(
-        (item) =>
-          item.name === habit.name
-      );
+    const exists = selectedHabits.some((item) => item.name === habit.name);
 
     if (exists) {
-      setSelectedHabits(
-        (current) =>
-          current.filter(
-            (item) =>
-              item.name !==
-              habit.name
-          )
+      setSelectedHabits((current) =>
+        current.filter((item) => item.name !== habit.name)
       );
 
       return;
     }
 
-    setSelectedHabits(
-      (current) => [
-        ...current,
-        habit,
-      ]
-    );
+    setSelectedHabits((current) => [...current, habit]);
   }
 
   async function getOnboardingKey() {
     let email =
-      (await SecureStore.getItemAsync(
-        "currentUserEmail"
-      )) || null;
+      (await SecureStore.getItemAsync("currentUserEmail")) || null;
 
     if (!email && token) {
       try {
-        const me =
-          await api.get("/auth/me");
+        const me = await api.get("/auth/me");
 
-        email =
-          me?.email?.toLowerCase() ||
-          null;
+        email = me?.email?.toLowerCase() || null;
 
         if (email) {
-          await SecureStore.setItemAsync(
-            "currentUserEmail",
-            email
-          );
+          await SecureStore.setItemAsync("currentUserEmail", email);
         }
       } catch {}
     }
 
-    const safeEmail = (
-      email || "default"
-    ).replace(
-      /[^a-zA-Z0-9]/g,
-      "_"
-    );
+    const safeEmail = (email || "default").replace(/[^a-zA-Z0-9]/g, "_");
 
     return `onboarding_${safeEmail}`;
   }
@@ -220,53 +198,37 @@ export default function OnboardingScreen() {
     setSubmitting(true);
 
     try {
-      if (
-        token &&
-        selectedHabits.length > 0
-      ) {
+      if (token && selectedHabits.length > 0) {
         for (const habit of selectedHabits) {
+          const isMaintenance = habit.category === "maintenance";
+
           await api.post("/habits", {
             name: habit.name,
-            description:
-              habit.description,
-
+            description: habit.description,
             frequency: "daily",
-
-            difficulty: "easy",
-
-            icon:
-              habit.icon ||
-              "flame",
-
-            category:
-              selectedCategory?.title ||
-              "Starter",
+            difficulty: isMaintenance ? "easy" : "easy",
+            custom_coins: isMaintenance ? 1 : null,
+            icon: habit.icon || (isMaintenance ? "pill" : "fire"),
+            category: isMaintenance
+              ? "maintenance"
+              : selectedCategory?.title || "Starter",
           });
         }
       }
 
-      const onboardingKey =
-        await getOnboardingKey();
+      const onboardingKey = await getOnboardingKey();
 
-      await SecureStore.setItemAsync(
-        onboardingKey,
-        "true"
-      );
+      await SecureStore.setItemAsync(onboardingKey, "true");
 
       await Haptics.notificationAsync(
-        Haptics
-          .NotificationFeedbackType
-          .Success
+        Haptics.NotificationFeedbackType.Success
       );
 
-      router.replace(
-        "/(tabs)/dashboard"
-      );
+      router.replace("/(tabs)/dashboard");
     } catch (error) {
       Alert.alert(
         "Onboarding error",
-        error?.message ||
-          "Unable to finish onboarding."
+        error?.message || "Unable to finish onboarding."
       );
     } finally {
       setSubmitting(false);
@@ -274,24 +236,12 @@ export default function OnboardingScreen() {
   }
 
   return (
-    <View
-      style={[
-        styles.screen,
-        {
-          backgroundColor:
-            c.background,
-        },
-      ]}
-    >
+    <View style={[styles.screen, { backgroundColor: c.background }]}>
       <View
         style={[
           styles.glowOne,
           {
-            backgroundColor:
-              `${
-                c.cyan ||
-                c.primary
-              }14`,
+            backgroundColor: `${c.cyan || c.primary}14`,
           },
         ]}
       />
@@ -300,25 +250,15 @@ export default function OnboardingScreen() {
         style={[
           styles.glowTwo,
           {
-            backgroundColor:
-              `${
-                c.coral ||
-                c.primary
-              }10`,
+            backgroundColor: `${c.coral || c.primary}10`,
           },
         ]}
       />
 
-      <AnimatedScreen
-        style={styles.screen}
-      >
+      <AnimatedScreen style={styles.screen}>
         <ScrollView
-          contentContainerStyle={
-            styles.container
-          }
-          showsVerticalScrollIndicator={
-            false
-          }
+          contentContainerStyle={styles.container}
+          showsVerticalScrollIndicator={false}
         >
           <BrandHeader
             centered
@@ -327,56 +267,26 @@ export default function OnboardingScreen() {
             subtitle="Build momentum through small daily actions."
           />
 
-          <View
-            style={
-              styles.progressWrap
-            }
-          >
-            <OrbitProgressBar
-              percent={progress}
-              style={
-                styles.progress
-              }
-            />
+          <View style={styles.progressWrap}>
+            <OrbitProgressBar percent={progress} style={styles.progress} />
 
-            <Text
-              style={[
-                styles.progressText,
-                {
-                  color:
-                    c.textSecondary,
-                },
-              ]}
-            >
+            <Text style={[styles.progressText, { color: c.textSecondary }]}>
               Step {step + 1} of 3
             </Text>
           </View>
 
           {step === 0 ? (
-            <IntroStep
-              onNext={() =>
-                setStep(1)
-              }
-            />
+            <IntroStep onNext={() => setStep(1)} />
           ) : step === 1 ? (
             <CategoryStep
-              selectedCategoryId={
-                selectedCategoryId
-              }
+              selectedCategoryId={selectedCategoryId}
               onSelect={(id) => {
-                setSelectedCategoryId(
-                  id
-                );
-
+                setSelectedCategoryId(id);
                 setSelectedHabits([]);
               }}
-              onBack={() =>
-                setStep(0)
-              }
+              onBack={() => setStep(0)}
               onNext={() => {
-                if (
-                  !selectedCategoryId
-                ) {
+                if (!selectedCategoryId) {
                   Alert.alert(
                     "Choose a category",
                     "Pick one area to start with."
@@ -390,24 +300,12 @@ export default function OnboardingScreen() {
             />
           ) : (
             <HabitStep
-              category={
-                selectedCategory
-              }
-              selectedHabits={
-                selectedHabits
-              }
-              onToggleHabit={
-                toggleHabit
-              }
-              onBack={() =>
-                setStep(1)
-              }
-              onFinish={
-                finishOnboarding
-              }
-              submitting={
-                submitting
-              }
+              category={selectedCategory}
+              selectedHabits={selectedHabits}
+              onToggleHabit={toggleHabit}
+              onBack={() => setStep(1)}
+              onFinish={finishOnboarding}
+              submitting={submitting}
             />
           )}
         </ScrollView>
@@ -422,18 +320,12 @@ function IntroStep({ onNext }) {
 
   return (
     <View style={styles.step}>
-      <AppCard
-        style={styles.heroCard}
-      >
+      <AppCard style={styles.heroCard}>
         <View
           style={[
             styles.heroGlow,
             {
-              backgroundColor:
-                `${
-                  c.cyan ||
-                  c.primary
-                }12`,
+              backgroundColor: `${c.cyan || c.primary}12`,
             },
           ]}
         />
@@ -442,109 +334,50 @@ function IntroStep({ onNext }) {
           style={[
             styles.heroIcon,
             {
-              backgroundColor:
-                `${
-                  c.cyan ||
-                  c.primary
-                }14`,
-
-              borderColor:
-                c.border,
+              backgroundColor: `${c.cyan || c.primary}14`,
+              borderColor: c.border,
             },
           ]}
         >
           <MaterialCommunityIcons
             name="orbit"
             size={42}
-            color={
-              c.cyan ||
-              c.primary
-            }
+            color={c.cyan || c.primary}
           />
         </View>
 
         <BrandBadge label="Momentum Begins" />
 
-        <Text
-          style={[
-            styles.heroTitle,
-            {
-              color: c.text,
-            },
-          ]}
-        >
+        <Text style={[styles.heroTitle, { color: c.text }]}>
           Small actions create lasting change.
         </Text>
 
-        <Text
-          style={[
-            styles.heroText,
-            {
-              color:
-                c.textSecondary,
-            },
-          ]}
-        >
-          Build habits, complete tasks,
-          earn rewards, and level up
-          your progress one day at a
-          time.
+        <Text style={[styles.heroText, { color: c.textSecondary }]}>
+          Build habits, complete tasks, earn rewards, and level up your progress
+          one day at a time.
         </Text>
 
-        <View
-          style={
-            styles.featureList
-          }
-        >
-          <Feature
-            icon="check-circle"
-            text="Complete habits and tasks"
-          />
-
-          <Feature
-            icon="zap"
-            text="Earn XP and level up"
-          />
-
-          <Feature
-            icon="gift"
-            text="Unlock rewards and themes"
-          />
+        <View style={styles.featureList}>
+          <Feature icon="check-circle" text="Complete habits and tasks" />
+          <Feature icon="zap" text="Earn XP and level up" />
+          <Feature icon="gift" text="Unlock rewards and themes" />
         </View>
       </AppCard>
 
-      <AppButton
-        title="Get Started"
-        onPress={onNext}
-        style={styles.button}
-      />
+      <AppButton title="Get Started" onPress={onNext} style={styles.button} />
     </View>
   );
 }
 
-function Feature({
-  icon,
-  text,
-}) {
+function Feature({ icon, text }) {
   const { theme } = useTheme();
   const c = theme.colors;
 
   return (
     <View style={styles.feature}>
-      <Feather
-        name={icon}
-        size={18}
-        color={c.success}
-      />
+      <Feather name={icon} size={18} color={c.success} />
 
-      <Text
-        style={[
-          styles.featureText,
-          {
-            color: c.text,
-          },
-        ]}
-      >
+      <Text style={[styles.featureText, { color: c.text }]}>
         {text}
       </Text>
     </View>
@@ -562,143 +395,75 @@ function CategoryStep({
 
   return (
     <View style={styles.step}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: c.text,
-          },
-        ]}
-      >
+      <Text style={[styles.sectionTitle, { color: c.text }]}>
         Choose your starting focus
       </Text>
 
-      <Text
-        style={[
-          styles.helperText,
-          {
-            color:
-              c.textSecondary,
-          },
-        ]}
-      >
-        Start small. You can always
-        expand later.
+      <Text style={[styles.helperText, { color: c.textSecondary }]}>
+        Start small. You can always expand later.
       </Text>
 
-      {CATEGORIES.map(
-        (category) => {
-          const selected =
-            selectedCategoryId ===
-            category.id;
+      {CATEGORIES.map((category) => {
+        const selected = selectedCategoryId === category.id;
 
-          return (
-            <AnimatedPressable
-              key={category.id}
-              onPress={() =>
-                onSelect(
-                  category.id
-                )
-              }
+        return (
+          <AnimatedPressable
+            key={category.id}
+            onPress={() => onSelect(category.id)}
+          >
+            <AppCard
+              style={[
+                styles.optionCard,
+                selected && {
+                  borderColor: c.cyan || c.primary,
+                },
+              ]}
             >
-              <AppCard
-                style={[
-                  styles.optionCard,
-
-                  selected && {
-                    borderColor:
-                      c.cyan ||
-                      c.primary,
-                  },
-                ]}
-              >
+              <View style={styles.optionRow}>
                 <View
-                  style={
-                    styles.optionRow
-                  }
+                  style={[
+                    styles.optionIcon,
+                    {
+                      backgroundColor: selected
+                        ? `${c.cyan || c.primary}18`
+                        : c.surfaceAlt,
+                    },
+                  ]}
                 >
-                  <View
+                  <MaterialCommunityIcons
+                    name={category.icon}
+                    size={26}
+                    color={selected ? c.cyan || c.primary : c.textMuted}
+                  />
+                </View>
+
+                <View style={styles.optionCopy}>
+                  <Text style={[styles.optionTitle, { color: c.text }]}>
+                    {category.title}
+                  </Text>
+
+                  <Text
                     style={[
-                      styles.optionIcon,
+                      styles.optionText,
                       {
-                        backgroundColor:
-                          selected
-                            ? `${
-                                c.cyan ||
-                                c.primary
-                              }18`
-                            : c.surfaceAlt,
+                        color: c.textSecondary,
                       },
                     ]}
                   >
-                    <MaterialCommunityIcons
-                      name={
-                        category.icon
-                      }
-                      size={26}
-                      color={
-                        selected
-                          ? c.cyan ||
-                            c.primary
-                          : c.textMuted
-                      }
-                    />
-                  </View>
-
-                  <View
-                    style={
-                      styles.optionCopy
-                    }
-                  >
-                    <Text
-                      style={[
-                        styles.optionTitle,
-                        {
-                          color:
-                            c.text,
-                        },
-                      ]}
-                    >
-                      {
-                        category.title
-                      }
-                    </Text>
-
-                    <Text
-                      style={[
-                        styles.optionText,
-                        {
-                          color:
-                            c.textSecondary,
-                        },
-                      ]}
-                    >
-                      {
-                        category.description
-                      }
-                    </Text>
-                  </View>
-
-                  <Feather
-                    name={
-                      selected
-                        ? "check-circle"
-                        : "circle"
-                    }
-                    size={22}
-                    color={
-                      selected
-                        ? c.cyan ||
-                          c.primary
-                        : c.textMuted
-                    }
-                  />
+                    {category.description}
+                  </Text>
                 </View>
-              </AppCard>
-            </AnimatedPressable>
-          );
-        }
-      )}
+
+                <Feather
+                  name={selected ? "check-circle" : "circle"}
+                  size={22}
+                  color={selected ? c.cyan || c.primary : c.textMuted}
+                />
+              </View>
+            </AppCard>
+          </AnimatedPressable>
+        );
+      })}
 
       <View style={styles.actions}>
         <AppButton
@@ -708,11 +473,7 @@ function CategoryStep({
           style={styles.actionButton}
         />
 
-        <AppButton
-          title="Next"
-          onPress={onNext}
-          style={styles.actionButton}
-        />
+        <AppButton title="Next" onPress={onNext} style={styles.actionButton} />
       </View>
     </View>
   );
@@ -731,138 +492,99 @@ function HabitStep({
 
   return (
     <View style={styles.step}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: c.text,
-          },
-        ]}
-      >
+      <Text style={[styles.sectionTitle, { color: c.text }]}>
         Pick your starter habits
       </Text>
 
-      <Text
-        style={[
-          styles.helperText,
-          {
-            color:
-              c.textSecondary,
-          },
-        ]}
-      >
-        Choose one or more habits to
-        begin building momentum.
+      <Text style={[styles.helperText, { color: c.textSecondary }]}>
+        Choose one or more habits to begin building momentum.
       </Text>
 
-      {(category?.habits || []).map(
-        (habit) => {
-          const selected =
-            selectedHabits.some(
-              (item) =>
-                item.name ===
-                habit.name
-            );
+      {(category?.habits || []).map((habit) => {
+        const selected = selectedHabits.some((item) => item.name === habit.name);
+        const isMaintenance = habit.category === "maintenance";
 
-          return (
-            <AnimatedPressable
-              key={habit.name}
-              onPress={() =>
-                onToggleHabit(
-                  habit
-                )
-              }
+        return (
+          <AnimatedPressable
+            key={habit.name}
+            onPress={() => onToggleHabit(habit)}
+          >
+            <AppCard
+              style={[
+                styles.optionCard,
+                selected && {
+                  borderColor: c.success,
+                },
+              ]}
             >
-              <AppCard
-                style={[
-                  styles.optionCard,
-
-                  selected && {
-                    borderColor:
-                      c.success,
-                  },
-                ]}
-              >
+              <View style={styles.optionRow}>
                 <View
-                  style={
-                    styles.optionRow
-                  }
+                  style={[
+                    styles.optionIcon,
+                    {
+                      backgroundColor: selected
+                        ? `${c.success}18`
+                        : c.surfaceAlt,
+                    },
+                  ]}
                 >
-                  <View
-                    style={[
-                      styles.optionIcon,
-                      {
-                        backgroundColor:
-                          selected
-                            ? `${c.success}18`
-                            : c.surfaceAlt,
-                      },
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name={
-                        habit.icon
-                      }
-                      size={25}
-                      color={
-                        selected
-                          ? c.success
-                          : c.textMuted
-                      }
-                    />
-                  </View>
+                  <MaterialCommunityIcons
+                    name={habit.icon}
+                    size={25}
+                    color={selected ? c.success : c.textMuted}
+                  />
+                </View>
 
-                  <View
-                    style={
-                      styles.optionCopy
-                    }
-                  >
-                    <Text
-                      style={[
-                        styles.optionTitle,
-                        {
-                          color:
-                            c.text,
-                        },
-                      ]}
-                    >
+                <View style={styles.optionCopy}>
+                  <View style={styles.habitTitleRow}>
+                    <Text style={[styles.optionTitle, { color: c.text }]}>
                       {habit.name}
                     </Text>
 
-                    <Text
-                      style={[
-                        styles.optionText,
-                        {
-                          color:
-                            c.textSecondary,
-                        },
-                      ]}
-                    >
-                      {
-                        habit.description
-                      }
-                    </Text>
+                    {isMaintenance ? (
+                      <View
+                        style={[
+                          styles.maintenancePill,
+                          {
+                            backgroundColor: `${c.cyan || c.primary}12`,
+                            borderColor: `${c.cyan || c.primary}40`,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.maintenancePillText,
+                            { color: c.cyan || c.primary },
+                          ]}
+                        >
+                          +1
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
 
-                  <Feather
-                    name={
-                      selected
-                        ? "check-circle"
-                        : "circle"
-                    }
-                    size={22}
-                    color={
-                      selected
-                        ? c.success
-                        : c.textMuted
-                    }
-                  />
+                  <Text
+                    style={[
+                      styles.optionText,
+                      {
+                        color: c.textSecondary,
+                      },
+                    ]}
+                  >
+                    {habit.description}
+                  </Text>
                 </View>
-              </AppCard>
-            </AnimatedPressable>
-          );
-        }
-      )}
+
+                <Feather
+                  name={selected ? "check-circle" : "circle"}
+                  size={22}
+                  color={selected ? c.success : c.textMuted}
+                />
+              </View>
+            </AppCard>
+          </AnimatedPressable>
+        );
+      })}
 
       <View style={styles.actions}>
         <AppButton
@@ -873,11 +595,7 @@ function HabitStep({
         />
 
         <AppButton
-          title={
-            submitting
-              ? "Starting..."
-              : "Start My Orbit"
-          }
+          title={submitting ? "Starting..." : "Start My Orbit"}
           onPress={onFinish}
           disabled={submitting}
           style={styles.actionButton}
@@ -1026,6 +744,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
+  habitTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+
   optionTitle: {
     ...typography.h3,
   },
@@ -1033,6 +757,18 @@ const styles = StyleSheet.create({
   optionText: {
     ...typography.body,
     marginTop: spacing.xs,
+  },
+
+  maintenancePill: {
+    borderWidth: 1,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+  },
+
+  maintenancePillText: {
+    fontSize: 11,
+    fontWeight: "900",
   },
 
   actions: {

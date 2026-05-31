@@ -1,9 +1,9 @@
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import Constants from "expo-constants";
 import * as Haptics from "expo-haptics";
-import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -16,18 +16,13 @@ import {
 import { AnimatedScreen } from "../../components/AnimatedScreen";
 import { AppButton } from "../../components/AppButton";
 import { AppCard } from "../../components/AppCard";
-import { BrandBadge, BrandHeader } from "../../components/BrandMark";
+import { BrandHeader } from "../../components/BrandMark";
 import { SectionTitle } from "../../components/SectionTitle";
 
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../hooks/useTheme";
 
-import { resetAccountData } from "../../lib/api";
-//import {
-//  cancelDailyOrbitReminder,
-//  getScheduledNotifications,
-//  scheduleDailyOrbitReminder,
-// } from "../../lib/notifications";
+import { api, resetAccountData } from "../../lib/api";
 
 import {
   radii,
@@ -41,24 +36,31 @@ const QUICK_THEMES = ["light", "dark", "nature", "focus"];
 export default function SettingsScreen() {
   const { logout } = useAuth();
   const { themeName, themes, setThemeName } = useTheme();
-  const [dailyReminderEnabled, setDailyReminderEnabled] = useState(false);
 
-  const activeTheme = themes[themeName];
+  const [profile, setProfile] = useState(null);
+
+  const activeTheme = themes[themeName] || themes.light;
   const c = activeTheme.colors;
 
-  useEffect(() => {
-    async function checkReminder() {
-      const scheduled = await getScheduledNotifications();
+  const appVersion =
+    Constants.expoConfig?.version ||
+    Constants.manifest?.version ||
+    "1.0";
 
-      setDailyReminderEnabled(
-        scheduled.some(
-          (item) => item.identifier === "daily_orbit_reminder"
-        )
-      );
+  useFocusEffect(
+    useCallback(() => {
+      loadProfile();
+    }, [])
+  );
+
+  async function loadProfile() {
+    try {
+      const data = await api.get("/profile/me");
+      setProfile(data);
+    } catch {
+      setProfile(null);
     }
-
-    checkReminder();
-  }, []);
+  }
 
   function confirmLogout() {
     Alert.alert(
@@ -78,39 +80,6 @@ export default function SettingsScreen() {
   async function handleThemeChange(key) {
     await Haptics.selectionAsync();
     await setThemeName(key);
-  }
-
-  async function handleDailyReminderToggle() {
-    try {
-      if (dailyReminderEnabled) {
-        await cancelDailyOrbitReminder();
-        setDailyReminderEnabled(false);
-
-        Alert.alert(
-          "Reminder Disabled",
-          "Daily orbit reminders have been turned off."
-        );
-
-        return;
-      }
-
-      await scheduleDailyOrbitReminder({
-        hour: 20,
-        minute: 0,
-      });
-
-      setDailyReminderEnabled(true);
-
-      Alert.alert(
-        "Reminder Enabled",
-        "We'll remind you every day at 8:00 PM."
-      );
-    } catch (error) {
-      Alert.alert(
-        "Notification Error",
-        error?.message || "Unable to update reminders."
-      );
-    }
   }
 
   async function handleResetData() {
@@ -160,6 +129,12 @@ export default function SettingsScreen() {
     );
   }
 
+  const level = profile?.level_data?.level || 1;
+  const xp =
+    profile?.level_data?.progress ||
+    profile?.level_data?.current_xp ||
+    0;
+
   return (
     <AnimatedScreen style={[styles.screen, { backgroundColor: c.background }]}>
       <ScrollView
@@ -175,41 +150,109 @@ export default function SettingsScreen() {
         />
 
         <AnimatedScreen delay={40}>
-          <AppCard padded={false} style={styles.heroCard}>
-            <LinearGradient
-              colors={activeTheme?.gradient || [c.background, c.primary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.heroGradient}
-            >
-              <View style={styles.heroGlow} />
-
-              <View style={styles.heroTop}>
-                <View style={styles.heroCopy}>
-                  <Text style={styles.heroEyebrow}>Current Theme</Text>
-
-                  <Text style={styles.heroTitle}>
-                    {activeTheme?.name || themeName}
-                  </Text>
-
-                  <Text style={styles.heroSubtitle}>
-                    {activeTheme?.tagline || "Personalize your experience"}
-                  </Text>
-
-                  <View style={styles.heroBadgeRow}>
-                    <BrandBadge label="Theme Active" />
-                  </View>
-                </View>
-
-                <View style={styles.heroIcon}>
-                  <MaterialCommunityIcons
-                    name="palette-outline"
-                    size={34}
-                    color="#FFFFFF"
-                  />
-                </View>
+          <AppCard style={styles.profileSummaryCard}>
+            <View style={styles.profileSummaryRow}>
+              <View
+                style={[
+                  styles.profileAvatar,
+                  {
+                    backgroundColor: `${c.cyan || c.primary}14`,
+                    borderColor: c.border,
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name={getAvatarIcon(profile)}
+                  size={34}
+                  color={c.cyan || c.primary}
+                />
               </View>
-            </LinearGradient>
+
+              <View style={styles.profileSummaryCopy}>
+                <Text style={[styles.profileLabel, { color: c.textSecondary }]}>
+                  Your Orbit
+                </Text>
+
+                <Text style={[styles.profileName, { color: c.text }]}>
+                  {profile?.display_name || "Explorer"}
+                </Text>
+
+                <Text style={[styles.profileUsername, { color: c.textSecondary }]}>
+                  {profile?.username ? `@${profile.username}` : "Profile ready"}
+                </Text>
+              </View>
+
+              <Pressable
+                onPress={() => router.push("/profile")}
+                style={({ pressed }) => [
+                  styles.profileButton,
+                  {
+                    backgroundColor: `${c.cyan || c.primary}14`,
+                    borderColor: c.border,
+                  },
+                  pressed && styles.rowPressed,
+                ]}
+              >
+                <Feather
+                  name="chevron-right"
+                  size={20}
+                  color={c.cyan || c.primary}
+                />
+              </Pressable>
+            </View>
+
+            <View style={styles.summaryStats}>
+              <MiniStat label="Level" value={level} icon="orbit" />
+              <MiniStat label="Streak" value={profile?.streak_days || 0} icon="fire" />
+              <MiniStat label="XP" value={xp} icon="star-four-points" />
+              <MiniStat label="Coins" value={profile?.coin_balance || 0} icon="cash" />
+            </View>
+          </AppCard>
+        </AnimatedScreen>
+
+        <AnimatedScreen delay={70}>
+          <AppCard style={styles.currentThemeCard}>
+            <View style={styles.currentThemeRow}>
+              <View
+                style={[
+                  styles.currentThemeIcon,
+                  {
+                    backgroundColor: `${c.cyan || c.primary}14`,
+                    borderColor: c.border,
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="palette-outline"
+                  size={28}
+                  color={c.cyan || c.primary}
+                />
+              </View>
+
+              <View style={styles.currentThemeCopy}>
+                <Text
+                  style={[
+                    styles.currentThemeLabel,
+                    { color: c.textSecondary },
+                  ]}
+                >
+                  Current Theme
+                </Text>
+
+                <Text style={[styles.currentThemeName, { color: c.text }]}>
+                  {activeTheme?.name || themeName}
+                </Text>
+
+                <Text
+                  style={[
+                    styles.currentThemeSubtitle,
+                    { color: c.textSecondary },
+                  ]}
+                >
+                  {activeTheme?.tagline || "Personalize your experience"}
+                </Text>
+              </View>
+            </View>
 
             <View style={styles.quickThemes}>
               {QUICK_THEMES.map((key) => {
@@ -236,69 +279,31 @@ export default function SettingsScreen() {
           </AppCard>
         </AnimatedScreen>
 
-        <AnimatedScreen delay={80}>
-          <AppCard style={styles.identityCard}>
-            <View
-              style={[
-                styles.identityGlow,
-                {
-                  backgroundColor: `${c.cyan || c.primary}10`,
-                },
-              ]}
-            />
-
-            <View style={styles.identityTop}>
-              <View
-                style={[
-                  styles.identityIcon,
-                  {
-                    backgroundColor: `${c.cyan || c.primary}14`,
-                    borderColor: c.border,
-                  },
-                ]}
-              >
-                <MaterialCommunityIcons
-                  name="orbit"
-                  size={28}
-                  color={c.cyan || c.primary}
-                />
-              </View>
-
-              <View style={styles.identityCopy}>
-                <Text style={[styles.identityTitle, { color: c.text }]}>
-                  Your Orbit
-                </Text>
-
-                <Text style={[styles.identityText, { color: c.textSecondary }]}>
-                  Small daily actions create long-term momentum.
-                </Text>
-              </View>
-            </View>
-          </AppCard>
-        </AnimatedScreen>
-
-        <AnimatedScreen delay={120}>
+        <AnimatedScreen delay={110}>
           <SectionTitle title="Personalization" />
 
           <AppCard>
-          <SettingsRow
-            icon="timeline-clock-outline"
-            label="Activity"
-            subtitle="View your recent orbit history"
-            onPress={() => router.push("/activity")}
-          />
+            <SettingsRow
+              icon="account-circle-outline"
+              label="Profile"
+              subtitle="View and customize your public profile"
+              onPress={() => router.push("/profile")}
+            />
+
+            <SettingsRow
+              icon="timeline-clock-outline"
+              label="Activity"
+              subtitle="View your recent orbit history"
+              onPress={() => router.push("/activity")}
+            />
+
             <SettingsRow
               icon="palette-outline"
               label="Theme Store"
               subtitle="Unlock and equip new themes"
               onPress={() => router.push("/theme-store")}
             />
-            <SettingsRow
-            icon="account-circle-outline"
-            label="Profile"
-            subtitle="View and customize your public profile"
-            onPress={() => router.push("/profile")}
-            />
+
             <SettingsRow
               icon="refresh"
               label="Restart Onboarding"
@@ -309,25 +314,7 @@ export default function SettingsScreen() {
           </AppCard>
         </AnimatedScreen>
 
-        <AnimatedScreen delay={140}>
-          <SectionTitle title="Reminders" />
-
-          <AppCard>
-            <SettingsRow
-              icon="bell-outline"
-              label="Daily Reminder"
-              subtitle={
-                dailyReminderEnabled
-                  ? "Enabled for 8:00 PM"
-                  : "Remind me to keep my orbit moving"
-              }
-              onPress={handleDailyReminderToggle}
-              last
-            />
-          </AppCard>
-        </AnimatedScreen>
-
-        <AnimatedScreen delay={160}>
+        <AnimatedScreen delay={150}>
           <SectionTitle title="Account" />
 
           <AppCard>
@@ -386,8 +373,10 @@ export default function SettingsScreen() {
               Built with momentum in mind.
             </Text>
 
-            <Text style={[styles.versionText, { color: c.textMuted || c.muted }]}>
-              OurOrbit v1.0
+            <Text
+              style={[styles.versionText, { color: c.textMuted || c.muted }]}
+            >
+              OurOrbit v{appVersion}
             </Text>
           </View>
         </AnimatedScreen>
@@ -431,11 +420,7 @@ function SettingsRow({
             },
           ]}
         >
-          <MaterialCommunityIcons
-            name={icon}
-            size={20}
-            color={accentColor}
-          />
+          <MaterialCommunityIcons name={icon} size={20} color={accentColor} />
         </View>
 
         <View style={styles.rowCopy}>
@@ -497,6 +482,37 @@ function ThemeChip({ label, active, onPress }) {
   );
 }
 
+function MiniStat({ icon, label, value }) {
+  const { theme } = useTheme();
+  const c = theme.colors;
+
+  return (
+    <View style={styles.miniStat}>
+      <MaterialCommunityIcons
+        name={icon}
+        size={17}
+        color={c.cyan || c.primary}
+      />
+
+      <Text style={[styles.miniStatValue, { color: c.text }]}>
+        {value}
+      </Text>
+
+      <Text style={[styles.miniStatLabel, { color: c.textSecondary }]}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function getAvatarIcon(profile) {
+  const avatarId = profile?.avatar || "explorer";
+  const avatarStore = profile?.avatar_store || [];
+  const avatar = avatarStore.find((item) => item.id === avatarId);
+
+  return avatar?.icon || "compass-outline";
+}
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
@@ -507,78 +523,124 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
 
-  heroCard: {
-    overflow: "hidden",
+  profileSummaryCard: {
+    marginTop: spacing.sm,
   },
 
-  heroGradient: {
-    minHeight: 190,
-    padding: spacing.xl,
-    justifyContent: "space-between",
-    overflow: "hidden",
-  },
-
-  heroGlow: {
-    position: "absolute",
-    width: 220,
-    height: 220,
-    borderRadius: radii.pill,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    top: -120,
-    right: -90,
-  },
-
-  heroTop: {
+  profileSummaryRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    gap: spacing.lg,
+    alignItems: "center",
+    gap: spacing.md,
   },
 
-  heroCopy: {
+  profileAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  profileSummaryCopy: {
     flex: 1,
   },
 
-  heroEyebrow: {
-    color: "rgba(255,255,255,0.78)",
+  profileLabel: {
+    ...typography.caption,
     fontWeight: "900",
-    fontSize: 12,
     textTransform: "uppercase",
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
 
-  heroTitle: {
-    color: "#FFFFFF",
-    fontSize: 34,
-    fontWeight: "900",
+  profileName: {
+    ...typography.h3,
     marginTop: spacing.xs,
   },
 
-  heroSubtitle: {
-    color: "rgba(255,255,255,0.92)",
-    marginTop: spacing.sm,
-    lineHeight: 20,
+  profileUsername: {
+    ...typography.caption,
+    marginTop: spacing.xs,
     fontWeight: "700",
   },
 
-  heroBadgeRow: {
+  profileButton: {
+    width: 42,
+    height: 42,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  summaryStats: {
+    marginTop: spacing.lg,
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+
+  miniStat: {
+    flex: 1,
+    alignItems: "center",
+    gap: 4,
+  },
+
+  miniStatValue: {
+    ...typography.bodyBold,
+  },
+
+  miniStatLabel: {
+    ...typography.caption,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  currentThemeCard: {
     marginTop: spacing.lg,
   },
 
-  heroIcon: {
-    width: 74,
-    height: 74,
+  currentThemeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+
+  currentThemeIcon: {
+    width: 58,
+    height: 58,
     borderRadius: radii.pill,
-    backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+  },
+
+  currentThemeCopy: {
+    flex: 1,
+  },
+
+  currentThemeLabel: {
+    ...typography.caption,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+
+  currentThemeName: {
+    ...typography.h3,
+    marginTop: spacing.xs,
+  },
+
+  currentThemeSubtitle: {
+    ...typography.caption,
+    marginTop: spacing.xs,
+    lineHeight: 18,
   },
 
   quickThemes: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.sm,
-    padding: spacing.xl,
-    paddingTop: spacing.lg,
+    marginTop: spacing.lg,
   },
 
   themeChip: {
@@ -600,50 +662,7 @@ const styles = StyleSheet.create({
   },
 
   storeButton: {
-    marginHorizontal: spacing.xl,
-    marginBottom: spacing.xl,
-  },
-
-  identityCard: {
     marginTop: spacing.lg,
-    overflow: "hidden",
-  },
-
-  identityGlow: {
-    position: "absolute",
-    width: 180,
-    height: 180,
-    borderRadius: radii.pill,
-    top: -110,
-    right: -80,
-  },
-
-  identityTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-  },
-
-  identityIcon: {
-    width: 58,
-    height: 58,
-    borderRadius: radii.pill,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-  },
-
-  identityCopy: {
-    flex: 1,
-  },
-
-  identityTitle: {
-    ...typography.h3,
-  },
-
-  identityText: {
-    ...typography.body,
-    marginTop: spacing.xs,
   },
 
   row: {

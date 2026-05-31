@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
@@ -54,7 +54,9 @@ function getDifficultyForCoins(coins) {
   return "hard";
 }
 
-function getInitialCoins(params) {
+function getInitialCoins(params, isMaintenance) {
+  if (isMaintenance) return 1;
+
   const custom = Number(params.custom_coins);
 
   if ([5, 10, 20, 50].includes(custom)) {
@@ -73,26 +75,20 @@ export default function EditHabitScreen() {
   const c = theme.colors;
 
   const params = useLocalSearchParams();
+  const isMaintenance = params.category === "maintenance";
 
   const [name, setName] = useState(params.name || "");
-  const [description, setDescription] =
-    useState(params.description || "");
-
-  const [selectedCoins, setSelectedCoins] =
-    useState(getInitialCoins(params));
-
-  const [submitting, setSubmitting] =
-    useState(false);
+  const [description, setDescription] = useState(params.description || "");
+  const [selectedCoins, setSelectedCoins] = useState(
+    getInitialCoins(params, isMaintenance)
+  );
+  const [submitting, setSubmitting] = useState(false);
 
   async function updateHabit() {
     if (!token) return;
 
     if (!name.trim()) {
-      Alert.alert(
-        "Missing name",
-        "Enter a habit name."
-      );
-
+      Alert.alert("Missing name", "Enter a habit name.");
       return;
     }
 
@@ -101,21 +97,18 @@ export default function EditHabitScreen() {
     setSubmitting(true);
 
     try {
+      const coins = isMaintenance ? 1 : selectedCoins;
+
       await api.put(
         `/habits/${params.id}`,
         {
           name: name.trim(),
           description: description.trim(),
-          frequency:
-            params.frequency || "daily",
-
-          difficulty:
-            getDifficultyForCoins(
-              selectedCoins
-            ),
-
-          custom_coins: selectedCoins,
-          icon: params.icon || "flame",
+          frequency: params.frequency || "daily",
+          difficulty: isMaintenance ? "easy" : getDifficultyForCoins(coins),
+          custom_coins: coins,
+          icon: params.icon || (isMaintenance ? "pill" : "fire"),
+          category: isMaintenance ? "maintenance" : params.category || "custom",
         },
         token
       );
@@ -127,6 +120,11 @@ export default function EditHabitScreen() {
       setSubmitting(false);
     }
   }
+
+  const previewCoins = isMaintenance ? 1 : selectedCoins;
+  const previewDifficulty = isMaintenance
+    ? "maintenance"
+    : getDifficultyForCoins(selectedCoins);
 
   return (
     <ScrollView
@@ -146,6 +144,40 @@ export default function EditHabitScreen() {
       />
 
       <AppCard>
+        {isMaintenance ? (
+          <View
+            style={[
+              styles.maintenanceBanner,
+              {
+                borderColor: c.border,
+                backgroundColor: `${c.cyan || c.primary}10`,
+              },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name="bell-outline"
+              size={24}
+              color={c.cyan || c.primary}
+            />
+
+            <View style={styles.maintenanceCopy}>
+              <Text style={[styles.maintenanceTitle, { color: c.text }]}>
+                Maintenance Habit
+              </Text>
+
+              <Text
+                style={[
+                  styles.maintenanceDescription,
+                  { color: c.textSecondary },
+                ]}
+              >
+                Reminder-style habits always award 1 coin to protect the reward
+                economy.
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
         <View style={styles.section}>
           <Text
             style={[
@@ -185,113 +217,101 @@ export default function EditHabitScreen() {
           />
         </View>
 
-        <View style={styles.section}>
-          <Text
-            style={[
-              styles.label,
-              {
-                color: c.text,
-              },
-            ]}
-          >
-            Coin value
-          </Text>
+        {!isMaintenance ? (
+          <View style={styles.section}>
+            <Text
+              style={[
+                styles.label,
+                {
+                  color: c.text,
+                },
+              ]}
+            >
+              Coin value
+            </Text>
 
-          <View style={styles.coinGrid}>
-            {COIN_OPTIONS.map((option, index) => {
-              const active =
-                selectedCoins === option.value;
+            <View style={styles.coinGrid}>
+              {COIN_OPTIONS.map((option, index) => {
+                const active = selectedCoins === option.value;
 
-              const accentColors = [
-                c.success,
-                c.cyan || c.primary,
-                c.blue || c.primary,
-                c.coral || c.primary,
-              ];
+                const accentColors = [
+                  c.success,
+                  c.cyan || c.primary,
+                  c.blue || c.primary,
+                  c.coral || c.primary,
+                ];
 
-              const accent =
-                accentColors[index] ||
-                c.primary;
+                const accent = accentColors[index] || c.primary;
 
-              return (
-                <Pressable
-                  key={option.value}
-                  onPress={() =>
-                    setSelectedCoins(option.value)
-                  }
-                  style={[
-                    styles.coinOption,
-                    {
-                      borderColor: active
-                        ? accent
-                        : c.border,
-
-                      backgroundColor: active
-                        ? `${accent}12`
-                        : c.surfaceAlt,
-                    },
-
-                    active && styles.coinActive,
-                  ]}
-                >
-                  <View
+                return (
+                  <Pressable
+                    key={option.value}
+                    onPress={() => setSelectedCoins(option.value)}
                     style={[
-                      styles.coinDot,
+                      styles.coinOption,
                       {
-                        backgroundColor:
-                          accent,
+                        borderColor: active ? accent : c.border,
+                        backgroundColor: active
+                          ? `${accent}12`
+                          : c.surfaceAlt,
                       },
-                    ]}
-                  />
-
-                  <Text
-                    style={[
-                      styles.coinLabel,
-                      {
-                        color: active
-                          ? accent
-                          : c.text,
-                      },
+                      active && styles.coinActive,
                     ]}
                   >
-                    {option.label}
-                  </Text>
+                    <View
+                      style={[
+                        styles.coinDot,
+                        {
+                          backgroundColor: accent,
+                        },
+                      ]}
+                    />
 
-                  <Text
-                    style={[
-                      styles.coinValue,
-                      {
-                        color: c.text,
-                      },
-                    ]}
-                  >
-                    {option.value} coins
-                  </Text>
+                    <Text
+                      style={[
+                        styles.coinLabel,
+                        {
+                          color: active ? accent : c.text,
+                        },
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
 
-                  <Text
-                    style={[
-                      styles.coinDescription,
-                      {
-                        color:
-                          c.textSecondary,
-                      },
-                    ]}
-                  >
-                    {option.description}
-                  </Text>
-                </Pressable>
-              );
-            })}
+                    <Text
+                      style={[
+                        styles.coinValue,
+                        {
+                          color: c.text,
+                        },
+                      ]}
+                    >
+                      {option.value} coins
+                    </Text>
+
+                    <Text
+                      style={[
+                        styles.coinDescription,
+                        {
+                          color: c.textSecondary,
+                        },
+                      ]}
+                    >
+                      {option.description}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
-        </View>
+        ) : null}
 
         <View
           style={[
             styles.previewBox,
             {
               borderColor: c.border,
-              backgroundColor:
-                c.surfaceAlt,
+              backgroundColor: c.surfaceAlt,
             },
           ]}
         >
@@ -299,9 +319,7 @@ export default function EditHabitScreen() {
             style={[
               styles.previewGlow,
               {
-                backgroundColor: `${
-                  c.cyan || c.primary
-                }14`,
+                backgroundColor: `${c.cyan || c.primary}14`,
               },
             ]}
           />
@@ -311,16 +329,20 @@ export default function EditHabitScreen() {
               style={[
                 styles.iconCircle,
                 {
-                  backgroundColor:
-                    c.surface,
-
+                  backgroundColor: c.surface,
                   borderColor: c.border,
                 },
               ]}
             >
-              <Text style={styles.iconText}>
-                🔥
-              </Text>
+              {isMaintenance ? (
+                <MaterialCommunityIcons
+                  name={params.icon || "pill"}
+                  size={28}
+                  color={c.cyan || c.primary}
+                />
+              ) : (
+                <Text style={styles.iconText}>🔥</Text>
+              )}
             </View>
 
             <View style={styles.previewText}>
@@ -332,60 +354,44 @@ export default function EditHabitScreen() {
                   },
                 ]}
               >
-                {name.trim() ||
-                  "Your habit"}
+                {name.trim() || "Your habit"}
               </Text>
 
               <Text
                 style={[
                   styles.previewSubtitle,
                   {
-                    color:
-                      c.textSecondary,
+                    color: c.textSecondary,
                   },
                 ]}
               >
-                {params.frequency ||
-                  "daily"}{" "}
-                •{" "}
-                {getDifficultyForCoins(
-                  selectedCoins
-                )}{" "}
-                • {selectedCoins} coins
+                {params.frequency || "daily"} • {previewDifficulty} •{" "}
+                {previewCoins} coin{previewCoins === 1 ? "" : "s"}
               </Text>
             </View>
           </View>
 
           <View style={styles.previewFooter}>
-            <Feather
-              name="repeat"
-              size={16}
-              color={
-                c.cyan || c.primary
-              }
-            />
+            <Feather name="repeat" size={16} color={c.cyan || c.primary} />
 
             <Text
               style={[
                 styles.previewHint,
                 {
-                  color:
-                    c.textSecondary,
+                  color: c.textSecondary,
                 },
               ]}
             >
-              Momentum compounds daily.
+              {isMaintenance
+                ? "Small reminders still count toward consistency."
+                : "Momentum compounds daily."}
             </Text>
           </View>
         </View>
       </AppCard>
 
       <AppButton
-        title={
-          submitting
-            ? "Saving..."
-            : "Save Changes"
-        }
+        title={submitting ? "Saving..." : "Save Changes"}
         onPress={updateHabit}
         disabled={submitting}
         style={styles.button}
@@ -393,17 +399,13 @@ export default function EditHabitScreen() {
 
       <Pressable
         style={styles.cancelButton}
-        onPress={() =>
-          router.replace("/(tabs)/habits")
-        }
+        onPress={() => router.replace("/(tabs)/habits")}
       >
         <Text
           style={[
             styles.cancelText,
             {
-              color:
-                c.textMuted ||
-                c.muted,
+              color: c.textMuted || c.muted,
             },
           ]}
         >
@@ -422,6 +424,30 @@ const styles = StyleSheet.create({
   container: {
     padding: spacing.xl,
     paddingBottom: 80,
+  },
+
+  maintenanceBanner: {
+    borderWidth: 1,
+    borderRadius: radii.xl,
+    padding: spacing.lg,
+    flexDirection: "row",
+    gap: spacing.md,
+    alignItems: "center",
+    marginBottom: spacing.xl,
+  },
+
+  maintenanceCopy: {
+    flex: 1,
+  },
+
+  maintenanceTitle: {
+    ...typography.bodyBold,
+  },
+
+  maintenanceDescription: {
+    ...typography.caption,
+    marginTop: spacing.xs,
+    lineHeight: 18,
   },
 
   section: {
