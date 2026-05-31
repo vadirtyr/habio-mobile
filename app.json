@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "com.OurOrbit.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundColor": "#E6F4FE"
