@@ -2,6 +2,8 @@ import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { createContext, useContext, useEffect, useState } from "react";
 
+import { googleSignOut } from "../lib/googleAuth";
+
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
@@ -49,6 +51,7 @@ export function AuthProvider({ children }) {
     } catch (error) {
       console.log("Failed to delete auth token:", error);
     } finally {
+      await googleSignOut();
       global.token = null;
       setToken(null);
       router.replace("/login");

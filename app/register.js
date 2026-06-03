@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import { useState } from "react";
 import {
     Alert,
@@ -16,9 +17,11 @@ import { AppCard } from "../components/AppCard";
 import { AppInput } from "../components/AppInput";
 import { BrandHeader } from "../components/BrandMark";
 
+import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../hooks/useTheme";
 
 import { api } from "../lib/api";
+import { signInWithGoogle } from "../lib/googleAuth";
 
 import {
     radii,
@@ -27,6 +30,7 @@ import {
 } from "../lib/theme";
 
 export default function RegisterScreen() {
+  const { login } = useAuth();
   const { theme } = useTheme();
   const c = theme.colors;
 
@@ -43,6 +47,63 @@ export default function RegisterScreen() {
 
   const [submitting, setSubmitting] =
     useState(false);
+
+  const [googleSubmitting, setGoogleSubmitting] =
+    useState(false);
+
+  async function handleGoogleRegister() {
+    if (submitting || googleSubmitting) return;
+
+    setGoogleSubmitting(true);
+
+    try {
+      const result = await signInWithGoogle();
+
+      if (result.cancelled) {
+        return;
+      }
+
+      const data = result.data;
+
+      if (!data?.token) {
+        throw new Error("Invalid Google response.");
+      }
+
+      await login(data.token);
+
+      const cleanEmail =
+        data?.user?.email?.trim()?.toLowerCase();
+
+      if (cleanEmail) {
+        await SecureStore.setItemAsync(
+          "currentUserEmail",
+          cleanEmail
+        );
+
+        const onboardingKey = `onboarding_${cleanEmail.replace(
+          /[^a-zA-Z0-9]/g,
+          "_"
+        )}`;
+
+        const hasCompletedOnboarding =
+          await SecureStore.getItemAsync(onboardingKey);
+
+        if (!hasCompletedOnboarding) {
+          router.replace("/onboarding");
+          return;
+        }
+      }
+
+      router.replace("/(tabs)/dashboard");
+    } catch (error) {
+      Alert.alert(
+        "Google sign-in failed",
+        error?.message || "Unable to sign in with Google."
+      );
+    } finally {
+      setGoogleSubmitting(false);
+    }
+  }
 
   async function handleRegister() {
     const cleanEmail =
@@ -316,8 +377,21 @@ export default function RegisterScreen() {
               handleRegister
             }
             disabled={
-              submitting
+              submitting || googleSubmitting
             }
+            testID="register-submit-button"
+          />
+
+          <AppButton
+            title={
+              googleSubmitting
+                ? "Connecting to Google..."
+                : "Continue with Google"
+            }
+            onPress={handleGoogleRegister}
+            disabled={submitting || googleSubmitting}
+            style={styles.googleButton}
+            testID="register-google-button"
           />
         </AppCard>
 
@@ -461,6 +535,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingTop:
       spacing.lg,
+  },
+
+  googleButton: {
+    marginTop: spacing.md,
   },
 
   loginText: {

@@ -1,5 +1,6 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useEffect } from "react";
 import { ActivityIndicator, Image, StyleSheet, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -7,6 +8,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider } from "../context/AuthContext";
 import { ThemeProvider } from "../context/ThemeContext";
 import { useTheme } from "../hooks/useTheme";
+import { configureGoogleSignIn } from "../lib/googleAuth";
 
 function AppShell() {
   const { theme, themeName, ready } = useTheme();
@@ -95,6 +97,10 @@ function AppShell() {
 }
 
 export default function RootLayout() {
+  useEffect(() => {
+    configureGoogleSignIn();
+  }, []);
+
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>

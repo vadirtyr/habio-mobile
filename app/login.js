@@ -21,6 +21,7 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../hooks/useTheme";
 
 import { api } from "../lib/api";
+import { signInWithGoogle } from "../lib/googleAuth";
 
 import {
   radii,
@@ -37,6 +38,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
 
   async function finishLogin(data, fallbackEmail) {
     if (!data?.token) {
@@ -73,10 +75,26 @@ export default function LoginScreen() {
   }
 
   async function handleGoogleLogin() {
-    Alert.alert(
-      "Google Login Disabled",
-      "Google Sign-In is temporarily disabled while testing in Expo Go."
-    );
+    if (submitting || googleSubmitting) return;
+
+    setGoogleSubmitting(true);
+
+    try {
+      const result = await signInWithGoogle();
+
+      if (result.cancelled) {
+        return;
+      }
+
+      await finishLogin(result.data);
+    } catch (error) {
+      Alert.alert(
+        "Google sign-in failed",
+        error?.message || "Unable to sign in with Google."
+      );
+    } finally {
+      setGoogleSubmitting(false);
+    }
   }
 
   async function handleLogin() {
@@ -250,15 +268,21 @@ export default function LoginScreen() {
           <AppButton
             title={submitting ? "Logging in..." : "Log in"}
             onPress={handleLogin}
-            disabled={submitting}
+            disabled={submitting || googleSubmitting}
             style={styles.button}
+            testID="login-submit-button"
           />
 
           <AppButton
-            title="Continue with Google"
+            title={
+              googleSubmitting
+                ? "Connecting to Google..."
+                : "Continue with Google"
+            }
             onPress={handleGoogleLogin}
-            disabled={submitting}
+            disabled={submitting || googleSubmitting}
             style={styles.googleButton}
+            testID="login-google-button"
           />
         </AppCard>
 
