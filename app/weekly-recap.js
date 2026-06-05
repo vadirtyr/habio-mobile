@@ -61,10 +61,17 @@ export default function WeeklyRecapScreen() {
   }, [])
 );
 
-  async function refresh() {
-    setRefreshing(true);
-    await loadRecaps();
-  }
+    async function refresh() {
+        setRefreshing(true);
+
+        try {
+            await api.generateWeeklyRecap();
+        } catch (error) {
+          console.log(error);
+        }
+
+        await loadRecaps();
+    }
 
   return (
     <View style={[styles.screen, { backgroundColor: c.background }]}>

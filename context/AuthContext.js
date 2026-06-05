@@ -1,8 +1,8 @@
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { createContext, useContext, useEffect, useState } from "react";
-
 import { googleSignOut } from "../lib/googleAuth";
+import { registerForPushNotifications } from "../lib/pushNotifications";
 
 const AuthContext = createContext(null);
 
@@ -16,11 +16,13 @@ export function AuthProvider({ children }) {
         const storedToken = await SecureStore.getItemAsync("token");
 
         if (storedToken) {
-          global.token = storedToken;
-          setToken(storedToken);
-        } else {
-          global.token = null;
-          setToken(null);
+            global.token = storedToken;
+            setToken(storedToken);
+
+            registerForPushNotifications().catch(console.log);
+            } else {
+            global.token = null;
+            setToken(null);
         }
       } catch (error) {
         console.log("Failed to load auth token:", error);
@@ -37,8 +39,10 @@ export function AuthProvider({ children }) {
   async function login(newToken) {
     try {
       await SecureStore.setItemAsync("token", newToken);
-      global.token = newToken;
-      setToken(newToken);
+        global.token = newToken;
+        setToken(newToken);
+
+    registerForPushNotifications().catch(console.log);
     } catch (error) {
       console.log("Failed to save auth token:", error);
       throw error;
