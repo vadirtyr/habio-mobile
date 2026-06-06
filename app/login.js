@@ -23,12 +23,7 @@ import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
 import { signInWithGoogle } from "../lib/googleAuth";
 
-import {
-  radii,
-  shadows,
-  spacing,
-  typography,
-} from "../lib/theme";
+import { radii, shadows, spacing, typography } from "../lib/theme";
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -45,33 +40,23 @@ export default function LoginScreen() {
       throw new Error("Invalid login response.");
     }
 
-    await login(data.token);
+    const userFromAuth = await login(data.token);
+    const user = userFromAuth || data?.user || null;
 
     const cleanEmail =
+      user?.email?.trim()?.toLowerCase() ||
       data?.user?.email?.trim()?.toLowerCase() ||
       fallbackEmail?.trim()?.toLowerCase();
 
     if (cleanEmail) {
-      await SecureStore.setItemAsync(
-        "currentUserEmail",
-        cleanEmail
-      );
-
-      const onboardingKey = `onboarding_${cleanEmail.replace(
-        /[^a-zA-Z0-9]/g,
-        "_"
-      )}`;
-
-      const hasCompletedOnboarding =
-        await SecureStore.getItemAsync(onboardingKey);
-
-      if (!hasCompletedOnboarding) {
-        router.replace("/onboarding");
-        return;
-      }
+      await SecureStore.setItemAsync("currentUserEmail", cleanEmail);
     }
 
-    router.replace("/(tabs)/dashboard");
+    if (user?.onboarding_completed) {
+      router.replace("/(tabs)/dashboard");
+    } else {
+      router.replace("/onboarding");
+    }
   }
 
   async function handleGoogleLogin() {
@@ -101,10 +86,7 @@ export default function LoginScreen() {
     const cleanEmail = email.trim().toLowerCase();
 
     if (!cleanEmail || !password.trim()) {
-      Alert.alert(
-        "Missing fields",
-        "Please enter your email and password."
-      );
+      Alert.alert("Missing fields", "Please enter your email and password.");
       return;
     }
 
@@ -120,10 +102,7 @@ export default function LoginScreen() {
 
       await finishLogin(data, cleanEmail);
     } catch (error) {
-      Alert.alert(
-        "Login failed",
-        error?.message || "Unable to log in."
-      );
+      Alert.alert("Login failed", error?.message || "Unable to log in.");
     } finally {
       setSubmitting(false);
     }
@@ -131,12 +110,7 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={[
-        styles.screen,
-        {
-          backgroundColor: c.background,
-        },
-      ]}
+      style={[styles.screen, { backgroundColor: c.background }]}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <View
@@ -208,16 +182,7 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.field}>
-            <Text
-              style={[
-                styles.label,
-                {
-                  color: c.text,
-                },
-              ]}
-            >
-              Email
-            </Text>
+            <Text style={[styles.label, { color: c.text }]}>Email</Text>
 
             <AppInput
               value={email}
@@ -230,16 +195,7 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.field}>
-            <Text
-              style={[
-                styles.label,
-                {
-                  color: c.text,
-                },
-              ]}
-            >
-              Password
-            </Text>
+            <Text style={[styles.label, { color: c.text }]}>Password</Text>
 
             <AppInput
               value={password}
@@ -253,14 +209,7 @@ export default function LoginScreen() {
             onPress={() => router.push("/forgot-password")}
             style={styles.forgotButton}
           >
-            <Text
-              style={[
-                styles.forgotText,
-                {
-                  color: c.primary,
-                },
-              ]}
-            >
+            <Text style={[styles.forgotText, { color: c.primary }]}>
               Forgot password?
             </Text>
           </Pressable>

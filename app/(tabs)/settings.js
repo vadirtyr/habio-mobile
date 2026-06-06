@@ -2,7 +2,6 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import * as Haptics from "expo-haptics";
 import { router, useFocusEffect } from "expo-router";
-import * as SecureStore from "expo-secure-store";
 import { useCallback, useState } from "react";
 import {
   Alert,
@@ -94,19 +93,6 @@ export default function SettingsScreen() {
           onPress: async () => {
             try {
               await resetAccountData();
-
-              const currentEmail =
-                await SecureStore.getItemAsync("currentUserEmail");
-
-              if (currentEmail) {
-                const onboardingKey = `onboarding_${currentEmail.replace(
-                  /[^a-zA-Z0-9]/g,
-                  "_"
-                )}`;
-
-                await SecureStore.deleteItemAsync(onboardingKey);
-              }
-
               Alert.alert(
                 "Data Reset",
                 "Your app data has been reset.",

@@ -69,32 +69,25 @@ export default function RegisterScreen() {
         throw new Error("Invalid Google response.");
       }
 
-      await login(data.token);
 
-      const cleanEmail =
+     const user = await login(data.token);
+
+     const cleanEmail =
+        user?.email?.trim()?.toLowerCase() ||
         data?.user?.email?.trim()?.toLowerCase();
 
-      if (cleanEmail) {
+    if (cleanEmail) {
         await SecureStore.setItemAsync(
           "currentUserEmail",
           cleanEmail
         );
-
-        const onboardingKey = `onboarding_${cleanEmail.replace(
-          /[^a-zA-Z0-9]/g,
-          "_"
-        )}`;
-
-        const hasCompletedOnboarding =
-          await SecureStore.getItemAsync(onboardingKey);
-
-        if (!hasCompletedOnboarding) {
-          router.replace("/onboarding");
-          return;
-        }
       }
 
-      router.replace("/(tabs)/dashboard");
+    if (user?.onboarding_completed) {
+        router.replace("/(tabs)/dashboard");
+    } else {
+        router.replace("/onboarding");
+    }
     } catch (error) {
       Alert.alert(
         "Google sign-in failed",
@@ -106,72 +99,51 @@ export default function RegisterScreen() {
   }
 
   async function handleRegister() {
-    const cleanEmail =
-      email.trim().toLowerCase();
+  const cleanEmail = email.trim().toLowerCase();
 
-    if (
-      !cleanEmail ||
-      !password.trim() ||
-      !confirmPassword.trim()
-    ) {
-      Alert.alert(
-        "Missing fields",
-        "Please enter your email and password."
-      );
-
-      return;
-    }
-
-    if (password.length < 8) {
-      Alert.alert(
-        "Password too short",
-        "Use at least 8 characters."
-      );
-
-      return;
-    }
-
-    if (
-      password !==
-      confirmPassword
-    ) {
-      Alert.alert(
-        "Passwords do not match",
-        "Please try again."
-      );
-
-      return;
-    }
-
-    if (submitting) return;
-
-    setSubmitting(true);
-
-    try {
-      await api.post(
-        "/auth/register",
-        {
-          email: cleanEmail,
-          password,
-        }
-      );
-
-      Alert.alert(
-        "Account created",
-        "Your account was created. Please log in to start onboarding."
-      );
-
-      router.replace("/login");
-    } catch (error) {
-      Alert.alert(
-        "Registration failed",
-        error?.message ||
-          "Unable to create account."
-      );
-    } finally {
-      setSubmitting(false);
-    }
+  if (!cleanEmail || !password.trim() || !confirmPassword.trim()) {
+    Alert.alert("Missing fields", "Please enter your email and password.");
+    return;
   }
+
+  if (password.length < 8) {
+    Alert.alert("Password too short", "Use at least 8 characters.");
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    Alert.alert("Passwords do not match", "Please try again.");
+    return;
+  }
+
+  if (submitting) return;
+
+  setSubmitting(true);
+
+  try {
+    const data = await api.post("/auth/register", {
+      email: cleanEmail,
+      password,
+    });
+
+    if (!data?.token) {
+      throw new Error("Account created, but login token was missing.");
+    }
+
+    await login(data.token);
+
+    await SecureStore.setItemAsync("currentUserEmail", cleanEmail);
+
+    router.replace("/onboarding");
+  } catch (error) {
+    Alert.alert(
+      "Registration failed",
+      error?.message || "Unable to create account."
+    );
+  } finally {
+    setSubmitting(false);
+  }
+}
 
   return (
     <KeyboardAvoidingView
