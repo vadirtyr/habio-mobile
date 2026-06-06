@@ -30,7 +30,7 @@ export default function MoreScreen() {
           icon="account-group-outline"
           label="Friend Feed"
           description="See progress from people in your orbit."
-          onPress={() => router.push("/social-feed")}
+          onPress={() => router.push("/activity-feed")}
         />
 
         <MoreRow

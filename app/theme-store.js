@@ -81,43 +81,8 @@ export default function ThemeStoreScreen() {
   const [unlockTarget, setUnlockTarget] = useState(null);
   const [purchasing, setPurchasing] = useState(false);
   const [equippedMessage, setEquippedMessage] = useState(null);
-if (loadingBalance || syncing) {
-  return (
-    <View
-      style={[
-        styles.screen,
-        {
-          backgroundColor: c.background,
-        },
-      ]}
-    >
-      <View style={styles.container}>
-        <ScreenHeader
-          title="Theme Store"
-          subtitle="Loading your orbit themes..."
-        />
-
-        <AnimatedScreen delay={40}>
-          <SkeletonCard lines={2} />
-        </AnimatedScreen>
-
-        <AnimatedScreen delay={80}>
-          <SkeletonCard />
-        </AnimatedScreen>
-
-        <AnimatedScreen delay={120}>
-          <SkeletonCard />
-        </AnimatedScreen>
-
-        <AnimatedScreen delay={160}>
-          <SkeletonCard compact />
-        </AnimatedScreen>
-      </View>
-    </View>
-  );
-}
   const sections = useMemo(() => {
-    const entries = Object.entries(themes);
+    const entries = Object.entries(themes || {});
 
     return [
       {
@@ -144,31 +109,37 @@ if (loadingBalance || syncing) {
   }, [themes]);
 
   useEffect(() => {
-    if (unlockedThemesNow?.length > 0) {
-      const firstUnlocked = unlockedThemesNow[0];
-      const unlockedTheme = themes[firstUnlocked];
+  if (unlockedThemesNow?.length > 0) {
+    const firstUnlocked = unlockedThemesNow[0];
+    const unlockedTheme = themes?.[firstUnlocked];
 
-      if (unlockedTheme) {
-        setUnlockTarget({
-          key: firstUnlocked,
-          theme: unlockedTheme,
-        });
-      }
-    }
-  }, [unlockedThemesNow, themes]);
-
-  async function loadBalance() {
-    if (!token) return;
-
-    try {
-      const data = await api.get("/stats", token);
-      setCoinBalance(data.coin_balance || 0);
-    } catch (error) {
-      console.warn("Failed to load coin balance:", error.message || error);
-    } finally {
-      setLoadingBalance(false);
+    if (unlockedTheme) {
+      setUnlockTarget({
+        key: firstUnlocked,
+        theme: unlockedTheme,
+      });
     }
   }
+}, [unlockedThemesNow, themes]);
+
+  async function loadBalance() {
+  setLoadingBalance(true);
+
+  if (!token) {
+    setCoinBalance(0);
+    setLoadingBalance(false);
+    return;
+  }
+
+  try {
+    const data = await api.get("/stats");
+    setCoinBalance(data.coin_balance || data.coins || 0);
+  } catch (error) {
+    console.warn("Failed to load coin balance:", error.message || error);
+  } finally {
+    setLoadingBalance(false);
+  }
+}
 
   useFocusEffect(
     useCallback(() => {
@@ -185,8 +156,16 @@ if (loadingBalance || syncing) {
   }
 
   async function handleThemePress(key) {
-    const selectedTheme = themes[key];
-    const owned = ownedThemes.includes(key);
+    const selectedTheme = themes?.[key];
+
+        if (!selectedTheme) {
+        return;
+        }
+        
+    const owned =
+        Array.isArray(ownedThemes) &&
+        ownedThemes.includes(key);
+
     const selected = themeName === key;
 
     if (selected) return;
@@ -263,6 +242,42 @@ if (loadingBalance || syncing) {
     setUnlockTarget(null);
     clearUnlockedThemesNow();
   }
+
+  if (loadingBalance || syncing) {
+  return (
+    <View
+      style={[
+        styles.screen,
+        {
+          backgroundColor: c.background,
+        },
+      ]}
+    >
+      <View style={styles.container}>
+        <ScreenHeader
+          title="Theme Store"
+          subtitle="Loading your orbit themes..."
+        />
+
+        <AnimatedScreen delay={40}>
+          <SkeletonCard lines={2} />
+        </AnimatedScreen>
+
+        <AnimatedScreen delay={80}>
+          <SkeletonCard />
+        </AnimatedScreen>
+
+        <AnimatedScreen delay={120}>
+          <SkeletonCard />
+        </AnimatedScreen>
+
+        <AnimatedScreen delay={160}>
+          <SkeletonCard compact />
+        </AnimatedScreen>
+      </View>
+    </View>
+  );
+}
 
   return (
     <View style={[styles.screen, { backgroundColor: c.background }]}>
@@ -368,7 +383,9 @@ if (loadingBalance || syncing) {
 
             {section.data.map(([key, item]) => {
               const selected = themeName === key;
-              const owned = ownedThemes.includes(key);
+              const owned =
+                Array.isArray(ownedThemes) &&
+                ownedThemes.includes(key);
               const included = item.type === "included";
               const achievement = item.type === "achievement";
               const level = item.type === "level";
