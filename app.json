@@ -20,6 +20,7 @@
     "android": {
       "package": "com.OurOrbit.app",
       "versionCode": 5,
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundColor": "#020817"
