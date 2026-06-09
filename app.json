@@ -61,6 +61,12 @@
         "projectId": "23f8fca0-1753-4299-99a0-214d5ca2b1ac"
       }
     },
-    "owner": "habiolabs"
+    "owner": "habiolabs",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/23f8fca0-1753-4299-99a0-214d5ca2b1ac"
+    }
   }
 }

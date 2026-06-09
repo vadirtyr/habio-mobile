@@ -27,7 +27,7 @@ export default function WeeklyRecapScreen() {
 
   async function loadRecaps() {
     try {
-      const data = await api.get("/weekly-recaps");
+      const data = await api.getWeeklyRecaps();
       const items = data.items || [];
 
       setRecaps(items);

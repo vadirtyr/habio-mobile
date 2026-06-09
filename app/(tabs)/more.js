@@ -60,11 +60,18 @@ export default function MoreScreen() {
         />
 
         <MoreRow
-          icon="trophy-outline"
-          label="Achievements"
-          description="View the milestones you’ve unlocked."
-          onPress={() => router.push("/achievements")}
-          last
+            icon="trophy-outline"
+            label="Achievements"
+            description="View the milestones you’ve unlocked."
+            onPress={() => router.push("/achievements")}
+        />
+
+        <MoreRow
+            icon="chart-line"
+            label="Weekly Recap"
+            description="See how your orbit grew this week."
+            onPress={() => router.push("/weekly-recap")}
+            last
         />
       </AppCard>
 
