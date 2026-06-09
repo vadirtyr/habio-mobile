@@ -16,7 +16,6 @@ import { AnimatedPressable } from "../components/AnimatedPressable";
 import { AppButton } from "../components/AppButton";
 import { AppCard } from "../components/AppCard";
 import { ScreenHeader } from "../components/ScreenHeader";
-import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
 import { radii, spacing, typography } from "../lib/theme";
@@ -76,7 +75,6 @@ const MAINTENANCE_PRESETS = [
 ];
 
 export default function CreateHabitScreen() {
-  const { token } = useAuth();
   const { theme } = useTheme();
   const c = theme.colors;
 
@@ -86,6 +84,8 @@ export default function CreateHabitScreen() {
   const [icon, setIcon] = useState("fire");
   const [habitType, setHabitType] = useState("standard");
   const [submitting, setSubmitting] = useState(false);
+  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [reminderTime, setReminderTime] = useState("20:00");
 
   function chooseHabitType(typeId) {
     setHabitType(typeId);
@@ -131,8 +131,17 @@ export default function CreateHabitScreen() {
             habitType === "maintenance"
               ? "maintenance"
               : "custom",
+              reminder_enabled:
+                habitType === "maintenance"
+                ? reminderEnabled
+                : false,
+
+              reminder_time:
+                  habitType === "maintenance" &&
+                  reminderEnabled
+                  ? reminderTime
+                  : null,
         },
-        token
       );
 
       router.replace("/(tabs)/habits");
@@ -291,6 +300,56 @@ export default function CreateHabitScreen() {
                   1 coin.
                 </Text>
               </View>
+              <View
+  style={[
+    styles.reminderCard,
+    {
+      borderColor: c.border,
+      backgroundColor: c.surfaceAlt,
+    },
+  ]}
+>
+  <Text style={[styles.label, { color: c.text }]}>
+    Daily Reminder
+  </Text>
+
+  <AnimatedPressable
+    style={[
+      styles.option,
+      {
+        borderColor: reminderEnabled
+          ? (c.cyan || c.primary)
+          : c.border,
+        backgroundColor: reminderEnabled
+          ? `${c.cyan || c.primary}12`
+          : c.surfaceAlt,
+      },
+    ]}
+    onPress={() =>
+      setReminderEnabled((current) => !current)
+    }
+  >
+    <Text style={{ color: c.text }}>
+      {reminderEnabled ? "Enabled" : "Disabled"}
+    </Text>
+  </AnimatedPressable>
+
+  {reminderEnabled && (
+    <TextInput
+      value={reminderTime}
+      onChangeText={setReminderTime}
+      placeholder="20:00"
+      style={[
+        styles.input,
+        {
+          borderColor: c.border,
+          backgroundColor: c.surfaceAlt,
+          color: c.text,
+        },
+      ]}
+    />
+  )}
+</View>
             </>
           ) : null}
 
@@ -557,4 +616,11 @@ const styles = StyleSheet.create({
   cancelButton: {
     marginTop: spacing.md,
   },
+  reminderCard: {
+  marginTop: spacing.md,
+  borderWidth: 1,
+  borderRadius: radii.lg,
+  padding: spacing.md,
+  gap: spacing.sm,
+},
 });
