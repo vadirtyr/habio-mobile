@@ -216,9 +216,9 @@ export default function OnboardingScreen() {
         }
       }
 
-      const onboardingKey = await getOnboardingKey();
-
-      await SecureStore.setItemAsync(onboardingKey, "true");
+      if (token) {
+        await api.post("/onboarding/complete");
+        }
 
       await Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Success

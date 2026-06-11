@@ -26,26 +26,10 @@ import {
 } from "../lib/theme";
 
 const COIN_OPTIONS = [
-  {
-    label: "Low",
-    value: 5,
-    description: "Small daily effort",
-  },
-  {
-    label: "Medium",
-    value: 10,
-    description: "Balanced routine",
-  },
-  {
-    label: "High",
-    value: 20,
-    description: "Focused challenge",
-  },
-  {
-    label: "Life Changing",
-    value: 50,
-    description: "Major commitment",
-  },
+  { label: "Low", value: 5, description: "Small daily effort" },
+  { label: "Medium", value: 10, description: "Balanced routine" },
+  { label: "High", value: 20, description: "Focused challenge" },
+  { label: "Life Changing", value: 50, description: "Major commitment" },
 ];
 
 function getDifficultyForCoins(coins) {
@@ -59,10 +43,7 @@ function getInitialCoins(params, isMaintenance) {
 
   const custom = Number(params.custom_coins);
 
-  if ([5, 10, 20, 50].includes(custom)) {
-    return custom;
-  }
-
+  if ([5, 10, 20, 50].includes(custom)) return custom;
   if (params.difficulty === "easy") return 5;
   if (params.difficulty === "hard") return 20;
 
@@ -82,6 +63,12 @@ export default function EditHabitScreen() {
   const [selectedCoins, setSelectedCoins] = useState(
     getInitialCoins(params, isMaintenance)
   );
+  const [reminderEnabled, setReminderEnabled] = useState(
+    params.reminder_enabled === "true" || params.reminder_enabled === true
+  );
+  const [reminderTime, setReminderTime] = useState(
+    params.reminder_time || "20:00"
+  );
   const [submitting, setSubmitting] = useState(false);
 
   async function updateHabit() {
@@ -99,19 +86,18 @@ export default function EditHabitScreen() {
     try {
       const coins = isMaintenance ? 1 : selectedCoins;
 
-      await api.put(
-        `/habits/${params.id}`,
-        {
-          name: name.trim(),
-          description: description.trim(),
-          frequency: params.frequency || "daily",
-          difficulty: isMaintenance ? "easy" : getDifficultyForCoins(coins),
-          custom_coins: coins,
-          icon: params.icon || (isMaintenance ? "pill" : "fire"),
-          category: isMaintenance ? "maintenance" : params.category || "custom",
-        },
-        token
-      );
+      await api.put(`/habits/${params.id}`, {
+        name: name.trim(),
+        description: description.trim(),
+        frequency: params.frequency || "daily",
+        difficulty: isMaintenance ? "easy" : getDifficultyForCoins(coins),
+        custom_coins: coins,
+        icon: params.icon || (isMaintenance ? "pill" : "fire"),
+        category: isMaintenance ? "maintenance" : params.category || "custom",
+        reminder_enabled: isMaintenance ? reminderEnabled : false,
+        reminder_time:
+          isMaintenance && reminderEnabled ? reminderTime : null,
+      });
 
       router.replace("/(tabs)/habits");
     } catch (error) {
@@ -128,12 +114,7 @@ export default function EditHabitScreen() {
 
   return (
     <ScrollView
-      style={[
-        styles.screen,
-        {
-          backgroundColor: c.background,
-        },
-      ]}
+      style={[styles.screen, { backgroundColor: c.background }]}
       contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
@@ -178,15 +159,57 @@ export default function EditHabitScreen() {
           </View>
         ) : null}
 
-        <View style={styles.section}>
-          <Text
+        {isMaintenance ? (
+          <View
             style={[
-              styles.label,
+              styles.reminderCard,
               {
-                color: c.text,
+                borderColor: c.border,
+                backgroundColor: c.surfaceAlt,
               },
             ]}
           >
+            <Text style={[styles.label, { color: c.text }]}>
+              Daily Reminder
+            </Text>
+
+            <Pressable
+              onPress={() =>
+                setReminderEnabled((current) => !current)
+              }
+              style={[
+                styles.reminderToggle,
+                {
+                  borderColor: reminderEnabled
+                    ? c.cyan || c.primary
+                    : c.border,
+                  backgroundColor: reminderEnabled
+                    ? `${c.cyan || c.primary}12`
+                    : c.surface,
+                },
+              ]}
+            >
+              <Text style={[styles.reminderToggleText, { color: c.text }]}>
+                {reminderEnabled ? "Enabled" : "Disabled"}
+              </Text>
+            </Pressable>
+
+            {reminderEnabled ? (
+              <AppInput
+                placeholder="20:00"
+                value={reminderTime}
+                onChangeText={setReminderTime}
+              />
+            ) : null}
+
+            <Text style={[styles.reminderHelp, { color: c.textSecondary }]}>
+              Use 24-hour time for now, like 08:00 or 20:00.
+            </Text>
+          </View>
+        ) : null}
+
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: c.text }]}>
             Habit name
           </Text>
 
@@ -198,14 +221,7 @@ export default function EditHabitScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text
-            style={[
-              styles.label,
-              {
-                color: c.text,
-              },
-            ]}
-          >
+          <Text style={[styles.label, { color: c.text }]}>
             Description
           </Text>
 
@@ -219,14 +235,7 @@ export default function EditHabitScreen() {
 
         {!isMaintenance ? (
           <View style={styles.section}>
-            <Text
-              style={[
-                styles.label,
-                {
-                  color: c.text,
-                },
-              ]}
-            >
+            <Text style={[styles.label, { color: c.text }]}>
               Coin value
             </Text>
 
@@ -261,40 +270,27 @@ export default function EditHabitScreen() {
                     <View
                       style={[
                         styles.coinDot,
-                        {
-                          backgroundColor: accent,
-                        },
+                        { backgroundColor: accent },
                       ]}
                     />
 
                     <Text
                       style={[
                         styles.coinLabel,
-                        {
-                          color: active ? accent : c.text,
-                        },
+                        { color: active ? accent : c.text },
                       ]}
                     >
                       {option.label}
                     </Text>
 
-                    <Text
-                      style={[
-                        styles.coinValue,
-                        {
-                          color: c.text,
-                        },
-                      ]}
-                    >
+                    <Text style={[styles.coinValue, { color: c.text }]}>
                       {option.value} coins
                     </Text>
 
                     <Text
                       style={[
                         styles.coinDescription,
-                        {
-                          color: c.textSecondary,
-                        },
+                        { color: c.textSecondary },
                       ]}
                     >
                       {option.description}
@@ -318,9 +314,7 @@ export default function EditHabitScreen() {
           <View
             style={[
               styles.previewGlow,
-              {
-                backgroundColor: `${c.cyan || c.primary}14`,
-              },
+              { backgroundColor: `${c.cyan || c.primary}14` },
             ]}
           />
 
@@ -346,23 +340,14 @@ export default function EditHabitScreen() {
             </View>
 
             <View style={styles.previewText}>
-              <Text
-                style={[
-                  styles.previewTitle,
-                  {
-                    color: c.text,
-                  },
-                ]}
-              >
+              <Text style={[styles.previewTitle, { color: c.text }]}>
                 {name.trim() || "Your habit"}
               </Text>
 
               <Text
                 style={[
                   styles.previewSubtitle,
-                  {
-                    color: c.textSecondary,
-                  },
+                  { color: c.textSecondary },
                 ]}
               >
                 {params.frequency || "daily"} • {previewDifficulty} •{" "}
@@ -377,9 +362,7 @@ export default function EditHabitScreen() {
             <Text
               style={[
                 styles.previewHint,
-                {
-                  color: c.textSecondary,
-                },
+                { color: c.textSecondary },
               ]}
             >
               {isMaintenance
@@ -404,9 +387,7 @@ export default function EditHabitScreen() {
         <Text
           style={[
             styles.cancelText,
-            {
-              color: c.textMuted || c.muted,
-            },
+            { color: c.textMuted || c.muted },
           ]}
         >
           Cancel
@@ -448,6 +429,30 @@ const styles = StyleSheet.create({
     ...typography.caption,
     marginTop: spacing.xs,
     lineHeight: 18,
+  },
+
+  reminderCard: {
+    borderWidth: 1,
+    borderRadius: radii.xl,
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+
+  reminderToggle: {
+    borderWidth: 1,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+  },
+
+  reminderToggleText: {
+    ...typography.bodyBold,
+  },
+
+  reminderHelp: {
+    ...typography.caption,
+    marginTop: spacing.sm,
   },
 
   section: {

@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import { useState } from "react";
 import {
     Alert,
@@ -16,9 +17,11 @@ import { AppCard } from "../components/AppCard";
 import { AppInput } from "../components/AppInput";
 import { BrandHeader } from "../components/BrandMark";
 
+import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../hooks/useTheme";
 
 import { api } from "../lib/api";
+import { signInWithGoogle } from "../lib/googleAuth";
 
 import {
     radii,
@@ -27,6 +30,7 @@ import {
 } from "../lib/theme";
 
 export default function RegisterScreen() {
+  const { login } = useAuth();
   const { theme } = useTheme();
   const c = theme.colors;
 
@@ -44,73 +48,102 @@ export default function RegisterScreen() {
   const [submitting, setSubmitting] =
     useState(false);
 
-  async function handleRegister() {
-    const cleanEmail =
-      email.trim().toLowerCase();
+  const [googleSubmitting, setGoogleSubmitting] =
+    useState(false);
 
-    if (
-      !cleanEmail ||
-      !password.trim() ||
-      !confirmPassword.trim()
-    ) {
-      Alert.alert(
-        "Missing fields",
-        "Please enter your email and password."
-      );
+  async function handleGoogleRegister() {
+    if (submitting || googleSubmitting) return;
 
-      return;
-    }
-
-    if (password.length < 8) {
-      Alert.alert(
-        "Password too short",
-        "Use at least 8 characters."
-      );
-
-      return;
-    }
-
-    if (
-      password !==
-      confirmPassword
-    ) {
-      Alert.alert(
-        "Passwords do not match",
-        "Please try again."
-      );
-
-      return;
-    }
-
-    if (submitting) return;
-
-    setSubmitting(true);
+    setGoogleSubmitting(true);
 
     try {
-      await api.post(
-        "/auth/register",
-        {
-          email: cleanEmail,
-          password,
-        }
-      );
+      const result = await signInWithGoogle();
 
-      Alert.alert(
-        "Account created",
-        "Your account was created. Please log in to start onboarding."
-      );
+      if (result.cancelled) {
+        return;
+      }
 
-      router.replace("/login");
+      const data = result.data;
+
+      if (!data?.token) {
+        throw new Error("Invalid Google response.");
+      }
+
+
+     const user = await login(data.token);
+
+     const cleanEmail =
+        user?.email?.trim()?.toLowerCase() ||
+        data?.user?.email?.trim()?.toLowerCase();
+
+    if (cleanEmail) {
+        await SecureStore.setItemAsync(
+          "currentUserEmail",
+          cleanEmail
+        );
+      }
+
+    if (user?.onboarding_completed) {
+        router.replace("/(tabs)/dashboard");
+    } else {
+        router.replace("/onboarding");
+    }
     } catch (error) {
       Alert.alert(
-        "Registration failed",
-        error?.message ||
-          "Unable to create account."
+        "Google sign-in failed",
+        error?.message || "Unable to sign in with Google."
       );
     } finally {
-      setSubmitting(false);
+      setGoogleSubmitting(false);
     }
   }
+
+  async function handleRegister() {
+  const cleanEmail = email.trim().toLowerCase();
+
+  if (!cleanEmail || !password.trim() || !confirmPassword.trim()) {
+    Alert.alert("Missing fields", "Please enter your email and password.");
+    return;
+  }
+
+  if (password.length < 8) {
+    Alert.alert("Password too short", "Use at least 8 characters.");
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    Alert.alert("Passwords do not match", "Please try again.");
+    return;
+  }
+
+  if (submitting) return;
+
+  setSubmitting(true);
+
+  try {
+    const data = await api.post("/auth/register", {
+      email: cleanEmail,
+      password,
+    });
+
+    if (!data?.token) {
+      throw new Error("Account created, but login token was missing.");
+    }
+
+    await login(data.token);
+
+    await SecureStore.setItemAsync("currentUserEmail", cleanEmail);
+
+    router.replace("/onboarding");
+  } catch (error) {
+    Alert.alert(
+      "Registration failed",
+      error?.message || "Unable to create account."
+    );
+  } finally {
+    setSubmitting(false);
+  }
+}
 
   return (
     <KeyboardAvoidingView
@@ -316,8 +349,21 @@ export default function RegisterScreen() {
               handleRegister
             }
             disabled={
-              submitting
+              submitting || googleSubmitting
             }
+            testID="register-submit-button"
+          />
+
+          <AppButton
+            title={
+              googleSubmitting
+                ? "Connecting to Google..."
+                : "Continue with Google"
+            }
+            onPress={handleGoogleRegister}
+            disabled={submitting || googleSubmitting}
+            style={styles.googleButton}
+            testID="register-google-button"
           />
         </AppCard>
 
@@ -461,6 +507,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingTop:
       spacing.lg,
+  },
+
+  googleButton: {
+    marginTop: spacing.md,
   },
 
   loginText: {

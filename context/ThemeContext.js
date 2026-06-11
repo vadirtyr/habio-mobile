@@ -10,6 +10,14 @@ export const ThemeContext = createContext(null);
 const THEME_KEY = "OurOrbit_theme";
 const DEFAULT_OWNED_THEMES = ["light", "dark", "nature", "focus"];
 
+function normalizeOwnedThemes(value) {
+  const owned = Array.isArray(value) ? value : DEFAULT_OWNED_THEMES;
+
+  return Array.from(
+    new Set([...DEFAULT_OWNED_THEMES, ...owned])
+  ).filter((themeId) => themes[themeId]);
+}
+
 export function ThemeProvider({ children }) {
   const { token } = useAuth();
 
@@ -38,25 +46,33 @@ export function ThemeProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function syncThemeFromBackend() {
-      if (!token) return;
+      if (!token) {
+        setSyncing(false);
+        setOwnedThemes(DEFAULT_OWNED_THEMES);
+        return;
+      }
 
       setSyncing(true);
 
       try {
-        const data = await api.get("/themes/me", token);
+        const data = await api.get("/themes/me");
 
-        const backendOwned = Array.isArray(data.owned_themes)
-          ? data.owned_themes
-          : DEFAULT_OWNED_THEMES;
+        if (cancelled) return;
+
+        const backendOwned = normalizeOwnedThemes(data?.owned_themes);
 
         const backendSelected =
-          data.selected_theme && themes[data.selected_theme]
+          data?.selected_theme &&
+          themes[data.selected_theme] &&
+          backendOwned.includes(data.selected_theme)
             ? data.selected_theme
             : DEFAULT_THEME;
 
-        const backendUnlockedNow = Array.isArray(data.unlocked_now)
-          ? data.unlocked_now
+        const backendUnlockedNow = Array.isArray(data?.unlocked_now)
+          ? data.unlocked_now.filter((themeId) => themes[themeId])
           : [];
 
         setOwnedThemes(backendOwned);
@@ -67,11 +83,17 @@ export function ThemeProvider({ children }) {
       } catch (error) {
         console.warn("Failed to sync themes:", error.message || error);
       } finally {
-        setSyncing(false);
+        if (!cancelled) {
+          setSyncing(false);
+        }
       }
     }
 
     syncThemeFromBackend();
+
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   const setThemeName = async (nextThemeName) => {
@@ -80,7 +102,9 @@ export function ThemeProvider({ children }) {
       return;
     }
 
-    if (!ownedThemes.includes(nextThemeName)) {
+    const safeOwnedThemes = normalizeOwnedThemes(ownedThemes);
+
+    if (!safeOwnedThemes.includes(nextThemeName)) {
       console.warn(`Theme not owned: ${nextThemeName}`);
       return;
     }
@@ -91,7 +115,9 @@ export function ThemeProvider({ children }) {
       await SecureStore.setItemAsync(THEME_KEY, nextThemeName);
 
       if (token) {
-        await api.post("/themes/select", { theme_id: nextThemeName }, token);
+        await api.post("/themes/select", {
+          theme_id: nextThemeName,
+        });
       }
     } catch (error) {
       console.warn("Failed to save selected theme:", error.message || error);
@@ -107,23 +133,32 @@ export function ThemeProvider({ children }) {
       throw new Error("Theme not found.");
     }
 
-    if (ownedThemes.includes(themeId)) {
+    const safeOwnedThemes = normalizeOwnedThemes(ownedThemes);
+
+    if (safeOwnedThemes.includes(themeId)) {
       return {
         ok: true,
         alreadyOwned: true,
-        owned_themes: ownedThemes,
+        owned_themes: safeOwnedThemes,
       };
     }
 
-    const data = await api.post("/themes/purchase", { theme_id: themeId }, token);
+    const data = await api.post("/themes/purchase", {
+      theme_id: themeId,
+    });
 
-    const updatedOwned = Array.isArray(data.owned_themes)
-      ? data.owned_themes
-      : [...ownedThemes, themeId];
+    const updatedOwned = normalizeOwnedThemes(
+      Array.isArray(data?.owned_themes)
+        ? data.owned_themes
+        : [...safeOwnedThemes, themeId]
+    );
 
     setOwnedThemes(updatedOwned);
 
-    return data;
+    return {
+      ...data,
+      owned_themes: updatedOwned,
+    };
   };
 
   const clearUnlockedThemesNow = () => {
@@ -139,14 +174,14 @@ export function ThemeProvider({ children }) {
       themeName,
       theme,
       themes,
-      ownedThemes,
+      ownedThemes: normalizeOwnedThemes(ownedThemes),
       unlockedThemesNow,
       clearUnlockedThemesNow,
       setThemeName,
       purchaseTheme,
       isDark: themeName === "dark",
     }),
-    [ready, syncing, themeName, ownedThemes, unlockedThemesNow]
+    [ready, syncing, themeName, theme, ownedThemes, unlockedThemesNow]
   );
 
   return (

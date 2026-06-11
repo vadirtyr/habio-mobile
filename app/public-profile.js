@@ -45,10 +45,12 @@ export default function PublicProfileScreen() {
       setProfile(data);
       setMe(myProfile);
 
-      setFollowing(
-        Array.isArray(myProfile?.following) &&
-          myProfile.following.includes(data.id)
-      );
+      const followingData = await api.get(`/users/${myProfile.id}/following`);
+
+    setFollowing(
+        Array.isArray(followingData?.following) &&
+        followingData.following.some((item) => item.id === data.id)
+    );
     } catch (error) {
       Alert.alert("Profile error", error.message);
     } finally {

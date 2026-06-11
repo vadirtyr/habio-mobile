@@ -1,6 +1,7 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
+    ActivityIndicator,
     Alert,
     FlatList,
     RefreshControl,
@@ -90,9 +91,9 @@ export default function NotificationsScreen() {
         </Text>
 
         <Text style={styles.date}>
-          {new Date(
-            item.created_at
-          ).toLocaleString()}
+         {item.created_at
+            ? new Date(item.created_at).toLocaleString()
+            : ""}
         </Text>
 
         {!item.read && (
@@ -109,6 +110,13 @@ export default function NotificationsScreen() {
     );
   }
 
+  if (loading) {
+    return (
+        <View style={styles.container}>
+            <ActivityIndicator />
+        </View>
+    );
+  }
   return (
     <View style={styles.container}>
       <Text style={styles.title}>

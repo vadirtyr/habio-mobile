@@ -27,7 +27,7 @@ export default function WeeklyRecapScreen() {
 
   async function loadRecaps() {
     try {
-      const data = await api.get("/weekly-recaps");
+      const data = await api.getWeeklyRecaps();
       const items = data.items || [];
 
       setRecaps(items);
@@ -61,10 +61,17 @@ export default function WeeklyRecapScreen() {
   }, [])
 );
 
-  async function refresh() {
-    setRefreshing(true);
-    await loadRecaps();
-  }
+    async function refresh() {
+        setRefreshing(true);
+
+        try {
+            await api.generateWeeklyRecap();
+        } catch (error) {
+          console.log(error);
+        }
+
+        await loadRecaps();
+    }
 
   return (
     <View style={[styles.screen, { backgroundColor: c.background }]}>
