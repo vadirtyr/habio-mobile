@@ -51,7 +51,11 @@ export default function PublicActivityScreen() {
           icon: "check-circle",
           title: `Completed ${item.habit_name || "a habit"}`,
         };
-
+      case "streak_milestone":
+       return {
+        icon: "zap",
+        title: `${item.habit_name || "Habit"} reached a ${item.streak}-day streak`,
+        };
       case "task_complete":
         return {
           icon: "check-square",
