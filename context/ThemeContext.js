@@ -5,6 +5,22 @@ import { api } from "../lib/api";
 import { DEFAULT_THEME, themes } from "../lib/theme/themes";
 import { useAuth } from "./AuthContext";
 
+/**
+ * @typedef {Object} ThemeContextValue
+ * @property {boolean} ready
+ * @property {boolean} syncing
+ * @property {string} themeName
+ * @property {(typeof themes)[keyof typeof themes]} theme
+ * @property {typeof themes} themes
+ * @property {string[]} ownedThemes
+ * @property {string[]} unlockedThemesNow
+ * @property {() => void} clearUnlockedThemesNow
+ * @property {(themeName: string) => Promise<void>} setThemeName
+ * @property {(themeId: string) => Promise<any>} purchaseTheme
+ * @property {boolean} isDark
+ */
+
+/** @type {React.Context<ThemeContextValue | null>} */
 export const ThemeContext = createContext(null);
 
 const THEME_KEY = "OurOrbit_theme";

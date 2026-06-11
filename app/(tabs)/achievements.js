@@ -3,6 +3,9 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
   Text,
   View
 } from "react-native";
@@ -19,6 +22,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../hooks/useTheme";
 
 import { api } from "../../lib/api";
+import { radii, spacing, typography } from "../../lib/theme";
 
 
 const CATEGORY_ORDER = [
@@ -809,3 +813,310 @@ function AchievementCard({
     </AppCard>
   );
 }
+
+function MetaPill({ icon, text, highlight = false, color = null }) {
+  const { theme } = useTheme();
+  const c = theme.colors;
+  const pillColor = color || c.textMuted || c.muted;
+
+  return (
+    <View
+      style={[
+        styles.metaPill,
+        {
+          backgroundColor: highlight ? `${pillColor}12` : c.surfaceAlt,
+          borderColor: highlight ? pillColor : c.border,
+        },
+      ]}
+    >
+      <Feather
+        name={icon}
+        size={13}
+        color={highlight ? pillColor : c.textMuted || c.muted}
+      />
+      <Text
+        style={[
+          styles.metaText,
+          { color: highlight ? pillColor : c.textSecondary },
+        ]}
+      >
+        {text}
+      </Text>
+    </View>
+  );
+}
+
+function AchievementCelebrationModal({ visible, achievement, onClose }) {
+  const { theme } = useTheme();
+  const c = theme.colors;
+
+  if (!achievement) return null;
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View
+          style={[
+            styles.modalCard,
+            { backgroundColor: c.surface, borderColor: c.success },
+          ]}
+        >
+          <View
+            style={[
+              styles.modalGlow,
+              { backgroundColor: `${c.success}14` },
+            ]}
+          />
+          <View style={[styles.modalIcon, { backgroundColor: c.success }]}>
+            <Feather name="award" size={38} color="#FFFFFF" />
+          </View>
+          <Text style={[styles.modalEyebrow, { color: c.success }]}>
+            Achievement Unlocked
+          </Text>
+          <Text style={[styles.modalTitle, { color: c.text }]}>
+            {achievement.name}
+          </Text>
+          <Text style={[styles.modalText, { color: c.textSecondary }]}>
+            {achievement.description || "Your momentum just reached a new milestone."}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onClose}
+            style={[styles.modalButton, { backgroundColor: c.primary }]}
+          >
+            <Text style={[styles.modalButtonText, { color: c.primaryText }]}>Continue</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function AnimatedCard({ children, index = 0 }) {
+  return <AnimatedScreen delay={index * 55}>{children}</AnimatedScreen>;
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xl,
+  },
+  listContent: {
+    paddingBottom: 120,
+  },
+  summaryCard: {
+    overflow: "hidden",
+    marginBottom: spacing.lg,
+  },
+  summaryGlowGold: {
+    position: "absolute",
+    width: 220,
+    height: 220,
+    borderRadius: radii.pill,
+    top: -135,
+    right: -90,
+  },
+  summaryGlowCyan: {
+    position: "absolute",
+    width: 170,
+    height: 170,
+    borderRadius: radii.pill,
+    bottom: -110,
+    left: -75,
+  },
+  summaryTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.lg,
+  },
+  summaryCopy: {
+    flex: 1,
+  },
+  summaryLabel: {
+    ...typography.caption,
+    textTransform: "uppercase",
+  },
+  summaryValue: {
+    ...typography.hero,
+    marginTop: spacing.xs,
+  },
+  summarySub: {
+    ...typography.bodyBold,
+    marginTop: spacing.xs,
+  },
+  summaryIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  progressBar: {
+    marginTop: spacing.lg,
+  },
+  emptyCard: {
+    marginTop: spacing.md,
+  },
+  categoryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  categoryIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: radii.pill,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  categoryTitle: {
+    ...typography.h3,
+  },
+  categoryLine: {
+    flex: 1,
+    height: 1,
+  },
+  card: {
+    overflow: "hidden",
+    marginBottom: spacing.md,
+  },
+  cardGlow: {
+    position: "absolute",
+    width: 150,
+    height: 150,
+    borderRadius: radii.pill,
+    top: -95,
+    right: -55,
+  },
+  cardTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.md,
+  },
+  iconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cardText: {
+    flex: 1,
+  },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  name: {
+    ...typography.h3,
+    flexShrink: 1,
+  },
+  newBadge: {
+    borderWidth: 1,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
+  newBadgeText: {
+    ...typography.micro,
+    color: "#FFFFFF",
+    textTransform: "uppercase",
+  },
+  description: {
+    ...typography.body,
+    marginTop: spacing.xs,
+  },
+  progressSection: {
+    marginTop: spacing.lg,
+  },
+  progressTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: spacing.sm,
+  },
+  progressLabel: {
+    ...typography.caption,
+  },
+  metaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  metaPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    borderWidth: 1,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+  },
+  metaText: {
+    ...typography.micro,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(2, 8, 23, 0.72)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.xl,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 420,
+    borderWidth: 1,
+    borderRadius: radii.xl,
+    padding: spacing.xl,
+    alignItems: "center",
+    overflow: "hidden",
+  },
+  modalGlow: {
+    position: "absolute",
+    width: 220,
+    height: 220,
+    borderRadius: radii.pill,
+    top: -145,
+    right: -85,
+  },
+  modalIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: radii.pill,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalEyebrow: {
+    ...typography.caption,
+    textTransform: "uppercase",
+    marginTop: spacing.lg,
+  },
+  modalTitle: {
+    ...typography.h2,
+    textAlign: "center",
+    marginTop: spacing.xs,
+  },
+  modalText: {
+    ...typography.body,
+    textAlign: "center",
+    marginTop: spacing.sm,
+  },
+  modalButton: {
+    alignSelf: "stretch",
+    alignItems: "center",
+    borderRadius: radii.lg,
+    paddingVertical: spacing.md,
+    marginTop: spacing.xl,
+  },
+  modalButtonText: {
+    ...typography.button,
+  },
+});
