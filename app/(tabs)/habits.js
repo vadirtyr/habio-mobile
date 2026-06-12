@@ -441,6 +441,8 @@ export default function HabitsScreen() {
                         custom_coins: item.custom_coins || "",
                         icon: item.icon || "fire",
                         category: item.category || "custom",
+                        reminder_enabled: item.reminder_enabled ? "true" : "false",
+                        reminder_time: item.reminder_time || "",
                       },
                     })
                   }

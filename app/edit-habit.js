@@ -17,6 +17,7 @@ import { ScreenHeader } from "../components/ScreenHeader";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
+import { normalizeReminderTime } from "../lib/reminders";
 
 import {
   radii,
@@ -79,6 +80,13 @@ export default function EditHabitScreen() {
       return;
     }
 
+    const cleanReminderTime = normalizeReminderTime(reminderTime);
+
+    if (reminderEnabled && !cleanReminderTime) {
+      Alert.alert("Invalid reminder time", "Enter a 24-hour time like 08:00 or 20:00.");
+      return;
+    }
+
     if (submitting) return;
 
     setSubmitting(true);
@@ -94,9 +102,9 @@ export default function EditHabitScreen() {
         custom_coins: coins,
         icon: params.icon || (isMaintenance ? "pill" : "fire"),
         category: isMaintenance ? "maintenance" : params.category || "custom",
-        reminder_enabled: isMaintenance ? reminderEnabled : false,
+        reminder_enabled: reminderEnabled,
         reminder_time:
-          isMaintenance && reminderEnabled ? reminderTime : null,
+          reminderEnabled ? cleanReminderTime : null,
       });
 
       router.replace("/(tabs)/habits");
@@ -159,8 +167,7 @@ export default function EditHabitScreen() {
           </View>
         ) : null}
 
-        {isMaintenance ? (
-          <View
+        <View
             style={[
               styles.reminderCard,
               {
@@ -199,14 +206,15 @@ export default function EditHabitScreen() {
                 placeholder="20:00"
                 value={reminderTime}
                 onChangeText={setReminderTime}
+                keyboardType="numbers-and-punctuation"
+                maxLength={5}
               />
             ) : null}
 
             <Text style={[styles.reminderHelp, { color: c.textSecondary }]}>
               Use 24-hour time for now, like 08:00 or 20:00.
             </Text>
-          </View>
-        ) : null}
+        </View>
 
         <View style={styles.section}>
           <Text style={[styles.label, { color: c.text }]}>

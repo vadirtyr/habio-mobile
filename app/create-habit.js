@@ -18,6 +18,7 @@ import { AppCard } from "../components/AppCard";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
+import { normalizeReminderTime } from "../lib/reminders";
 import { radii, spacing, typography } from "../lib/theme";
 
 const HABIT_TYPES = [
@@ -107,9 +108,15 @@ export default function CreateHabitScreen() {
   async function handleCreate() {
     const cleanName = name.trim();
     const cleanDescription = description.trim();
+    const cleanReminderTime = normalizeReminderTime(reminderTime);
 
     if (!cleanName) {
       Alert.alert("Missing name", "Give this habit a name.");
+      return;
+    }
+
+    if (reminderEnabled && !cleanReminderTime) {
+      Alert.alert("Invalid reminder time", "Enter a 24-hour time like 08:00 or 20:00.");
       return;
     }
 
@@ -131,16 +138,9 @@ export default function CreateHabitScreen() {
             habitType === "maintenance"
               ? "maintenance"
               : "custom",
-              reminder_enabled:
-                habitType === "maintenance"
-                ? reminderEnabled
-                : false,
-
-              reminder_time:
-                  habitType === "maintenance" &&
-                  reminderEnabled
-                  ? reminderTime
-                  : null,
+          reminder_enabled: reminderEnabled,
+          reminder_time:
+            reminderEnabled ? cleanReminderTime : null,
         },
       );
 
@@ -300,58 +300,60 @@ export default function CreateHabitScreen() {
                   1 coin.
                 </Text>
               </View>
-              <View
-  style={[
-    styles.reminderCard,
-    {
-      borderColor: c.border,
-      backgroundColor: c.surfaceAlt,
-    },
-  ]}
->
-  <Text style={[styles.label, { color: c.text }]}>
-    Daily Reminder
-  </Text>
-
-  <AnimatedPressable
-    style={[
-      styles.option,
-      {
-        borderColor: reminderEnabled
-          ? (c.cyan || c.primary)
-          : c.border,
-        backgroundColor: reminderEnabled
-          ? `${c.cyan || c.primary}12`
-          : c.surfaceAlt,
-      },
-    ]}
-    onPress={() =>
-      setReminderEnabled((current) => !current)
-    }
-  >
-    <Text style={{ color: c.text }}>
-      {reminderEnabled ? "Enabled" : "Disabled"}
-    </Text>
-  </AnimatedPressable>
-
-  {reminderEnabled && (
-    <TextInput
-      value={reminderTime}
-      onChangeText={setReminderTime}
-      placeholder="20:00"
-      style={[
-        styles.input,
-        {
-          borderColor: c.border,
-          backgroundColor: c.surfaceAlt,
-          color: c.text,
-        },
-      ]}
-    />
-  )}
-</View>
             </>
           ) : null}
+
+          <View
+            style={[
+              styles.reminderCard,
+              {
+                borderColor: c.border,
+                backgroundColor: c.surfaceAlt,
+              },
+            ]}
+          >
+            <Text style={[styles.label, { color: c.text }]}>Daily Reminder</Text>
+
+            <AnimatedPressable
+              style={[
+                styles.option,
+                {
+                  borderColor: reminderEnabled ? c.cyan || c.primary : c.border,
+                  backgroundColor: reminderEnabled
+                    ? `${c.cyan || c.primary}12`
+                    : c.surfaceAlt,
+                },
+              ]}
+              onPress={() => setReminderEnabled((current) => !current)}
+            >
+              <Text style={{ color: c.text }}>
+                {reminderEnabled ? "Enabled" : "Disabled"}
+              </Text>
+            </AnimatedPressable>
+
+            {reminderEnabled ? (
+              <TextInput
+                value={reminderTime}
+                onChangeText={setReminderTime}
+                placeholder="20:00"
+                keyboardType="numbers-and-punctuation"
+                maxLength={5}
+                style={[
+                  styles.input,
+                  {
+                    borderColor: c.border,
+                    backgroundColor: c.surfaceAlt,
+                    color: c.text,
+                  },
+                ]}
+              />
+            ) : null}
+
+            <Text style={[styles.reminderHelp, { color: c.textSecondary }]}>
+              Use 24-hour time, like 08:00 or 20:00. Reminders protect an active
+              streak when the habit is still incomplete.
+            </Text>
+          </View>
 
           <Text style={[styles.label, { color: c.textSecondary }]}>
             Description
@@ -617,10 +619,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   reminderCard: {
-  marginTop: spacing.md,
-  borderWidth: 1,
-  borderRadius: radii.lg,
-  padding: spacing.md,
-  gap: spacing.sm,
-},
+    marginTop: spacing.md,
+    borderWidth: 1,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  reminderHelp: {
+    ...typography.caption,
+    lineHeight: 18,
+  },
 });

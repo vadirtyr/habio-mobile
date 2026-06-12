@@ -1,4 +1,5 @@
-import { Stack } from "expo-router";
+import * as Notifications from "expo-notifications";
+import { router, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { ActivityIndicator, Image, StyleSheet, Text, View } from "react-native";
@@ -99,6 +100,29 @@ function AppShell() {
 export default function RootLayout() {
   useEffect(() => {
     configureGoogleSignIn();
+
+    function handleNotificationResponse(response: Notifications.NotificationResponse) {
+      const data = response.notification.request.content.data;
+
+      if (data?.type === "streak_reminder") {
+        router.push("/(tabs)/habits");
+        return;
+      }
+
+      router.push("/notifications");
+    }
+
+    const subscription = Notifications.addNotificationResponseReceivedListener(
+      handleNotificationResponse
+    );
+
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) {
+        handleNotificationResponse(response);
+      }
+    });
+
+    return () => subscription.remove();
   }, []);
 
   return (
