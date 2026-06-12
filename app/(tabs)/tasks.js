@@ -20,13 +20,14 @@ import { AvatarUnlockModal } from "../../components/AvatarUnlockModal";
 import { BrandHeader } from "../../components/BrandMark";
 import { EmptyState } from "../../components/EmptyState";
 import { ErrorState } from "../../components/ErrorState";
-import { LevelUpModal } from "../../components/LevelUpModal";
+import { MilestoneCelebrationModal } from "../../components/MilestoneCelebrationModal";
 import { OrbitProgressBar } from "../../components/OrbitProgressBar";
 import { SectionTitle } from "../../components/SectionTitle";
 import { SkeletonCard } from "../../components/SkeletonCard";
 import { XPGainToast } from "../../components/XPGainToast";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../hooks/useTheme";
+import { useCelebrationQueue } from "../../hooks/useCelebrationQueue";
 import { api } from "../../lib/api";
 import { radii, spacing, typography } from "../../lib/theme";
 
@@ -42,12 +43,18 @@ export default function TasksScreen() {
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
   const [completionCelebration, setCompletionCelebration] = useState(null);
-  const [levelUp, setLevelUp] = useState(null);
   const [xpToast, setXpToast] = useState(0);
   const [avatarUnlock, setAvatarUnlock] = useState(null);
 
   const firstBalanceLoad = useRef(true);
   const coinScale = useSharedValue(1);
+  const {
+    activeCelebration,
+    celebrationCount,
+    enqueueCelebrations,
+    loadPendingCelebrations,
+    dismissCelebration,
+  } = useCelebrationQueue();
 
   const coinAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: coinScale.value }],
@@ -124,19 +131,15 @@ export default function TasksScreen() {
 
     try {
       const data = await api.post(`/tasks/${taskId}/complete`, {}, token);
+      const hasMilestone = (data?.celebrations?.length || 0) > 0;
+
+      enqueueCelebrations(data?.celebrations || []);
       if (data?.new_avatars?.length > 0) {
       const avatar = data.new_avatars[0];
 
       
      setAvatarUnlock(avatar);
     }
-
-      if (data.leveled_up) {
-        setLevelUp({
-          oldLevel: data.old_level,
-          newLevel: data.new_level,
-        });
-      }
 
       setXpToast(data.xp_earned || 0);
       setTimeout(() => setXpToast(0), 900);
@@ -148,13 +151,15 @@ export default function TasksScreen() {
       setBalance(data.new_balance);
       setMessage(`+${data.coins_earned} coins • +${data.xp_earned || 0} XP`);
 
-      setCompletionCelebration({
-        taskName: task.name,
-        coins: data.coins_earned,
-        newBalance: data.new_balance,
-        nextTaskCreated: !!data.next_task_id,
-        newAchievements: data.new_achievements || [],
-      });
+      if (!hasMilestone) {
+        setCompletionCelebration({
+          taskName: task.name,
+          coins: data.coins_earned,
+          newBalance: data.new_balance,
+          nextTaskCreated: !!data.next_task_id,
+          newAchievements: data.new_achievements || [],
+        });
+      }
 
       setTimeout(() => setMessage(null), 2200);
       setTimeout(() => setCompletionCelebration(null), 2600);
@@ -230,7 +235,9 @@ export default function TasksScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      if (!token) return;
       fetchTasks();
+      loadPendingCelebrations();
     }, [token])
   );
 
@@ -275,16 +282,15 @@ export default function TasksScreen() {
     <View style={[styles.container, { backgroundColor: c.background }]}>
       <TaskCompletionCelebration data={completionCelebration} />
 
-      <LevelUpModal
-        visible={!!levelUp}
-        oldLevel={levelUp?.oldLevel}
-        newLevel={levelUp?.newLevel}
-        onClose={() => setLevelUp(null)}
+      <MilestoneCelebrationModal
+        celebration={activeCelebration}
+        remaining={celebrationCount}
+        onDismiss={dismissCelebration}
       />
 
       <XPGainToast xp={xpToast} />
       <AvatarUnlockModal
-      visible={!!avatarUnlock}
+      visible={!!avatarUnlock && !activeCelebration}
       avatar={avatarUnlock}
       onClose={() => setAvatarUnlock(null)}
       />

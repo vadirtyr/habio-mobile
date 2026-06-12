@@ -20,13 +20,14 @@ import { AvatarUnlockModal } from "../../components/AvatarUnlockModal";
 import { BrandHeader } from "../../components/BrandMark";
 import { EmptyState } from "../../components/EmptyState";
 import { ErrorState } from "../../components/ErrorState";
-import { LevelUpModal } from "../../components/LevelUpModal";
+import { MilestoneCelebrationModal } from "../../components/MilestoneCelebrationModal";
 import { OrbitProgressBar } from "../../components/OrbitProgressBar";
 import { SectionTitle } from "../../components/SectionTitle";
 import { SkeletonCard } from "../../components/SkeletonCard";
 import { XPGainToast } from "../../components/XPGainToast";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../hooks/useTheme";
+import { useCelebrationQueue } from "../../hooks/useCelebrationQueue";
 import { api } from "../../lib/api";
 import { radii, spacing, typography } from "../../lib/theme";
 
@@ -42,12 +43,18 @@ export default function HabitsScreen() {
   const [message, setMessage] = useState(null);
   const [balance, setBalance] = useState(0);
   const [streakCelebration, setStreakCelebration] = useState(null);
-  const [levelUp, setLevelUp] = useState(null);
   const [xpToast, setXpToast] = useState(0);
   const [avatarUnlock, setAvatarUnlock] = useState(null);
 
   const firstBalanceLoad = useRef(true);
   const coinScale = useSharedValue(1);
+  const {
+    activeCelebration,
+    celebrationCount,
+    enqueueCelebrations,
+    loadPendingCelebrations,
+    dismissCelebration,
+  } = useCelebrationQueue();
 
   const coinAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: coinScale.value }],
@@ -126,16 +133,12 @@ export default function HabitsScreen() {
 
     try {
       const data = await api.post(`/habits/${habitId}/complete`, {}, token);
+      const hasMilestone = (data?.celebrations?.length || 0) > 0;
+
+      enqueueCelebrations(data?.celebrations || []);
 
       if (data?.new_avatars?.length > 0) {
         setAvatarUnlock(data.new_avatars[0]);
-      }
-
-      if (data.leveled_up) {
-        setLevelUp({
-          oldLevel: data.old_level,
-          newLevel: data.new_level,
-        });
       }
 
       setXpToast(data.xp_earned || 0);
@@ -157,7 +160,7 @@ export default function HabitsScreen() {
 
       setBalance(data.new_balance);
 
-      if (bonus > 0) {
+      if (bonus > 0 && !hasMilestone) {
         setStreakCelebration({
           habitName: habit.name,
           streak: data.streak,
@@ -213,7 +216,9 @@ export default function HabitsScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      if (!token) return;
       fetchHabits();
+      loadPendingCelebrations();
     }, [token])
   );
 
@@ -258,17 +263,16 @@ export default function HabitsScreen() {
     <View style={[styles.container, { backgroundColor: c.background }]}>
       <StreakCelebration data={streakCelebration} />
 
-      <LevelUpModal
-        visible={!!levelUp}
-        oldLevel={levelUp?.oldLevel}
-        newLevel={levelUp?.newLevel}
-        onClose={() => setLevelUp(null)}
+      <MilestoneCelebrationModal
+        celebration={activeCelebration}
+        remaining={celebrationCount}
+        onDismiss={dismissCelebration}
       />
 
       <XPGainToast xp={xpToast} />
 
       <AvatarUnlockModal
-        visible={!!avatarUnlock}
+        visible={!!avatarUnlock && !activeCelebration}
         avatar={avatarUnlock}
         onClose={() => setAvatarUnlock(null)}
       />
