@@ -27,6 +27,13 @@ export default function MoreScreen() {
 
       <AppCard>
         <MoreRow
+          icon="account-group"
+          label="Shared Orbits"
+          description="Build momentum with a small accountability group."
+          onPress={() => router.push("/orbits")}
+        />
+
+        <MoreRow
           icon="account-group-outline"
           label="Friend Feed"
           description="See progress from people in your orbit."

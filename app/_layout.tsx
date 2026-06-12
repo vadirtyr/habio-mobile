@@ -90,6 +90,11 @@ function AppShell() {
         <Stack.Screen name="change-password" />
         <Stack.Screen name="delete-account" />
         <Stack.Screen name="privacy" />
+        <Stack.Screen name="orbits" />
+        <Stack.Screen name="create-orbit" />
+        <Stack.Screen name="orbit-detail" />
+        <Stack.Screen name="orbit-members" />
+        <Stack.Screen name="create-orbit-goal" />
 
         <Stack.Screen name="(tabs)" />
       </Stack>
@@ -111,6 +116,11 @@ export default function RootLayout() {
 
       if (data?.type === "weekly_recap") {
         router.push("/weekly-recap");
+        return;
+      }
+
+      if (data?.type === "orbit_invite") {
+        router.push("/orbits");
         return;
       }
 

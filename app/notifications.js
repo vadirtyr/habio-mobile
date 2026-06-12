@@ -80,6 +80,11 @@ export default function NotificationsScreen() {
 
     if (notification.type === "weekly_recap") {
       router.push("/weekly-recap");
+      return;
+    }
+
+    if (notification.type === "orbit_invite") {
+      router.push("/orbits");
     }
   }
 
