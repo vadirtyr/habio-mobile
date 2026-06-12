@@ -1,9 +1,10 @@
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
     FlatList,
+    Pressable,
     RefreshControl,
     StyleSheet,
     Text,
@@ -72,6 +73,16 @@ export default function NotificationsScreen() {
     }
   }
 
+  async function openNotification(notification) {
+    if (!notification.read) {
+      await markRead(notification.id);
+    }
+
+    if (notification.type === "weekly_recap") {
+      router.push("/weekly-recap");
+    }
+  }
+
   useFocusEffect(
     useCallback(() => {
       loadNotifications();
@@ -80,7 +91,8 @@ export default function NotificationsScreen() {
 
   function renderItem({ item }) {
     return (
-      <View
+      <Pressable
+        onPress={() => openNotification(item)}
         style={[
           styles.card,
           !item.read && styles.unreadCard,
@@ -99,14 +111,15 @@ export default function NotificationsScreen() {
         {!item.read && (
           <Text
             style={styles.markRead}
-            onPress={() =>
-              markRead(item.id)
-            }
+            onPress={(event) => {
+              event.stopPropagation();
+              markRead(item.id);
+            }}
           >
             Mark Read
           </Text>
         )}
-      </View>
+      </Pressable>
     );
   }
 

@@ -109,6 +109,11 @@ export default function RootLayout() {
         return;
       }
 
+      if (data?.type === "weekly_recap") {
+        router.push("/weekly-recap");
+        return;
+      }
+
       router.push("/notifications");
     }
 

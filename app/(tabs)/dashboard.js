@@ -117,12 +117,6 @@ export default function DashboardScreen() {
         api.get("/quests"),
       ]);
 
-
-      try {
-      await api.generateWeeklyRecap();
-      } catch (error) {
-        // recap already exists for this week
-      }
       await loadNotificationCount();
 
       const failed =

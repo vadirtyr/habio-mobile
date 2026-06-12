@@ -44,31 +44,14 @@ export default function WeeklyRecapScreen() {
   }
 
   
-   useFocusEffect(
-  useCallback(() => {
-    async function load() {
-      try {
-        await api.generateWeeklyRecap();
-      } catch (error) {
-        // ignore duplicate recap errors
-        console.log(error);
-      }
-
-      await loadRecaps();
-    }
-
-    load();
-  }, [])
-);
+  useFocusEffect(
+    useCallback(() => {
+      loadRecaps();
+    }, [])
+  );
 
     async function refresh() {
         setRefreshing(true);
-
-        try {
-            await api.generateWeeklyRecap();
-        } catch (error) {
-          console.log(error);
-        }
 
         await loadRecaps();
     }
@@ -231,7 +214,7 @@ export default function WeeklyRecapScreen() {
           <AppCard>
             <EmptyState
               title="No weekly recap yet."
-              description="Generate your first recap to see this week's progress."
+              description="Your first recap will appear after the week ends."
               icon={
                 <MaterialCommunityIcons
                   name="chart-timeline-variant"
