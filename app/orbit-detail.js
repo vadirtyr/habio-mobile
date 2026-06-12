@@ -65,11 +65,9 @@ export default function OrbitDetailScreen() {
   const { orbit, stats, members = [], recent_activity: recentActivity = [] } = dashboard;
   const level = orbit.level || 1;
   const xp = orbit.xp || 0;
-  const levelStartXp = ((level - 1) ** 2) * 100;
-  const nextLevelXp = (level ** 2) * 100;
-  const xpPercent = Math.round(
-    ((xp - levelStartXp) / Math.max(1, nextLevelXp - levelStartXp)) * 100
-  );
+  const xpProgress = orbit.xp_progress || 0;
+  const xpNeeded = orbit.xp_needed_for_next_level || 100;
+  const xpPercent = orbit.xp_progress_percent || 0;
 
   return (
     <ScrollView style={[styles.screen, { backgroundColor: c.background }]} contentContainerStyle={styles.container}>
@@ -86,7 +84,7 @@ export default function OrbitDetailScreen() {
           <MaterialCommunityIcons name="orbit" size={44} color={c.primary} />
         </View>
         <OrbitProgressBar percent={xpPercent} style={styles.progressBar} glow />
-        <Text style={[styles.time, { color: c.textMuted }]}>{Math.max(0, xp - levelStartXp)} / {nextLevelXp - levelStartXp} XP to next level</Text>
+        <Text style={[styles.time, { color: c.textMuted }]}>{xpProgress} / {xpNeeded} XP to next level</Text>
       </AppCard>
 
       <View style={styles.actions}>
