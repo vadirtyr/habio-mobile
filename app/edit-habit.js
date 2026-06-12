@@ -14,6 +14,11 @@ import { AppButton } from "../components/AppButton";
 import { AppCard } from "../components/AppCard";
 import { AppInput } from "../components/AppInput";
 import { ScreenHeader } from "../components/ScreenHeader";
+import {
+  RecurrenceFields,
+  recurrenceFromParams,
+  recurrencePayload,
+} from "../components/RecurrenceFields";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
@@ -70,6 +75,9 @@ export default function EditHabitScreen() {
   const [reminderTime, setReminderTime] = useState(
     params.reminder_time || "20:00"
   );
+  const [schedule, setSchedule] = useState(
+    recurrenceFromParams(params, "daily")
+  );
   const [submitting, setSubmitting] = useState(false);
 
   async function updateHabit() {
@@ -97,7 +105,8 @@ export default function EditHabitScreen() {
       await api.put(`/habits/${params.id}`, {
         name: name.trim(),
         description: description.trim(),
-        frequency: params.frequency || "daily",
+        frequency: schedule.recurrence_type,
+        ...recurrencePayload(schedule),
         difficulty: isMaintenance ? "easy" : getDifficultyForCoins(coins),
         custom_coins: coins,
         icon: params.icon || (isMaintenance ? "pill" : "fire"),
@@ -215,6 +224,8 @@ export default function EditHabitScreen() {
               Use 24-hour time for now, like 08:00 or 20:00.
             </Text>
         </View>
+
+        <RecurrenceFields value={schedule} onChange={setSchedule} />
 
         <View style={styles.section}>
           <Text style={[styles.label, { color: c.text }]}>
@@ -358,7 +369,7 @@ export default function EditHabitScreen() {
                   { color: c.textSecondary },
                 ]}
               >
-                {params.frequency || "daily"} • {previewDifficulty} •{" "}
+                {schedule.recurrence_type} • {previewDifficulty} •{" "}
                 {previewCoins} coin{previewCoins === 1 ? "" : "s"}
               </Text>
             </View>

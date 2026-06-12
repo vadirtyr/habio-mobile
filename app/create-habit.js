@@ -16,6 +16,7 @@ import { AnimatedPressable } from "../components/AnimatedPressable";
 import { AppButton } from "../components/AppButton";
 import { AppCard } from "../components/AppCard";
 import { ScreenHeader } from "../components/ScreenHeader";
+import { RecurrenceFields, recurrencePayload } from "../components/RecurrenceFields";
 import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
 import { normalizeReminderTime } from "../lib/reminders";
@@ -87,6 +88,15 @@ export default function CreateHabitScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderTime, setReminderTime] = useState("20:00");
+  const [schedule, setSchedule] = useState({
+    recurrence_type: "daily",
+    interval: "1",
+    days_of_week: [],
+    day_of_month: "",
+    annual_month: "",
+    annual_day: "",
+    show_days_before: 0,
+  });
 
   function chooseHabitType(typeId) {
     setHabitType(typeId);
@@ -130,7 +140,8 @@ export default function CreateHabitScreen() {
         {
           name: cleanName,
           description: cleanDescription,
-          frequency: "daily",
+          frequency: schedule.recurrence_type,
+          ...recurrencePayload(schedule),
           difficulty: habitType === "maintenance" ? "easy" : difficulty,
           custom_coins: habitType === "maintenance" ? 1 : null,
           icon,
@@ -379,9 +390,9 @@ export default function CreateHabitScreen() {
 
           {habitType === "standard" ? (
             <>
-              <Text style={[styles.label, { color: c.textSecondary }]}>
-                Difficulty
-              </Text>
+          <Text style={[styles.label, { color: c.textSecondary }]}>
+            Difficulty
+          </Text>
 
               <View style={styles.optionsRow}>
                 {DIFFICULTIES.map((item) => {
@@ -464,6 +475,8 @@ export default function CreateHabitScreen() {
               );
             })}
           </View>
+
+          <RecurrenceFields value={schedule} onChange={setSchedule} />
         </AppCard>
 
         <AppButton

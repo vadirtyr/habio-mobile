@@ -16,6 +16,11 @@ import { AppButton } from "../components/AppButton";
 import { AppCard } from "../components/AppCard";
 import { AppInput } from "../components/AppInput";
 import { ScreenHeader } from "../components/ScreenHeader";
+import {
+  RecurrenceFields,
+  recurrenceFromParams,
+  recurrencePayload,
+} from "../components/RecurrenceFields";
 
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../hooks/useTheme";
@@ -102,6 +107,9 @@ export default function EditTaskScreen() {
 
   const [showPicker, setShowPicker] =
     useState(false);
+  const [schedule, setSchedule] = useState(
+    recurrenceFromParams(params, "none")
+  );
 
   const [submitting, setSubmitting] =
     useState(false);
@@ -140,8 +148,12 @@ export default function EditTaskScreen() {
             ? formatDate(dueDate)
             : null,
 
-          recurrence:
-            params.recurrence || "none",
+          recurrence: schedule.recurrence_type,
+          ...recurrencePayload(schedule),
+          show_days_before:
+            schedule.recurrence_type === "none"
+              ? null
+              : recurrencePayload(schedule).show_days_before,
         },
         token
       );
@@ -449,6 +461,12 @@ export default function EditTaskScreen() {
             />
           )}
         </View>
+
+        <RecurrenceFields
+          value={schedule}
+          onChange={setSchedule}
+          allowNone
+        />
 
         <View
           style={[

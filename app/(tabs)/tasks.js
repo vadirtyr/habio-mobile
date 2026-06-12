@@ -467,7 +467,14 @@ export default function TasksScreen() {
                       difficulty: item.difficulty || "medium",
                       custom_coins: item.custom_coins || "",
                       due_date: item.due_date || "",
-                      recurrence: item.recurrence || "none",
+                        recurrence: item.recurrence || "none",
+                        recurrence_type: item.recurrence || "none",
+                        interval: String(item.interval || 1),
+                        days_of_week: JSON.stringify(item.days_of_week || []),
+                        day_of_month: String(item.day_of_month || ""),
+                        annual_month: String(item.annual_month || ""),
+                        annual_day: String(item.annual_day || ""),
+                        show_days_before: String(item.show_days_before || 0),
                     },
                   })
                 }

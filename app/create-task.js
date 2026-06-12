@@ -15,6 +15,7 @@ import { AnimatedPressable } from "../components/AnimatedPressable";
 import { AppButton } from "../components/AppButton";
 import { AppCard } from "../components/AppCard";
 import { ScreenHeader } from "../components/ScreenHeader";
+import { RecurrenceFields, recurrencePayload } from "../components/RecurrenceFields";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
@@ -26,12 +27,6 @@ const DIFFICULTIES = [
   { key: "hard", label: "Hard", coins: 20 },
 ];
 
-const RECURRENCES = [
-  { key: "none", label: "One-time" },
-  { key: "daily", label: "Daily" },
-  { key: "weekly", label: "Weekly" },
-];
-
 export default function CreateTaskScreen() {
   const { token } = useAuth();
   const { theme } = useTheme();
@@ -40,7 +35,15 @@ export default function CreateTaskScreen() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [difficulty, setDifficulty] = useState("medium");
-  const [recurrence, setRecurrence] = useState("none");
+  const [schedule, setSchedule] = useState({
+    recurrence_type: "none",
+    interval: "1",
+    days_of_week: [],
+    day_of_month: "",
+    annual_month: "",
+    annual_day: "",
+    show_days_before: 0,
+  });
   const [dueDate, setDueDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -65,7 +68,12 @@ export default function CreateTaskScreen() {
           name: cleanName,
           description: cleanDescription,
           difficulty,
-          recurrence,
+          recurrence: schedule.recurrence_type,
+          ...recurrencePayload(schedule),
+          show_days_before:
+            schedule.recurrence_type === "none"
+              ? null
+              : recurrencePayload(schedule).show_days_before,
           due_date: cleanDueDate || null,
         },
         token
@@ -147,14 +155,10 @@ export default function CreateTaskScreen() {
             showCoins
           />
 
-          <Text style={[styles.label, { color: c.textSecondary }]}>
-            Repeat
-          </Text>
-
-          <OptionRow
-            options={RECURRENCES}
-            value={recurrence}
-            onChange={setRecurrence}
+          <RecurrenceFields
+            value={schedule}
+            onChange={setSchedule}
+            allowNone
           />
 
           <Text style={[styles.label, { color: c.textSecondary }]}>
