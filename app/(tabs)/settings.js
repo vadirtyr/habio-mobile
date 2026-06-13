@@ -17,6 +17,7 @@ import { AppButton } from "../../components/AppButton";
 import { AppCard } from "../../components/AppCard";
 import { BrandHeader } from "../../components/BrandMark";
 import { SectionTitle } from "../../components/SectionTitle";
+import { UserAvatar } from "../../components/UserAvatar";
 
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../hooks/useTheme";
@@ -138,21 +139,7 @@ export default function SettingsScreen() {
         <AnimatedScreen delay={40}>
           <AppCard style={styles.profileSummaryCard}>
             <View style={styles.profileSummaryRow}>
-              <View
-                style={[
-                  styles.profileAvatar,
-                  {
-                    backgroundColor: `${c.cyan || c.primary}14`,
-                    borderColor: c.border,
-                  },
-                ]}
-              >
-                <MaterialCommunityIcons
-                  name={getAvatarIcon(profile)}
-                  size={34}
-                  color={c.cyan || c.primary}
-                />
-              </View>
+              <UserAvatar user={profile} size={58} icon={getAvatarIcon(profile)} color={c.cyan || c.primary} backgroundColor={`${c.cyan || c.primary}14`} borderColor={c.border} style={styles.profileAvatar} />
 
               <View style={styles.profileSummaryCopy}>
                 <Text style={[styles.profileLabel, { color: c.textSecondary }]}>

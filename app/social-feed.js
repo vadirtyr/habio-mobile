@@ -12,6 +12,7 @@ import {
 
 import { AppCard } from "../components/AppCard";
 import { ScreenHeader } from "../components/ScreenHeader";
+import { UserAvatar } from "../components/UserAvatar";
 import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
 import { radii, spacing, typography } from "../lib/theme";
@@ -250,6 +251,7 @@ export default function PublicActivityScreen() {
             return (
               <AppCard key={item.id || `${item.type}-${index}`}>
                 <View style={styles.row}>
+                  <UserAvatar user={item} size={40} icon="account-circle" color={c.primary} backgroundColor={`${c.primary}12`} />
                   <View
                     style={[
                       styles.iconWrap,
@@ -262,6 +264,7 @@ export default function PublicActivityScreen() {
                   </View>
 
                   <View style={styles.copy}>
+                    <Text style={[styles.date, { color: c.textSecondary }]}>{item.display_name || item.username || "OurOrbit member"}</Text>
                     <Text style={[styles.title, { color: c.text }]}>
                       {meta.title}
                     </Text>

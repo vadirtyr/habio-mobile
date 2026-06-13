@@ -24,6 +24,7 @@ import { EmptyState } from "../../components/EmptyState";
 import { ErrorState } from "../../components/ErrorState";
 import { SectionTitle } from "../../components/SectionTitle";
 import { SkeletonCard } from "../../components/SkeletonCard";
+import { UserAvatar } from "../../components/UserAvatar";
 
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../hooks/useTheme";
@@ -31,7 +32,7 @@ import { api } from "../../lib/api";
 import { radii, spacing, typography } from "../../lib/theme";
 
 export default function DashboardScreen() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { theme } = useTheme();
   const c = theme.colors;
 
@@ -211,6 +212,10 @@ export default function DashboardScreen() {
           />
         </View>
 
+        <View style={styles.headerActions}>
+        <Pressable onPress={() => router.push("/profile")} accessibilityLabel="Open profile">
+          <UserAvatar user={user} size={44} icon="account-circle" color={c.primary} backgroundColor={c.surfaceAlt} borderColor={c.border} />
+        </Pressable>
         <Pressable
           style={[
             styles.notificationButton,
@@ -235,6 +240,7 @@ export default function DashboardScreen() {
             </View>
           )}
         </Pressable>
+        </View>
       </View>
     );
   }
@@ -500,6 +506,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: spacing.md,
   },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
 
   headerContent: {
     flex: 1,

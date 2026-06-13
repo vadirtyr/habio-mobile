@@ -32,6 +32,7 @@ export default function LoginScreen() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
 
@@ -197,13 +198,28 @@ export default function LoginScreen() {
           <View style={styles.field}>
             <Text style={[styles.label, { color: c.text }]}>Password</Text>
 
-            <AppInput
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              placeholder="Password"
-            />
-          </View>
+              <AppInput
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                placeholder="Password"
+                autoCapitalize="none"
+                autoCorrect={false}
+                rightElement={
+                 <Pressable
+                    onPress={() => setShowPassword((prev) => !prev)}
+                    hitSlop={12}
+                    style={{ padding: 4 }}
+                  >
+              <MaterialCommunityIcons
+                  name={showPassword ? "eye-off-outline" : "eye-outline"}
+                  size={22}
+                  color={c.textMuted || c.muted}
+              />
+           </Pressable>
+          }
+         />
+      </View> 
 
           <Pressable
             onPress={() => router.push("/forgot-password")}

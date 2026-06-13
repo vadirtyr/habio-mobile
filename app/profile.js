@@ -15,6 +15,7 @@ import { AppCard } from "../components/AppCard";
 import { BrandHeader } from "../components/BrandMark";
 import { ErrorState } from "../components/ErrorState";
 import { SkeletonCard } from "../components/SkeletonCard";
+import { UserAvatar } from "../components/UserAvatar";
 
 import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
@@ -120,21 +121,7 @@ export default function ProfileScreen() {
           />
 
           <AppCard style={styles.heroCard}>
-            <View
-              style={[
-                styles.avatar,
-                {
-                  backgroundColor: `${c.cyan || c.primary}18`,
-                  borderColor: c.border,
-                },
-              ]}
-            >
-              <MaterialCommunityIcons
-                name={getAvatarIcon(profile)}
-                size={58}
-                color={c.cyan || c.primary}
-                />
-            </View>
+            <UserAvatar user={profile} size={96} icon={getAvatarIcon(profile)} color={c.cyan || c.primary} backgroundColor={`${c.cyan || c.primary}18`} borderColor={c.border} style={styles.avatar} />
 
             <Text style={[styles.displayName, { color: c.text }]}>
               {profile?.display_name || "Explorer"}

@@ -12,6 +12,7 @@ import {
 import { AppButton } from "../components/AppButton";
 import { AppCard } from "../components/AppCard";
 import { ScreenHeader } from "../components/ScreenHeader";
+import { UserAvatar } from "../components/UserAvatar";
 import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
 import { radii, spacing, typography } from "../lib/theme";
@@ -141,21 +142,7 @@ export default function PublicProfileScreen() {
       />
 
       <AppCard style={styles.heroCard}>
-        <View
-          style={[
-            styles.avatar,
-            {
-              backgroundColor: c.surfaceAlt,
-              borderColor: c.border,
-            },
-          ]}
-        >
-          <MaterialCommunityIcons
-            name={profile.avatar || "compass-outline"}
-            size={42}
-            color={c.primary}
-          />
-        </View>
+        <UserAvatar user={profile} size={76} icon="compass-outline" color={c.primary} backgroundColor={c.surfaceAlt} borderColor={c.border} style={styles.avatar} />
 
         <Text style={[styles.displayName, { color: c.text }]}>
           {profile.display_name || profile.username}

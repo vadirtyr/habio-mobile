@@ -12,6 +12,7 @@ import {
 
 import { AppCard } from "../components/AppCard";
 import { ScreenHeader } from "../components/ScreenHeader";
+import { UserAvatar } from "../components/UserAvatar";
 import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
 import { radii, spacing, typography } from "../lib/theme";
@@ -91,21 +92,7 @@ export default function FollowersScreen() {
           {followers.map((user) => (
             <Pressable key={user.id} onPress={() => openProfile(user)}>
               <AppCard style={styles.userCard}>
-                <View
-                  style={[
-                    styles.avatar,
-                    {
-                      backgroundColor: c.surfaceAlt,
-                      borderColor: c.border,
-                    },
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    name={user.avatar || "compass-outline"}
-                    size={26}
-                    color={c.primary}
-                  />
-                </View>
+                <UserAvatar user={user} size={48} icon="compass-outline" color={c.primary} backgroundColor={c.surfaceAlt} borderColor={c.border} style={styles.avatar} />
 
                 <View style={styles.userCopy}>
                   <Text style={[styles.displayName, { color: c.text }]}>

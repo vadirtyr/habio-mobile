@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
@@ -20,13 +21,16 @@ import { AppInput } from "../components/AppInput";
 import { BrandHeader } from "../components/BrandMark";
 import { ErrorState } from "../components/ErrorState";
 import { SkeletonCard } from "../components/SkeletonCard";
+import { UserAvatar } from "../components/UserAvatar";
 
 import { useTheme } from "../hooks/useTheme";
+import { useAuth } from "../context/AuthContext";
 import { api } from "../lib/api";
 import { radii, spacing, typography } from "../lib/theme";
 
 export default function EditProfileScreen() {
   const { theme } = useTheme();
+  const { refresh } = useAuth();
   const c = theme.colors;
 
   const [loading, setLoading] = useState(true);
@@ -41,6 +45,10 @@ export default function EditProfileScreen() {
   const [avatar, setAvatar] = useState("explorer");
   const [ownedAvatars, setOwnedAvatars] = useState(["explorer"]);
   const [avatarStore, setAvatarStore] = useState([]);
+  const [avatarType, setAvatarType] = useState("preset");
+  const [customAvatarKey, setCustomAvatarKey] = useState(null);
+  const [customAvatarUrl, setCustomAvatarUrl] = useState(null);
+  const [avatarImage, setAvatarImage] = useState(null);
 
   async function loadProfile() {
     setError(null);
@@ -56,6 +64,9 @@ export default function EditProfileScreen() {
       setAvatar(data?.avatar || "explorer");
       setOwnedAvatars(data?.owned_avatars || ["explorer"]);
       setAvatarStore(data?.avatar_store || []);
+      setAvatarType(data?.avatar_type || "preset");
+      setCustomAvatarKey(data?.custom_avatar_key || null);
+      setCustomAvatarUrl(data?.custom_avatar_url || null);
     } catch (error) {
       setError(error?.message || "Unable to load profile.");
     } finally {
@@ -95,7 +106,7 @@ export default function EditProfileScreen() {
       return;
     }
 
-    if (!ownedAvatars.includes(avatar)) {
+    if (avatarType === "preset" && !ownedAvatars.includes(avatar)) {
       Alert.alert(
         "Avatar Locked",
         "Choose an unlocked avatar before saving."
@@ -113,8 +124,29 @@ export default function EditProfileScreen() {
         display_name: cleanDisplayName,
         bio: cleanBio,
         is_public: isPublic,
-        avatar,
       });
+
+      if (avatarType === "custom" && avatarImage) {
+        const upload = await api.createUploadUrl({
+          upload_type: "avatar",
+          filename: avatarImage.fileName,
+          content_type: avatarImage.mimeType,
+        });
+        const imageResponse = await fetch(avatarImage.uri);
+        const imageBlob = await imageResponse.blob();
+        const putResponse = await fetch(upload.upload_url, {
+          method: "PUT",
+          headers: upload.headers,
+          body: imageBlob,
+        });
+        if (!putResponse.ok) throw new Error("Avatar upload failed. Please try again.");
+        await api.updateAvatar({ avatar_type: "custom", custom_avatar_key: upload.key });
+      } else if (avatarType === "preset") {
+        await api.updateAvatar({ avatar_type: "preset", avatar });
+      } else if (!customAvatarKey) {
+        throw new Error("Choose a custom avatar image before saving.");
+      }
+      await refresh();
 
       Alert.alert("Profile Updated", "Your profile has been saved.", [
         {
@@ -130,6 +162,23 @@ export default function EditProfileScreen() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function pickAvatar() {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Photo access needed", "Allow photo access to choose a custom avatar.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.85 });
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    const mimeType = asset.mimeType || "image/jpeg";
+    const extensions = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic" };
+    const extension = extensions[mimeType] || "jpg";
+    const fileName = asset.fileName?.toLowerCase().endsWith(`.${extension}`) ? asset.fileName : `avatar.${extension}`;
+    setAvatarImage({ uri: asset.uri, mimeType, fileName });
+    setAvatarType("custom");
   }
 
   if (loading) {
@@ -190,21 +239,15 @@ export default function EditProfileScreen() {
           />
 
           <AppCard style={styles.card}>
-            <View
-              style={[
-                styles.avatar,
-                {
-                  backgroundColor: `${c.cyan || c.primary}18`,
-                  borderColor: c.border,
-                },
-              ]}
-            >
-              <MaterialCommunityIcons
-                name={getAvatarIcon(avatar, avatarStore)}
-                size={58}
-                color={c.cyan || c.primary}
-              />
-            </View>
+            <UserAvatar
+              user={{ avatar_type: avatarType, custom_avatar_url: avatarImage?.uri || customAvatarUrl }}
+              size={96}
+              icon={getAvatarIcon(avatar, avatarStore)}
+              color={c.cyan || c.primary}
+              backgroundColor={`${c.cyan || c.primary}18`}
+              borderColor={c.border}
+              style={styles.avatar}
+            />
 
             <View style={styles.field}>
               <Text style={[styles.label, { color: c.text }]}>
@@ -259,19 +302,21 @@ export default function EditProfileScreen() {
                 profile.
               </Text>
 
+              <AppButton title="Upload custom avatar" variant="secondary" onPress={pickAvatar} style={styles.uploadAvatarButton} disabled={saving} />
+
               <View style={styles.avatarGrid}>
                 {(avatarStore.length > 0
                   ? avatarStore
                   : fallbackAvatarStore
                 ).map((item) => {
                   const unlocked = ownedAvatars.includes(item.id);
-                  const selected = avatar === item.id;
+                  const selected = avatarType === "preset" && avatar === item.id;
 
                   return (
                     <Pressable
                       key={item.id}
                       disabled={!unlocked}
-                      onPress={() => setAvatar(item.id)}
+                      onPress={() => { setAvatar(item.id); setAvatarType("preset"); setAvatarImage(null); }}
                       style={({ pressed }) => [
                         styles.avatarOption,
                         {
@@ -455,6 +500,7 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     marginBottom: spacing.xl,
   },
+  uploadAvatarButton: { marginTop: spacing.md },
 
   field: {
     marginBottom: spacing.lg,

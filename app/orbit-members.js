@@ -1,4 +1,4 @@
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -7,6 +7,7 @@ import { AppButton } from "../components/AppButton";
 import { AppCard } from "../components/AppCard";
 import { AppInput } from "../components/AppInput";
 import { ScreenHeader } from "../components/ScreenHeader";
+import { UserAvatar } from "../components/UserAvatar";
 import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
 import { spacing, typography } from "../lib/theme";
@@ -59,7 +60,7 @@ export default function OrbitMembersScreen() {
           <Text style={[styles.title, { color: c.text }]}>Invite someone</Text>
           <AppInput value={query} onChangeText={setQuery} placeholder="Search by username or name" autoCapitalize="none" style={styles.input} leftElement={<Feather name="search" size={18} color={c.textMuted} />} />
           {results.map((user) => <Pressable key={user.id} onPress={() => invite(user)} style={[styles.result, { borderTopColor: c.border }]}>
-            <MaterialCommunityIcons name={user.avatar || "account-circle"} size={28} color={c.primary} />
+            <UserAvatar user={user} size={28} icon="account-circle" color={c.primary} backgroundColor={c.surfaceAlt} />
             <View style={styles.resultCopy}><Text style={[styles.memberName, { color: c.text }]}>{user.display_name || user.name || user.username}</Text><Text style={[styles.handle, { color: c.textSecondary }]}>@{user.username}</Text></View>
             <Feather name="plus" size={22} color={c.primary} />
           </Pressable>)}
@@ -69,7 +70,7 @@ export default function OrbitMembersScreen() {
       <Text style={[styles.sectionTitle, { color: c.text }]}>Current members</Text>
       {orbit.members.map((member) => <AppCard key={member.user_id} style={styles.memberCard}>
         <View style={styles.row}>
-          <MaterialCommunityIcons name={member.user?.avatar || "account-circle"} size={34} color={c.primary} />
+          <UserAvatar user={member.user} size={34} icon="account-circle" color={c.primary} backgroundColor={c.surfaceAlt} />
           <View style={styles.resultCopy}><Text style={[styles.memberName, { color: c.text }]}>{member.user?.display_name || member.user?.name || "Member"}</Text><Text style={[styles.handle, { color: c.textSecondary }]}>{member.role}</Text></View>
           {canManage && member.role !== "owner" && <AppButton title="Remove" variant="ghost" fullWidth={false} onPress={() => remove(member)} />}
         </View>
