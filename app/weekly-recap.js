@@ -11,6 +11,7 @@ import {
 } from "react-native";
 
 import { AppCard } from "../components/AppCard";
+import { AppButton } from "../components/AppButton";
 import { EmptyState } from "../components/EmptyState";
 import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
@@ -24,6 +25,7 @@ export default function WeeklyRecapScreen() {
   const [latestRecap, setLatestRecap] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [generatingAI, setGeneratingAI] = useState(false);
 
   async function loadRecaps() {
     try {
@@ -55,6 +57,18 @@ export default function WeeklyRecapScreen() {
 
         await loadRecaps();
     }
+
+  async function generateAIRecap() {
+    setGeneratingAI(true);
+    try {
+      await api.generateAIWeeklyRecap();
+      await loadRecaps();
+    } catch (error) {
+      Alert.alert("AI recap unavailable", error.message || "Your regular recap is still available.");
+    } finally {
+      setGeneratingAI(false);
+    }
+  }
 
   return (
     <View style={[styles.screen, { backgroundColor: c.background }]}>
@@ -189,6 +203,19 @@ export default function WeeklyRecapScreen() {
               )}
             </AppCard>
 
+            <AppCard style={styles.aiCard}>
+              <View style={styles.aiHeader}>
+                <MaterialCommunityIcons name="creation" size={24} color={c.primary} />
+                <Text style={[styles.sectionTitle, { color: c.text }]}>AI Recap</Text>
+              </View>
+              {latestRecap.ai_recap ? (
+                <AIRecap recap={latestRecap.ai_recap} colors={c} />
+              ) : (
+                <Text style={[styles.cardCopy, { color: c.textSecondary }]}>Turn your weekly metrics into a concise reflection and suggested focus.</Text>
+              )}
+              <AppButton title={generatingAI ? "Generating..." : latestRecap.ai_recap ? "Refresh AI Recap" : "Generate AI Recap"} onPress={generateAIRecap} disabled={generatingAI} style={styles.aiButton} />
+            </AppCard>
+
             {recaps.length > 1 && (
               <View style={styles.historySection}>
                 <Text style={[styles.sectionTitle, { color: c.text }]}>
@@ -254,6 +281,22 @@ function StatTile({ label, value, icon, color, themeColors }) {
       </Text>
     </View>
   );
+}
+
+function AIRecap({ recap, colors }) {
+  const sections = [
+    ["Wins", recap.wins],
+    ["Needs attention", recap.needs_attention],
+    ["Suggested focus", recap.suggested_focus],
+  ];
+  return <View style={styles.aiContent}>
+    <Text style={[styles.cardCopy, { color: colors.text }]}>{recap.summary}</Text>
+    {sections.map(([label, items]) => items?.length ? <View key={label}>
+      <Text style={[styles.aiLabel, { color: colors.text }]}>{label}</Text>
+      {items.map((item, index) => <Text key={`${label}-${index}`} style={[styles.aiListItem, { color: colors.textSecondary }]}>• {item}</Text>)}
+    </View> : null)}
+    {!!recap.suggested_challenge && <Text style={[styles.aiChallenge, { color: colors.primary }]}>Challenge idea: {recap.suggested_challenge}</Text>}
+  </View>;
 }
 
 const styles = StyleSheet.create({
@@ -354,6 +397,14 @@ const styles = StyleSheet.create({
     flex: 1,
     ...typography.bodyBold,
   },
+
+  aiCard: { marginTop: spacing.lg },
+  aiHeader: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  aiContent: { gap: spacing.md, marginTop: spacing.md },
+  aiLabel: { ...typography.bodyBold },
+  aiListItem: { ...typography.body, marginTop: spacing.xs },
+  aiChallenge: { ...typography.bodyBold },
+  aiButton: { marginTop: spacing.lg },
 
   historySection: {
     marginTop: spacing.xl,

@@ -29,6 +29,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../hooks/useTheme";
 import { useCelebrationQueue } from "../../hooks/useCelebrationQueue";
 import { api } from "../../lib/api";
+import { getOrbitItems, mergeUnique } from "../../lib/orbitItems";
 import { radii, spacing, typography } from "../../lib/theme";
 
 export default function HabitsScreen() {
@@ -102,8 +103,11 @@ export default function HabitsScreen() {
       const statsData = await api.get("/stats", token);
       setBalance(statsData.coin_balance || 0);
 
-      const data = await api.get("/habits", token);
-      setHabits(Array.isArray(data) ? data : []);
+      const [data, orbitItems] = await Promise.all([
+        api.get("/habits", token),
+        getOrbitItems().catch(() => ({ habits: [] })),
+      ]);
+      setHabits(mergeUnique(Array.isArray(data) ? data : [], orbitItems.habits, "habit"));
     } catch (error) {
       setError(error?.message || "Unable to load habits.");
     } finally {
@@ -118,12 +122,17 @@ export default function HabitsScreen() {
   }
 
   async function completeHabit(habitId) {
-    const habit = habits.find((h) => h.id === habitId);
+    const habit = habits.find((h) => h.id === habitId || h._list_key === habitId);
     if (!habit || habit.completed_today || !token) return;
+
+    if (habit.is_orbit_item && habit.requires_proof) {
+      router.push({ pathname: "/orbit-detail", params: { orbitId: habit.orbit_id } });
+      return;
+    }
 
     setHabits((current) =>
       current.map((h) =>
-        h.id === habitId
+        h._list_key === habit._list_key || (!h._list_key && h.id === habit.id)
           ? { ...h, completed_today: true, streak: (h.streak || 0) + 1 }
           : h
       )
@@ -132,7 +141,15 @@ export default function HabitsScreen() {
     setBalance((current) => current + (habit.coins_per_completion || 0));
 
     try {
-      const data = await api.post(`/habits/${habitId}/complete`, {}, token);
+      if (habit.is_orbit_item) {
+        await api.completeOrbitHabit(habit.orbit_id, habit.id);
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setMessage(`Completed for ${habit.orbit_name}`);
+        setTimeout(() => setMessage(null), 1800);
+        await fetchHabits();
+        return;
+      }
+      const data = await api.post(`/habits/${habit.id}/complete`, {}, token);
       const hasMilestone = (data?.celebrations?.length || 0) > 0;
 
       enqueueCelebrations(data?.celebrations || []);
@@ -279,7 +296,7 @@ export default function HabitsScreen() {
 
       <FlatList
         data={sortedHabits}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item._list_key || item.id}
         refreshing={refreshing}
         onRefresh={handleRefresh}
         contentContainerStyle={styles.listContent}
@@ -415,7 +432,7 @@ export default function HabitsScreen() {
                   />
                 )
               }
-              renderRightActions={() => (
+              renderRightActions={() => item.is_orbit_item ? null : (
                 <SwipeAction
                   color={c.danger}
                   icon="trash-2"
@@ -424,16 +441,16 @@ export default function HabitsScreen() {
                 />
               )}
               onSwipeableOpen={(direction) => {
-                if (direction === "left") completeHabit(item.id);
-                if (direction === "right") confirmDeleteHabit(item.id);
+                if (direction === "left") completeHabit(item._list_key || item.id);
+                if (direction === "right" && !item.is_orbit_item) confirmDeleteHabit(item.id);
               }}
             >
               <AnimatedCard index={index}>
                 <HabitCard
                   item={item}
                   tier={tier}
-                  onComplete={() => completeHabit(item.id)}
-                  onEdit={() =>
+                  onComplete={() => completeHabit(item._list_key || item.id)}
+                  onEdit={item.is_orbit_item ? null : () =>
                     router.push({
                       pathname: "/edit-habit",
                       params: {
@@ -563,7 +580,7 @@ function HabitCard({ item, tier, onComplete, onEdit }) {
                 {item.name}
               </Text>
 
-              <AnimatedPressable
+              {!item.is_orbit_item && <AnimatedPressable
                 style={[
                   styles.iconButton,
                   {
@@ -574,7 +591,7 @@ function HabitCard({ item, tier, onComplete, onEdit }) {
                 onPress={onEdit}
               >
                 <Feather name="edit-3" size={15} color={c.text} />
-              </AnimatedPressable>
+              </AnimatedPressable>}
             </View>
 
             {!!item.description && (
@@ -582,6 +599,7 @@ function HabitCard({ item, tier, onComplete, onEdit }) {
                 {item.description}
               </Text>
             )}
+            {item.is_orbit_item && <Text style={[styles.orbitLabel, { color: c.primary }]}>Orbit: {item.orbit_name}</Text>}
           </View>
         </View>
 
@@ -1094,6 +1112,7 @@ const styles = StyleSheet.create({
     ...typography.body,
     marginTop: spacing.xs,
   },
+  orbitLabel: { ...typography.caption, fontWeight: "800", marginTop: spacing.xs },
 
   cardFooter: {
     flexDirection: "row",

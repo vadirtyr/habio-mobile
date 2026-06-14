@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { useState } from "react";
 import {
@@ -26,6 +26,7 @@ import { signInWithGoogle } from "../lib/googleAuth";
 import { radii, shadows, spacing, typography } from "../lib/theme";
 
 export default function LoginScreen() {
+  const { returnTo } = useLocalSearchParams();
   const { login } = useAuth();
   const { theme } = useTheme();
   const c = theme.colors;
@@ -53,7 +54,9 @@ export default function LoginScreen() {
       await SecureStore.setItemAsync("currentUserEmail", cleanEmail);
     }
 
-    if (user?.onboarding_completed) {
+    if (typeof returnTo === "string" && returnTo.startsWith("/")) {
+      router.replace(returnTo);
+    } else if (user?.onboarding_completed) {
       router.replace("/(tabs)/dashboard");
     } else {
       router.replace("/onboarding");
@@ -251,7 +254,7 @@ export default function LoginScreen() {
           />
         </AppCard>
 
-        <Pressable onPress={() => router.push("/register")}>
+        <Pressable onPress={() => router.push(returnTo ? { pathname: "/register", params: { returnTo } } : "/register")}>
           <Text
             style={[
               styles.registerText,

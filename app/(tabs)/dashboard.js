@@ -29,6 +29,7 @@ import { UserAvatar } from "../../components/UserAvatar";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../hooks/useTheme";
 import { api } from "../../lib/api";
+import { getOrbitItems, mergeUnique } from "../../lib/orbitItems";
 import { radii, spacing, typography } from "../../lib/theme";
 
 export default function DashboardScreen() {
@@ -63,6 +64,7 @@ export default function DashboardScreen() {
 
   const [todayHabits, setTodayHabits] = useState([]);
   const [todayTasks, setTodayTasks] = useState([]);
+  const [orbitCounts, setOrbitCounts] = useState({ habitsTotal: 0, habitsDone: 0, tasksTotal: 0, tasksDone: 0 });
 
   const totalTodayItems = todayHabits.length + todayTasks.length;
   const dailyGoal = Math.max(totalTodayItems, stats.completed_today, 1);
@@ -110,12 +112,14 @@ export default function DashboardScreen() {
         habitsData,
         tasksData,
         questsData,
+        orbitItemsData,
       ] = await Promise.allSettled([
         api.get("/stats"),
         api.get("/achievements"),
         api.get("/habits"),
         api.get("/tasks"),
         api.get("/quests"),
+        getOrbitItems(),
       ]);
 
       await loadNotificationCount();
@@ -157,8 +161,19 @@ export default function DashboardScreen() {
         setAchievements(data.items || []);
       }
 
+      const orbitItems = orbitItemsData.status === "fulfilled"
+        ? orbitItemsData.value
+        : { habits: [], tasks: [] };
+      setOrbitCounts({
+        habitsTotal: orbitItems.habits.length,
+        habitsDone: orbitItems.habits.filter((item) => item.completed_today).length,
+        tasksTotal: orbitItems.tasks.length,
+        tasksDone: orbitItems.tasks.filter((item) => item.completed).length,
+      });
+
       if (habitsData.status === "fulfilled") {
-        const habits = normalizeList(habitsData.value)
+        const habits = mergeUnique(normalizeList(habitsData.value), orbitItems.habits, "habit")
+          .sort((a, b) => Number(b.is_orbit_item) - Number(a.is_orbit_item))
           .filter((item) => !item.completed_today)
           .slice(0, 3);
 
@@ -166,7 +181,8 @@ export default function DashboardScreen() {
       }
 
       if (tasksData.status === "fulfilled") {
-        const tasks = normalizeList(tasksData.value)
+        const tasks = mergeUnique(normalizeList(tasksData.value), orbitItems.tasks, "task")
+          .sort((a, b) => Number(b.is_orbit_item) - Number(a.is_orbit_item))
           .filter((item) => !item.completed && !item.done)
           .slice(0, 3);
 
@@ -298,15 +314,15 @@ export default function DashboardScreen() {
             xp={stats?.level_data?.progress || stats?.xp || 0}
             xpToNextLevel={stats?.level_data?.needed || 100}
             streak={stats?.streak_days || 0}
-            completedToday={stats?.completed_today || 0}
-            totalToday={(stats?.total_habits || 0) + (stats?.total_tasks || 0)}
+            completedToday={(stats?.completed_today || 0) + (stats?.tasks_done || 0) + orbitCounts.habitsDone + orbitCounts.tasksDone}
+            totalToday={(stats?.total_habits || 0) + (stats?.total_tasks || 0) + orbitCounts.habitsTotal + orbitCounts.tasksTotal}
           />
 
           <TodayOrbitCard
-            habitsCompleted={stats?.completed_today || 0}
-            habitsTotal={stats?.total_habits || 0}
-            tasksCompleted={stats?.tasks_done || 0}
-            tasksTotal={stats?.total_tasks || 0}
+            habitsCompleted={(stats?.completed_today || 0) + orbitCounts.habitsDone}
+            habitsTotal={(stats?.total_habits || 0) + orbitCounts.habitsTotal}
+            tasksCompleted={(stats?.tasks_done || 0) + orbitCounts.tasksDone}
+            tasksTotal={(stats?.total_tasks || 0) + orbitCounts.tasksTotal}
           />
 
           <DashboardStatsGrid
@@ -379,6 +395,7 @@ export default function DashboardScreen() {
                         key={`habit-${habit.id || habit._id || habit.name}`}
                         icon="repeat"
                         label={habit.name || habit.title || "Habit"}
+                        badge={habit.is_orbit_item ? `Orbit: ${habit.orbit_name}` : null}
                         accent="cyan"
                         themeColors={c}
                       />
@@ -391,6 +408,7 @@ export default function DashboardScreen() {
                         }`}
                         icon="checkbox-marked-circle-outline"
                         label={task.title || task.name || "Task"}
+                        badge={task.is_orbit_item ? `Orbit: ${task.orbit_name}` : null}
                         accent="coral"
                         themeColors={c}
                       />
@@ -458,7 +476,7 @@ function normalizeList(data) {
   return [];
 }
 
-function PreviewItem({ icon, label, accent = "cyan", themeColors }) {
+function PreviewItem({ icon, label, badge, accent = "cyan", themeColors }) {
   const c = themeColors;
   const accentColor = c?.[accent] || c?.primary || "#22C7DE";
 
@@ -483,9 +501,10 @@ function PreviewItem({ icon, label, accent = "cyan", themeColors }) {
         <MaterialCommunityIcons name={icon} size={19} color={accentColor} />
       </View>
 
-      <Text numberOfLines={1} style={[styles.previewLabel, { color: c.text }]}>
-        {label}
-      </Text>
+      <View style={styles.previewCopy}>
+        <Text numberOfLines={1} style={[styles.previewLabel, { color: c.text }]}>{label}</Text>
+        {!!badge && <Text numberOfLines={1} style={[styles.previewBadge, { color: c.primary }]}>{badge}</Text>}
+      </View>
     </View>
   );
 }
@@ -575,9 +594,10 @@ const styles = StyleSheet.create({
   },
 
   previewLabel: {
-    flex: 1,
     ...typography.bodyBold,
   },
+  previewCopy: { flex: 1 },
+  previewBadge: { ...typography.caption, fontWeight: "800", marginTop: 2 },
 
   actionRow: {
     flexDirection: "row",

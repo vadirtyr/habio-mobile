@@ -94,6 +94,7 @@ function AppShell() {
         <Stack.Screen name="create-orbit" />
         <Stack.Screen name="orbit-detail" />
         <Stack.Screen name="orbit-members" />
+        <Stack.Screen name="orbit-invite/[token]" />
         <Stack.Screen name="create-orbit-goal" />
 
         <Stack.Screen name="(tabs)" />

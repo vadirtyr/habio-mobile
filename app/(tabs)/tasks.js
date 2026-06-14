@@ -29,6 +29,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../hooks/useTheme";
 import { useCelebrationQueue } from "../../hooks/useCelebrationQueue";
 import { api } from "../../lib/api";
+import { getOrbitItems, mergeUnique } from "../../lib/orbitItems";
 import { radii, spacing, typography } from "../../lib/theme";
 
 export default function TasksScreen() {
@@ -102,8 +103,11 @@ export default function TasksScreen() {
       const statsData = await api.get("/stats", token);
       setBalance(statsData.coin_balance || 0);
 
-      const data = await api.get("/tasks", token);
-      setTasks(Array.isArray(data) ? data : []);
+      const [data, orbitItems] = await Promise.all([
+        api.get("/tasks", token),
+        getOrbitItems().catch(() => ({ tasks: [] })),
+      ]);
+      setTasks(mergeUnique(Array.isArray(data) ? data : [], orbitItems.tasks, "task"));
     } catch (error) {
       setError(error?.message || "Unable to load tasks.");
     } finally {
@@ -118,19 +122,32 @@ export default function TasksScreen() {
   }
 
   async function completeTask(taskId) {
-    const task = tasks.find((t) => t.id === taskId);
+    const task = tasks.find((t) => t.id === taskId || t._list_key === taskId);
     if (!task || task.completed || !token) return;
+
+    if (task.is_orbit_item && task.requires_proof) {
+      router.push({ pathname: "/orbit-detail", params: { orbitId: task.orbit_id } });
+      return;
+    }
 
     const previous = tasks;
 
     setTasks((current) =>
-      current.map((t) => (t.id === taskId ? { ...t, completed: true } : t))
+      current.map((t) => (t._list_key === task._list_key || (!t._list_key && t.id === task.id) ? { ...t, completed: true } : t))
     );
 
     setBalance((current) => current + (task.coins_reward || 0));
 
     try {
-      const data = await api.post(`/tasks/${taskId}/complete`, {}, token);
+      if (task.is_orbit_item) {
+        await api.completeOrbitTask(task.orbit_id, task.id);
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setMessage(`Completed for ${task.orbit_name}`);
+        setTimeout(() => setMessage(null), 1800);
+        await fetchTasks();
+        return;
+      }
+      const data = await api.post(`/tasks/${task.id}/complete`, {}, token);
       const hasMilestone = (data?.celebrations?.length || 0) > 0;
 
       enqueueCelebrations(data?.celebrations || []);
@@ -175,6 +192,7 @@ export default function TasksScreen() {
   async function uncompleteTask(taskId) {
     const task = tasks.find((t) => t.id === taskId);
     if (!task || !task.completed || !token) return;
+    if (task.is_orbit_item) return;
 
     const previous = tasks;
 
@@ -296,7 +314,7 @@ export default function TasksScreen() {
       />
       <FlatList
         data={sortedTasks}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item._list_key || item.id}
         refreshing={refreshing}
         onRefresh={handleRefresh}
         contentContainerStyle={styles.listContent}
@@ -424,7 +442,7 @@ export default function TasksScreen() {
         renderItem={({ item, index }) => (
           <Swipeable
             renderLeftActions={() =>
-              item.completed ? (
+              item.is_orbit_item && item.completed ? null : item.completed ? (
                 <SwipeAction
                   color={c.blue || c.primary}
                   icon="rotate-ccw"
@@ -438,15 +456,15 @@ export default function TasksScreen() {
                 />
               )
             }
-            renderRightActions={() => (
+            renderRightActions={() => item.is_orbit_item ? null : (
               <SwipeAction color={c.danger} icon="trash-2" label="Delete" white />
             )}
             onSwipeableOpen={(direction) => {
               if (direction === "left") {
-                item.completed ? uncompleteTask(item.id) : completeTask(item.id);
+                item.completed ? uncompleteTask(item.id) : completeTask(item._list_key || item.id);
               }
 
-              if (direction === "right") {
+              if (direction === "right" && !item.is_orbit_item) {
                 confirmDeleteTask(item.id);
               }
             }}
@@ -455,9 +473,9 @@ export default function TasksScreen() {
               <TaskCard
                 item={item}
                 onToggle={() =>
-                  item.completed ? uncompleteTask(item.id) : completeTask(item.id)
+                  item.completed ? uncompleteTask(item.id) : completeTask(item._list_key || item.id)
                 }
-                onEdit={() =>
+                onEdit={item.is_orbit_item ? null : () =>
                   router.push({
                     pathname: "/edit-task",
                     params: {
@@ -579,7 +597,7 @@ function TaskCard({ item, onToggle, onEdit }) {
                 {item.name}
               </Text>
 
-              <AnimatedPressable
+              {!item.is_orbit_item && <AnimatedPressable
                 style={[
                   styles.iconButton,
                   {
@@ -590,7 +608,7 @@ function TaskCard({ item, onToggle, onEdit }) {
                 onPress={onEdit}
               >
                 <Feather name="edit-3" size={15} color={c.text} />
-              </AnimatedPressable>
+              </AnimatedPressable>}
             </View>
 
             {!!item.description && (
@@ -598,6 +616,7 @@ function TaskCard({ item, onToggle, onEdit }) {
                 {item.description}
               </Text>
             )}
+            {item.is_orbit_item && <Text style={[styles.orbitLabel, { color: c.primary }]}>Orbit: {item.orbit_name}</Text>}
           </View>
         </View>
 
@@ -1042,6 +1061,7 @@ const styles = StyleSheet.create({
     ...typography.body,
     marginTop: spacing.xs,
   },
+  orbitLabel: { ...typography.caption, fontWeight: "800", marginTop: spacing.xs },
 
   cardFooter: {
     flexDirection: "row",

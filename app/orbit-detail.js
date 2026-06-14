@@ -37,6 +37,7 @@ export default function OrbitDetailScreen() {
   const { theme } = useTheme();
   const c = theme.colors;
   const [dashboard, setDashboard] = useState(null);
+  const [orbitRecaps, setOrbitRecaps] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [createType, setCreateType] = useState(null);
@@ -61,7 +62,12 @@ export default function OrbitDetailScreen() {
   });
 
   const load = useCallback(async () => {
-    try { setDashboard(await api.getOrbitDashboard(orbitId)); setError(null); }
+    try {
+      setDashboard(await api.getOrbitDashboard(orbitId));
+      const recapData = await api.getOrbitWeeklyRecaps(orbitId);
+      setOrbitRecaps(recapData.items || []);
+      setError(null);
+    }
     catch (err) { setError(err.message); }
     finally { setLoading(false); }
   }, [orbitId]);
@@ -73,6 +79,18 @@ export default function OrbitDetailScreen() {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await load();
     } catch (err) { Alert.alert("Could not add progress", err.message); }
+  }
+
+  async function generateOrbitAIRecap() {
+    setBusyItem("orbit-ai-recap");
+    try {
+      await api.generateOrbitAIWeeklyRecap(orbitId);
+      await load();
+    } catch (err) {
+      Alert.alert("AI recap unavailable", err.message || "The Orbit dashboard is still available.");
+    } finally {
+      setBusyItem(null);
+    }
   }
 
   function openCreate(type) {
@@ -205,6 +223,19 @@ export default function OrbitDetailScreen() {
     }
   }
 
+  async function aiCheckProof(proof) {
+    setBusyItem(`ai-${proof.id}`);
+    try {
+      await api.aiCheckOrbitProof(orbitId, proof.id);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await load();
+    } catch (err) {
+      Alert.alert("AI check unavailable", err.message || "Manual review is still available.");
+    } finally {
+      setBusyItem(null);
+    }
+  }
+
   async function createChallenge() {
     const goalValue = Number(challengeGoal);
     const rewardXp = Number(challengeReward);
@@ -272,6 +303,7 @@ export default function OrbitDetailScreen() {
   const xpProgress = orbit.xp_progress || 0;
   const xpNeeded = orbit.xp_needed_for_next_level || 100;
   const xpPercent = orbit.xp_progress_percent || 0;
+  const canManage = orbit.viewer_role === "owner" || orbit.viewer_role === "admin";
 
   return (
     <ScrollView style={[styles.screen, { backgroundColor: c.background }]} contentContainerStyle={styles.container}>
@@ -293,7 +325,7 @@ export default function OrbitDetailScreen() {
 
       <View style={styles.actions}>
         <AppButton title="Members" variant="secondary" style={styles.action} onPress={() => router.push({ pathname: "/orbit-members", params: { orbitId } })} />
-        <AppButton title="New goal" style={styles.action} onPress={() => router.push({ pathname: "/create-orbit-goal", params: { orbitId } })} />
+        {canManage && <AppButton title="New goal" style={styles.action} onPress={() => router.push({ pathname: "/create-orbit-goal", params: { orbitId } })} />}
       </View>
 
       <Text style={[styles.sectionTitle, { color: c.text }]}>This week</Text>
@@ -323,7 +355,7 @@ export default function OrbitDetailScreen() {
 
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, styles.sectionTitleInline, { color: c.text }]}>Challenges</Text>
-        <AppButton title="Create" variant="ghost" fullWidth={false} style={styles.smallButton} onPress={() => setShowChallengeForm((value) => !value)} disabled={!!busyItem} />
+        {canManage && <AppButton title="Create" variant="ghost" fullWidth={false} style={styles.smallButton} onPress={() => setShowChallengeForm((value) => !value)} disabled={!!busyItem} />}
       </View>
 
       {!!showChallengeForm && <AppCard style={styles.createCard}>
@@ -360,6 +392,7 @@ export default function OrbitDetailScreen() {
         itemType="habit"
         colors={c}
         busyItem={busyItem}
+        canCreate={canManage}
         onCreate={() => openCreate("habit")}
         onComplete={completeSharedItem}
       />
@@ -387,6 +420,7 @@ export default function OrbitDetailScreen() {
         itemType="task"
         colors={c}
         busyItem={busyItem}
+        canCreate={canManage}
         onCreate={() => openCreate("task")}
         onComplete={completeSharedItem}
       />
@@ -429,6 +463,13 @@ export default function OrbitDetailScreen() {
         <Text style={[styles.copy, { color: c.textSecondary }]}>Submitted by {proof.submitter?.display_name || proof.submitter?.name || "a member"}</Text>
         {!!proof.proof_text && <Text style={[styles.proofQuote, { color: c.text }]}>{proof.proof_text}</Text>}
         {!!proof.proof_image_key && <ProofImage objectKey={proof.proof_image_key} colors={c} />}
+        {proof.ai_status === "completed" && <View style={[styles.aiRecommendation, { backgroundColor: c.surfaceAlt }]}>
+          <Text style={[styles.aiTitle, { color: c.text }]}>AI recommendation: {proof.ai_recommendation || "uncertain"}</Text>
+          <Text style={[styles.time, { color: c.textMuted }]}>{Math.round((proof.ai_confidence || 0) * 100)}% confidence</Text>
+          {!!proof.ai_reason && <Text style={[styles.copy, { color: c.textSecondary }]}>{proof.ai_reason}</Text>}
+        </View>}
+        {proof.ai_status === "failed" && !!proof.ai_reason && <Text style={[styles.copy, { color: c.danger }]}>{proof.ai_reason}</Text>}
+        <AppButton title={proof.ai_status === "pending" ? "Checking..." : "AI Check"} variant="secondary" style={styles.proofImageButton} onPress={() => aiCheckProof(proof)} disabled={!!busyItem || proof.ai_status === "pending"} />
         <AppInput value={rejectionReason} onChangeText={setRejectionReason} placeholder="Rejection reason (optional)" maxLength={500} style={styles.formInput} />
         <View style={styles.formActions}>
           <AppButton title="Reject" variant="secondary" style={styles.formAction} onPress={() => reviewProof(proof, false)} disabled={!!busyItem} />
@@ -447,6 +488,12 @@ export default function OrbitDetailScreen() {
           {goal.status !== "completed" && <AppButton title={goal.target_type === "check_in" ? "Check in" : "Add 1"} variant="secondary" onPress={() => contribute(goal)} style={styles.contribute} />}
         </AppCard>;
       }) : <AppCard><EmptyState compact title="No group goals" description="Create the first shared target for this Orbit." icon={<MaterialCommunityIcons name="target" size={40} color={c.primary} />} /></AppCard>}
+
+      <Text style={[styles.sectionTitle, { color: c.text }]}>Weekly Orbit Recap</Text>
+      <AppCard style={styles.card}>
+        {orbitRecaps[0]?.ai_recap ? <OrbitAIRecap recap={orbitRecaps[0].ai_recap} colors={c} /> : <Text style={[styles.copy, { color: c.textSecondary }]}>Generate a shared reflection from this Orbit&apos;s completions, challenges, XP, and proof reviews.</Text>}
+        <AppButton title={busyItem === "orbit-ai-recap" ? "Generating..." : orbitRecaps[0]?.ai_recap ? "Refresh AI Recap" : "Generate AI Recap"} onPress={generateOrbitAIRecap} disabled={!!busyItem} style={styles.contribute} />
+      </AppCard>
 
       <Text style={[styles.sectionTitle, { color: c.text }]}>Recent activity</Text>
       {recentActivity.length ? recentActivity.map((item) => <AppCard key={item.id} style={styles.activityCard}>
@@ -469,7 +516,7 @@ export default function OrbitDetailScreen() {
             <UserAvatar user={member.user} size={34} icon="account-circle" color={c.primary} backgroundColor={c.surfaceAlt} />
             <View style={styles.memberCopy}>
               <Text style={[styles.memberName, { color: c.text }]}>{member.user?.display_name || member.user?.name || member.user?.username || "Member"}</Text>
-              <Text style={[styles.time, { color: c.textSecondary }]}>{member.role} · Level {member.user?.level || 1}</Text>
+              <View style={styles.memberMetaRow}><View style={[styles.roleBadge, { backgroundColor: c.surfaceAlt }]}><Text style={[styles.time, { color: c.primary, textTransform: "capitalize" }]}>{member.role}</Text></View><Text style={[styles.time, { color: c.textSecondary }]}>Level {member.user?.level || 1}</Text></View>
             </View>
           </View>
         </AppCard>
@@ -498,6 +545,7 @@ function SharedItemsSection({
   itemType,
   colors,
   busyItem,
+  canCreate,
   onCreate,
   onComplete,
 }) {
@@ -505,7 +553,7 @@ function SharedItemsSection({
     <>
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, styles.sectionTitleInline, { color: colors.text }]}>{title}</Text>
-        <AppButton title="Create" variant="ghost" fullWidth={false} style={styles.smallButton} onPress={onCreate} disabled={!!busyItem} />
+        {canCreate && <AppButton title="Create" variant="ghost" fullWidth={false} style={styles.smallButton} onPress={onCreate} disabled={!!busyItem} />}
       </View>
       {items.length ? items.map((item) => {
         const completed = itemType === "habit" ? item.completed_today : item.completed;
@@ -554,6 +602,18 @@ function ChallengeCard({ challenge, colors }) {
   );
 }
 
+function OrbitAIRecap({ recap, colors }) {
+  const sections = [["Wins", recap.wins], ["Needs attention", recap.needs_attention], ["Suggested focus", recap.suggested_focus]];
+  return <View style={styles.aiRecap}>
+    <Text style={[styles.copy, { color: colors.text }]}>{recap.summary}</Text>
+    {sections.map(([label, items]) => items?.length ? <View key={label}>
+      <Text style={[styles.memberName, { color: colors.text }]}>{label}</Text>
+      {items.map((item, index) => <Text key={`${label}-${index}`} style={[styles.copy, { color: colors.textSecondary }]}>- {item}</Text>)}
+    </View> : null)}
+    {!!recap.suggested_challenge && <Text style={[styles.memberName, { color: colors.primary }]}>Challenge idea: {recap.suggested_challenge}</Text>}
+  </View>;
+}
+
 function ProofImage({ objectKey, colors }) {
   const [uri, setUri] = useState(null);
   const [failed, setFailed] = useState(false);
@@ -580,10 +640,12 @@ const styles = StyleSheet.create({
   copy: { ...typography.body, marginTop: spacing.xs }, track: { height: 9, borderRadius: radii.pill, overflow: "hidden", marginTop: spacing.lg }, fill: { height: "100%" },
   statGrid: { flexDirection: "row", flexWrap: "wrap", rowGap: spacing.lg }, stat: { width: "50%" }, statValue: { ...typography.h2 }, statLabel: { ...typography.caption, marginTop: 2 },
   contribute: { marginTop: spacing.lg }, activityCard: { marginBottom: spacing.sm }, activityRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md }, activityCopy: { flex: 1 }, activityMessage: { ...typography.bodyBold }, time: { ...typography.caption, marginTop: spacing.xs },
-  memberCard: { marginBottom: spacing.sm }, memberRow: { flexDirection: "row", alignItems: "center", gap: spacing.md }, memberCopy: { flex: 1 }, memberName: { ...typography.bodyBold }, dangerButton: { marginTop: spacing.xxl },
+  memberCard: { marginBottom: spacing.sm }, memberRow: { flexDirection: "row", alignItems: "center", gap: spacing.md }, memberCopy: { flex: 1 }, memberName: { ...typography.bodyBold }, memberMetaRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.xs }, roleBadge: { borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 2 }, dangerButton: { marginTop: spacing.xxl },
   smallButton: { minHeight: 40, paddingHorizontal: spacing.md }, sharedItemCard: { marginBottom: spacing.sm }, sharedItemRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md }, sharedItemCopy: { flex: 1 }, completeButton: { marginTop: spacing.md },
   createCard: { marginTop: spacing.md, marginBottom: spacing.lg }, formInput: { marginTop: spacing.md }, formActions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md }, formAction: { flex: 1 },
   formLabel: { ...typography.caption, marginTop: spacing.md, marginBottom: spacing.sm }, chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }, chip: { borderWidth: 1, borderRadius: radii.pill, paddingVertical: spacing.sm, paddingHorizontal: spacing.md }, challengeProgress: { marginTop: spacing.md }, completedLabel: { marginTop: spacing.sm, marginBottom: spacing.sm },
   proofToggle: { flexDirection: "row", alignItems: "center", gap: spacing.sm, borderWidth: 1, borderRadius: radii.xl, padding: spacing.md, marginTop: spacing.md }, proofQuote: { ...typography.body, marginTop: spacing.md, padding: spacing.md, borderRadius: radii.lg },
   proofImageButton: { marginTop: spacing.md }, selectedProof: { gap: spacing.sm, marginTop: spacing.md }, proofImage: { width: "100%", height: 220, borderRadius: radii.lg, marginTop: spacing.md },
+  aiRecommendation: { gap: spacing.xs, borderRadius: radii.lg, padding: spacing.md, marginTop: spacing.md }, aiTitle: { ...typography.bodyBold, textTransform: "capitalize" },
+  aiRecap: { gap: spacing.md },
 });

@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { useState } from "react";
 import {
@@ -30,6 +30,7 @@ import {
 } from "../lib/theme";
 
 export default function RegisterScreen() {
+  const { returnTo } = useLocalSearchParams();
   const { login } = useAuth();
   const { theme } = useTheme();
   const c = theme.colors;
@@ -83,7 +84,9 @@ export default function RegisterScreen() {
         );
       }
 
-    if (user?.onboarding_completed) {
+    if (typeof returnTo === "string" && returnTo.startsWith("/")) {
+        router.replace(returnTo);
+    } else if (user?.onboarding_completed) {
         router.replace("/(tabs)/dashboard");
     } else {
         router.replace("/onboarding");
@@ -134,7 +137,8 @@ export default function RegisterScreen() {
 
     await SecureStore.setItemAsync("currentUserEmail", cleanEmail);
 
-    router.replace("/onboarding");
+    if (typeof returnTo === "string" && returnTo.startsWith("/")) router.replace(returnTo);
+    else router.replace("/onboarding");
   } catch (error) {
     Alert.alert(
       "Registration failed",
@@ -373,7 +377,7 @@ export default function RegisterScreen() {
           }
           onPress={() =>
             router.replace(
-              "/login"
+              returnTo ? { pathname: "/login", params: { returnTo } } : "/login"
             )
           }
         >
