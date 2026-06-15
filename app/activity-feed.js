@@ -13,6 +13,7 @@ import { AppCard } from "../components/AppCard";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
+import { getOrbitItems } from "../lib/orbitItems";
 import { radii, spacing, typography } from "../lib/theme";
 
 export default function ActivityFeedScreen() {
@@ -31,8 +32,12 @@ export default function ActivityFeedScreen() {
     setLoading(true);
 
     try {
-      const data = await api.get("/activity");
-      setItems(Array.isArray(data?.items) ? data.items : []);
+      const [data, orbitData] = await Promise.all([
+        api.get("/activity"),
+        getOrbitItems().catch(() => ({ activity: [] })),
+      ]);
+      const personal = (Array.isArray(data?.items) ? data.items : []).map((item) => ({ ...item, _list_key: `personal-activity-${item.id}` }));
+      setItems([...personal, ...(orbitData.activity || [])].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || ""))));
     } catch (error) {
       Alert.alert("Activity error", error.message);
     } finally {
@@ -41,6 +46,9 @@ export default function ActivityFeedScreen() {
   }
 
   function getActivityMeta(item) {
+    if (item.is_orbit_activity) {
+      return { icon: "users", title: `${item.message || "Orbit activity"} · ${item.orbit_name}` };
+    }
     switch (item.type) {
       case "habit_complete":
         return {
@@ -245,7 +253,7 @@ export default function ActivityFeedScreen() {
             const meta = getActivityMeta(item);
 
             return (
-              <AppCard key={item.id || `${item.type}-${index}`}>
+              <AppCard key={item._list_key || item.id || `${item.type}-${index}`}>
                 <View style={styles.row}>
                   <View
                     style={[
@@ -269,7 +277,7 @@ export default function ActivityFeedScreen() {
                   </View>
                 </View>
 
-                <View style={styles.reactionsRow}>
+                {!item.is_orbit_activity && <View style={styles.reactionsRow}>
                   <ReactionButton
                     item={item}
                     reaction="like"
@@ -283,7 +291,7 @@ export default function ActivityFeedScreen() {
                     icon="hand-clap"
                     label="Cheer"
                   />
-                </View>
+                </View>}
               </AppCard>
             );
           })}

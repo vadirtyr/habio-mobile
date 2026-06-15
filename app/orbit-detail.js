@@ -37,7 +37,9 @@ export default function OrbitDetailScreen() {
   const { theme } = useTheme();
   const c = theme.colors;
   const [dashboard, setDashboard] = useState(null);
+  const [leaderboards, setLeaderboards] = useState(null);
   const [orbitRecaps, setOrbitRecaps] = useState([]);
+  const [insightsError, setInsightsError] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [createType, setCreateType] = useState(null);
@@ -55,6 +57,11 @@ export default function OrbitDetailScreen() {
   const [challengeType, setChallengeType] = useState("actions");
   const [challengeGoal, setChallengeGoal] = useState("100");
   const [challengeReward, setChallengeReward] = useState("500");
+  const [showRewardForm, setShowRewardForm] = useState(false);
+  const [editingReward, setEditingReward] = useState(null);
+  const [rewardTitle, setRewardTitle] = useState("");
+  const [rewardDescription, setRewardDescription] = useState("");
+  const [rewardCost, setRewardCost] = useState("500");
   const [challengeEndDate, setChallengeEndDate] = useState(() => {
     const end = new Date();
     end.setUTCDate(end.getUTCDate() + 30);
@@ -63,8 +70,13 @@ export default function OrbitDetailScreen() {
 
   const load = useCallback(async () => {
     try {
-      setDashboard(await api.getOrbitDashboard(orbitId));
-      const recapData = await api.getOrbitWeeklyRecaps(orbitId);
+      const [dashboardData, recapData, leaderboardData] = await Promise.all([
+        api.getOrbitDashboard(orbitId),
+        api.getOrbitWeeklyRecaps(orbitId),
+        api.getOrbitLeaderboards(orbitId),
+      ]);
+      setDashboard(dashboardData);
+      setLeaderboards(leaderboardData);
       setOrbitRecaps(recapData.items || []);
       setError(null);
     }
@@ -88,6 +100,21 @@ export default function OrbitDetailScreen() {
       await load();
     } catch (err) {
       Alert.alert("AI recap unavailable", err.message || "The Orbit dashboard is still available.");
+    } finally {
+      setBusyItem(null);
+    }
+  }
+
+  async function generateOrbitAIInsights() {
+    setBusyItem("orbit-ai-insights");
+    setInsightsError(null);
+    try {
+      await api.generateOrbitAIInsights(orbitId);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await load();
+    } catch (err) {
+      setInsightsError(err.message || "AI coaching is temporarily unavailable.");
+      Alert.alert("Orbit Insights unavailable", err.message || "The Orbit dashboard is still available.");
     } finally {
       setBusyItem(null);
     }
@@ -266,6 +293,53 @@ export default function OrbitDetailScreen() {
     }
   }
 
+  function openRewardForm(reward = null) {
+    setEditingReward(reward);
+    setRewardTitle(reward?.title || "");
+    setRewardDescription(reward?.description || "");
+    setRewardCost(String(reward?.xp_cost || 500));
+    setShowRewardForm(true);
+  }
+
+  async function saveReward() {
+    const xpCost = Number(rewardCost);
+    if (!rewardTitle.trim() || xpCost < 1) {
+      Alert.alert("Check reward details", "Add a title and a positive XP cost.");
+      return;
+    }
+    setBusyItem(editingReward ? `edit-reward-${editingReward.id}` : "create-reward");
+    try {
+      const body = { title: rewardTitle.trim(), description: rewardDescription.trim(), xp_cost: xpCost };
+      if (editingReward) await api.updateOrbitReward(orbitId, editingReward.id, body);
+      else await api.createOrbitReward(orbitId, body);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowRewardForm(false);
+      setEditingReward(null);
+      await load();
+    } catch (err) { Alert.alert("Could not save reward", err.message); }
+    finally { setBusyItem(null); }
+  }
+
+  async function redeemReward(reward) {
+    setBusyItem(`redeem-reward-${reward.id}`);
+    try {
+      await api.redeemOrbitReward(orbitId, reward.id);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await load();
+    } catch (err) { Alert.alert("Could not redeem reward", err.message); }
+    finally { setBusyItem(null); }
+  }
+
+  function deleteReward(reward) {
+    Alert.alert("Delete Orbit reward?", `Delete “${reward.title}”?`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: async () => {
+        try { await api.deleteOrbitReward(orbitId, reward.id); await load(); }
+        catch (err) { Alert.alert("Could not delete reward", err.message); }
+      } },
+    ]);
+  }
+
   function leaveOrDelete() {
     const orbit = dashboard.orbit;
     const owner = orbit.viewer_role === "owner";
@@ -295,6 +369,17 @@ export default function OrbitDetailScreen() {
     shared_tasks: sharedTasks = [],
     active_challenges: activeChallenges = [],
     completed_challenges: completedChallenges = [],
+    orbit_achievements: orbitAchievements = [],
+    recent_achievement_unlocks: recentAchievementUnlocks = [],
+    recent_milestones: recentMilestones = [],
+    milestone_count: milestoneCount = 0,
+    active_rewards: activeRewards = [],
+    redeemed_rewards: redeemedRewards = [],
+    health_score: healthScore = 0,
+    health_trend: healthTrend = "stable",
+    health_change: healthChange = 0,
+    health_breakdown: healthBreakdown = {},
+    health_summary: healthSummary = "",
     pending_proof_count: pendingProofCount = 0,
     pending_proofs: pendingProofs = [],
   } = dashboard;
@@ -323,6 +408,27 @@ export default function OrbitDetailScreen() {
         <Text style={[styles.time, { color: c.textMuted }]}>{xpProgress} / {xpNeeded} XP to next level</Text>
       </AppCard>
 
+      <AppCard style={styles.healthCard}>
+        <View style={styles.row}>
+          <View>
+            <Text style={[styles.smallLabel, { color: c.textSecondary }]}>Orbit Health</Text>
+            <Text style={[styles.healthScore, { color: c.text }]}>{healthScore}/100</Text>
+          </View>
+          <View style={[styles.healthTrend, { backgroundColor: c.surfaceAlt }]}>
+            <MaterialCommunityIcons name={healthTrend === "up" ? "trending-up" : healthTrend === "down" ? "trending-down" : "trending-neutral"} size={20} color={healthTrend === "up" ? c.success : healthTrend === "down" ? c.danger : c.textMuted} />
+            <Text style={[styles.memberName, { color: healthTrend === "up" ? c.success : healthTrend === "down" ? c.danger : c.textMuted }]}>{healthChange > 0 ? "+" : ""}{healthChange}</Text>
+          </View>
+        </View>
+        <OrbitProgressBar percent={healthScore} style={styles.progressBar} />
+        <Text style={[styles.copy, { color: c.textSecondary }]}>{healthSummary}</Text>
+        <View style={styles.healthBreakdown}>
+          {[["Completion", "completion", 40], ["Members", "members", 25], ["Challenges", "challenges", 15], ["Streaks", "streaks", 10], ["Activity", "activity", 10]].map(([label, key, max]) => <View key={key} style={styles.healthMetric}>
+            <Text style={[styles.time, { color: c.textMuted }]}>{label}</Text>
+            <Text style={[styles.memberName, { color: c.text }]}>{healthBreakdown[key] || 0}/{max}</Text>
+          </View>)}
+        </View>
+      </AppCard>
+
       <View style={styles.actions}>
         <AppButton title="Members" variant="secondary" style={styles.action} onPress={() => router.push({ pathname: "/orbit-members", params: { orbitId } })} />
         {canManage && <AppButton title="New goal" style={styles.action} onPress={() => router.push({ pathname: "/create-orbit-goal", params: { orbitId } })} />}
@@ -346,6 +452,79 @@ export default function OrbitDetailScreen() {
         </View>
         <OrbitProgressBar percent={stats.weekly_completion_rate} style={styles.progressBar} glow />
         <Text style={[styles.copy, { color: c.textSecondary }]}>Progress across Shared Orbit goals active this week.</Text>
+      </AppCard>
+
+      <Text style={[styles.sectionTitle, { color: c.text }]}>Leaderboards</Text>
+      <Text style={[styles.copy, styles.leaderboardIntro, { color: c.textSecondary }]}>Friendly rankings from shared Orbit activity this week.</Text>
+      <View style={styles.leaderboardGrid}>
+        <LeaderboardCard title="Weekly XP" metric="XP" items={leaderboards?.weekly_xp} colors={c} />
+        <LeaderboardCard title="Shared habits" metric="habits" items={leaderboards?.habit_completions} colors={c} />
+        <LeaderboardCard title="Shared tasks" metric="tasks" items={leaderboards?.task_completions} colors={c} />
+        <LeaderboardCard title="Current streak" metric="days" items={leaderboards?.streaks} colors={c} />
+      </View>
+
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, styles.sectionTitleInline, { color: c.text }]}>Orbit Rewards</Text>
+        {canManage && <AppButton title="Create" variant="ghost" fullWidth={false} style={styles.smallButton} onPress={() => openRewardForm()} disabled={!!busyItem} />}
+      </View>
+      {!!showRewardForm && <AppCard style={styles.createCard}>
+        <Text style={[styles.title, { color: c.text }]}>{editingReward ? "Edit Orbit reward" : "New Orbit reward"}</Text>
+        <AppInput value={rewardTitle} onChangeText={setRewardTitle} placeholder="Reward title" maxLength={100} style={styles.formInput} />
+        <AppInput value={rewardDescription} onChangeText={setRewardDescription} placeholder="Description (optional)" maxLength={500} style={styles.formInput} />
+        <AppInput value={rewardCost} onChangeText={setRewardCost} placeholder="XP cost" keyboardType="number-pad" style={styles.formInput} />
+        <View style={styles.formActions}>
+          <AppButton title="Cancel" variant="secondary" style={styles.formAction} onPress={() => { setShowRewardForm(false); setEditingReward(null); }} disabled={!!busyItem} />
+          <AppButton title="Save" style={styles.formAction} onPress={saveReward} disabled={!!busyItem} />
+        </View>
+      </AppCard>}
+      {activeRewards.length ? activeRewards.map((reward) => <OrbitRewardCard key={reward.id} reward={reward} colors={c} canManage={canManage} busy={!!busyItem} onEdit={() => openRewardForm(reward)} onDelete={() => deleteReward(reward)} onRedeem={() => redeemReward(reward)} />) : <AppCard style={styles.card}><EmptyState compact title="No Orbit rewards" description="Create a shared reward worth working toward together." icon={<MaterialCommunityIcons name="gift-outline" size={40} color={c.primary} />} /></AppCard>}
+      {!!redeemedRewards.length && <>
+        <Text style={[styles.smallLabel, styles.completedLabel, { color: c.textSecondary }]}>Redeemed</Text>
+        {redeemedRewards.slice(0, 3).map((reward) => <OrbitRewardCard key={reward.id} reward={reward} colors={c} canManage={false} busy={false} />)}
+      </>}
+
+      <Text style={[styles.sectionTitle, { color: c.text }]}>Orbit Milestones</Text>
+      {recentMilestones.length ? <AppCard style={[styles.card, styles.milestoneCard, { borderColor: c.primary }] }>
+        <View style={styles.milestoneHeader}>
+          <MaterialCommunityIcons name="party-popper" size={28} color={c.primary} />
+          <View style={styles.activityCopy}>
+            <Text style={[styles.memberName, { color: c.text }]}>Shared celebrations</Text>
+            <Text style={[styles.time, { color: c.textMuted }]}>{milestoneCount} milestone{milestoneCount === 1 ? "" : "s"} unlocked</Text>
+          </View>
+        </View>
+        {recentMilestones.map((milestone) => <View key={milestone.id || milestone.milestone_id} style={styles.milestoneRow}>
+          <View style={[styles.milestoneIcon, { backgroundColor: `${milestone.color || c.primary}20` }]}>
+            <MaterialCommunityIcons name={milestone.icon || "star-four-points"} size={24} color={milestone.color || c.primary} />
+          </View>
+          <View style={styles.activityCopy}>
+            <Text style={[styles.memberName, { color: c.text }]}>{milestone.title}</Text>
+            <Text style={[styles.copy, { color: c.textSecondary }]}>{milestone.description}</Text>
+            {!!milestone.unlocked_at && <Text style={[styles.time, { color: c.textMuted }]}>Unlocked {new Date(milestone.unlocked_at).toLocaleDateString()}</Text>}
+          </View>
+        </View>)}
+      </AppCard> : <AppCard style={styles.card}>
+        <Text style={[styles.copy, { color: c.textSecondary }]}>Major shared accomplishments will be celebrated here.</Text>
+      </AppCard>}
+
+      <Text style={[styles.sectionTitle, { color: c.text }]}>Orbit Achievements</Text>
+      {!!recentAchievementUnlocks.length && <AppCard style={styles.card}>
+        <Text style={[styles.smallLabel, { color: c.textSecondary }]}>Recent unlocks</Text>
+        {recentAchievementUnlocks.map((achievement) => <View key={achievement.id} style={styles.achievementUnlock}>
+          <MaterialCommunityIcons name="trophy-award" size={24} color={achievement.color || c.primary} />
+          <View style={styles.activityCopy}>
+            <Text style={[styles.memberName, { color: c.text }]}>{achievement.name}</Text>
+            <Text style={[styles.time, { color: c.textMuted }]}>{achievement.description}</Text>
+          </View>
+        </View>)}
+      </AppCard>}
+      <AppCard style={styles.card}>
+        {orbitAchievements.length ? orbitAchievements.map((achievement) => <View key={achievement.id} style={styles.achievementRow}>
+          <View style={styles.row}>
+            <Text style={[styles.memberName, { color: c.text }]}>{achievement.earned ? "✓ " : ""}{achievement.name}</Text>
+            <Text style={[styles.time, { color: achievement.earned ? c.success : c.textMuted }]}>{achievement.progress} / {achievement.target}</Text>
+          </View>
+          <View style={[styles.achievementTrack, { backgroundColor: c.surfaceAlt }]}><View style={[styles.fill, { width: `${achievement.percent || 0}%`, backgroundColor: achievement.color || c.primary }]} /></View>
+        </View>) : <Text style={[styles.copy, { color: c.textSecondary }]}>Orbit achievement progress will appear as members build momentum.</Text>}
       </AppCard>
 
       <AppCard style={styles.inviteCard}>
@@ -495,6 +674,14 @@ export default function OrbitDetailScreen() {
         <AppButton title={busyItem === "orbit-ai-recap" ? "Generating..." : orbitRecaps[0]?.ai_recap ? "Refresh AI Recap" : "Generate AI Recap"} onPress={generateOrbitAIRecap} disabled={!!busyItem} style={styles.contribute} />
       </AppCard>
 
+      <Text style={[styles.sectionTitle, { color: c.text }]}>AI Orbit Coach</Text>
+      <AppCard style={styles.card}>
+        {orbitRecaps[0]?.ai_insights ? <OrbitAIInsights insights={orbitRecaps[0].ai_insights} colors={c} /> : <Text style={[styles.copy, { color: c.textSecondary }]}>Get practical coaching based on this Orbit&apos;s participation, progress, streaks, and challenges.</Text>}
+        {!!orbitRecaps[0]?.ai_insights_generated_at && <Text style={[styles.time, { color: c.textMuted }]}>Last generated {new Date(orbitRecaps[0].ai_insights_generated_at).toLocaleString()}</Text>}
+        {!!insightsError && <Text style={[styles.copy, { color: c.danger }]}>{insightsError}</Text>}
+        <AppButton title={busyItem === "orbit-ai-insights" ? "Generating..." : orbitRecaps[0]?.ai_insights ? "Refresh Insights" : "Generate Insights"} onPress={generateOrbitAIInsights} disabled={!!busyItem} style={styles.contribute} />
+      </AppCard>
+
       <Text style={[styles.sectionTitle, { color: c.text }]}>Recent activity</Text>
       {recentActivity.length ? recentActivity.map((item) => <AppCard key={item.id} style={styles.activityCard}>
         <View style={styles.activityRow}>
@@ -536,6 +723,21 @@ function Stat({ label, value, color, labelColor }) {
   );
 }
 
+function LeaderboardCard({ title, metric, items = [], colors }) {
+  return <AppCard style={styles.leaderboardCard}>
+    <Text style={[styles.memberName, { color: colors.text }]}>{title}</Text>
+    {items.slice(0, 3).map((item) => <View key={item.user_id} style={styles.leaderboardRow}>
+      <Text style={[styles.leaderboardRank, { color: item.rank === 1 ? colors.primary : colors.textMuted }]}>#{item.rank}</Text>
+      <UserAvatar user={item} size={32} icon="account-circle" color={colors.primary} backgroundColor={colors.surfaceAlt} />
+      <View style={styles.leaderboardName}>
+        <Text numberOfLines={1} style={[styles.memberName, { color: colors.text }]}>{item.display_name}</Text>
+        <Text style={[styles.time, { color: colors.textMuted, textTransform: "capitalize" }]}>{item.role}</Text>
+      </View>
+      <Text style={[styles.memberName, { color: colors.primary }]}>{item.score} {metric}</Text>
+    </View>)}
+  </AppCard>;
+}
+
 function SharedItemsSection({
   title,
   emptyTitle,
@@ -562,6 +764,7 @@ function SharedItemsSection({
             <MaterialCommunityIcons name={completed ? "check-circle" : icon} size={28} color={completed ? colors.success : colors.primary} />
             <View style={styles.sharedItemCopy}>
               <Text style={[styles.memberName, { color: colors.text }]}>{item.name}</Text>
+              <Text style={[styles.time, { color: colors.primary }]}>Shared Orbit</Text>
               {!!item.description && <Text style={[styles.copy, { color: colors.textSecondary }]}>{item.description}</Text>}
               {!!item.requires_proof && <Text style={[styles.time, { color: colors.primary }]}>Proof required</Text>}
               {item.viewer_proof_status === "pending" && <Text style={[styles.time, { color: colors.textMuted }]}>Awaiting review</Text>}
@@ -602,6 +805,20 @@ function ChallengeCard({ challenge, colors }) {
   );
 }
 
+function OrbitRewardCard({ reward, colors, canManage, busy, onEdit, onDelete, onRedeem }) {
+  return <AppCard style={styles.card}>
+    <View style={styles.row}><Text style={[styles.title, { color: colors.text }]}>{reward.title}</Text><Text style={[styles.status, { color: reward.redeemed ? colors.success : colors.primary }]}>{reward.redeemed ? "redeemed" : `${reward.xp_cost} XP`}</Text></View>
+    {!!reward.description && <Text style={[styles.copy, { color: colors.textSecondary }]}>{reward.description}</Text>}
+    <OrbitProgressBar percent={reward.progress_percent || 0} style={styles.progressBar} />
+    <Text style={[styles.time, { color: colors.textMuted }]}>{reward.progress_xp || 0} / {reward.xp_cost} XP</Text>
+    {canManage && !reward.redeemed && <View style={styles.formActions}>
+      <AppButton title="Edit" variant="secondary" style={styles.formAction} onPress={onEdit} disabled={busy} />
+      <AppButton title="Delete" variant="secondary" style={styles.formAction} onPress={onDelete} disabled={busy} />
+      {reward.redeemable && <AppButton title="Redeem" style={styles.formAction} onPress={onRedeem} disabled={busy} />}
+    </View>}
+  </AppCard>;
+}
+
 function OrbitAIRecap({ recap, colors }) {
   const sections = [["Wins", recap.wins], ["Needs attention", recap.needs_attention], ["Suggested focus", recap.suggested_focus]];
   return <View style={styles.aiRecap}>
@@ -611,6 +828,26 @@ function OrbitAIRecap({ recap, colors }) {
       {items.map((item, index) => <Text key={`${label}-${index}`} style={[styles.copy, { color: colors.textSecondary }]}>- {item}</Text>)}
     </View> : null)}
     {!!recap.suggested_challenge && <Text style={[styles.memberName, { color: colors.primary }]}>Challenge idea: {recap.suggested_challenge}</Text>}
+  </View>;
+}
+
+function OrbitAIInsights({ insights, colors }) {
+  const sections = [["Strengths", insights.strengths], ["Risks", insights.risks], ["Opportunities", insights.opportunities], ["Recommendations", insights.recommendations]];
+  const challenge = insights.suggested_challenge;
+  return <View style={styles.aiRecap}>
+    <Text style={[styles.copy, { color: colors.text }]}>{insights.summary}</Text>
+    {!!insights.health_explanation && <View>
+      <Text style={[styles.memberName, { color: colors.text }]}>Health explanation</Text>
+      <Text style={[styles.copy, { color: colors.textSecondary }]}>{insights.health_explanation}</Text>
+    </View>}
+    {sections.map(([label, items]) => items?.length ? <View key={label}>
+      <Text style={[styles.memberName, { color: colors.text }]}>{label}</Text>
+      {items.map((item, index) => <Text key={`${label}-${index}`} style={[styles.copy, { color: colors.textSecondary }]}>- {item}</Text>)}
+    </View> : null)}
+    {!!challenge && <View>
+      <Text style={[styles.memberName, { color: colors.primary }]}>Suggested challenge: {typeof challenge === "string" ? challenge : challenge.title}</Text>
+      {typeof challenge === "object" && !!challenge.description && <Text style={[styles.copy, { color: colors.textSecondary }]}>{challenge.description}</Text>}
+    </View>}
   </View>;
 }
 
@@ -633,6 +870,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 }, center: { flex: 1, alignItems: "center", justifyContent: "center" }, container: { padding: spacing.xl, paddingBottom: 100 },
   actions: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.lg }, action: { flex: 1 },
   heroCard: { marginBottom: spacing.lg }, heroRow: { flexDirection: "row", alignItems: "center", gap: spacing.md }, heroCopy: { flex: 1 }, heroTitle: { ...typography.h2, marginTop: spacing.xs }, progressBar: { marginTop: spacing.lg },
+  healthCard: { marginBottom: spacing.lg }, healthScore: { ...typography.h1, marginTop: spacing.xs }, healthTrend: { flexDirection: "row", alignItems: "center", gap: spacing.xs, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm }, healthBreakdown: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md }, healthMetric: { minWidth: "30%" },
   inviteCard: { marginBottom: spacing.xl }, smallLabel: { ...typography.caption }, code: { ...typography.h2, marginTop: spacing.xs },
   sectionTitle: { ...typography.h3, marginTop: spacing.lg, marginBottom: spacing.md }, card: { marginBottom: spacing.md },
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing.lg }, sectionTitleInline: { marginTop: 0 },
@@ -648,4 +886,7 @@ const styles = StyleSheet.create({
   proofImageButton: { marginTop: spacing.md }, selectedProof: { gap: spacing.sm, marginTop: spacing.md }, proofImage: { width: "100%", height: 220, borderRadius: radii.lg, marginTop: spacing.md },
   aiRecommendation: { gap: spacing.xs, borderRadius: radii.lg, padding: spacing.md, marginTop: spacing.md }, aiTitle: { ...typography.bodyBold, textTransform: "capitalize" },
   aiRecap: { gap: spacing.md },
+  achievementUnlock: { flexDirection: "row", alignItems: "center", gap: spacing.md, marginTop: spacing.md }, achievementRow: { marginBottom: spacing.md }, achievementTrack: { height: 7, borderRadius: radii.pill, overflow: "hidden", marginTop: spacing.sm },
+  milestoneCard: { borderWidth: 1 }, milestoneHeader: { flexDirection: "row", alignItems: "center", gap: spacing.md, marginBottom: spacing.sm }, milestoneRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md, paddingTop: spacing.md, marginTop: spacing.sm, borderTopWidth: 1, borderTopColor: "rgba(127,127,127,0.18)" }, milestoneIcon: { width: 44, height: 44, borderRadius: radii.pill, alignItems: "center", justifyContent: "center" },
+  leaderboardIntro: { marginTop: -spacing.sm, marginBottom: spacing.md }, leaderboardGrid: { gap: spacing.sm, marginBottom: spacing.md }, leaderboardCard: { marginBottom: 0 }, leaderboardRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingTop: spacing.md, marginTop: spacing.sm, borderTopWidth: 1, borderTopColor: "rgba(127,127,127,0.18)" }, leaderboardRank: { ...typography.bodyBold, width: 28 }, leaderboardName: { flex: 1 },
 });

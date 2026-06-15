@@ -22,6 +22,9 @@ export default function OrbitMembersScreen() {
   const [results, setResults] = useState([]);
   const [inviteLink, setInviteLink] = useState("");
   const [linkInvites, setLinkInvites] = useState([]);
+  const [emailInvites, setEmailInvites] = useState([]);
+  const [emailText, setEmailText] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -30,8 +33,10 @@ export default function OrbitMembersScreen() {
       if (orbitData.capabilities?.can_manage_invites) {
         const inviteData = await api.listOrbitInvites(orbitId);
         setLinkInvites(inviteData.link_invites || []);
+        setEmailInvites(inviteData.email_invites || []);
       } else {
         setLinkInvites([]);
+        setEmailInvites([]);
       }
     }
     catch (err) { Alert.alert("Unable to load members", err.message); }
@@ -65,8 +70,32 @@ export default function OrbitMembersScreen() {
     }
   }
 
+  async function sendEmailInvites() {
+    const emails = emailText.split(/[\s,;]+/).map((value) => value.trim().toLowerCase()).filter(Boolean);
+    if (!emails.length) {
+      Alert.alert("Email required", "Enter at least one email address.");
+      return;
+    }
+    setSendingEmail(true);
+    try {
+      const result = await api.sendOrbitEmailInvites(orbitId, emails);
+      setEmailText("");
+      await load();
+      const sentCount = result.items?.length || 0;
+      const errors = result.errors || [];
+      Alert.alert(
+        sentCount ? "Invitation sent" : "No invitations sent",
+        `${sentCount} email invitation${sentCount === 1 ? "" : "s"} sent.${errors.length ? ` ${errors.map((item) => `${item.email}: ${item.detail}`).join("\n")}` : ""}`,
+      );
+    } catch (err) {
+      Alert.alert("Could not send invitation", err.message);
+    } finally {
+      setSendingEmail(false);
+    }
+  }
+
   function revokeInvite(invite) {
-    Alert.alert("Revoke invite link?", "Anyone using this link will no longer be able to join.", [
+    Alert.alert("Revoke invitation?", "This invitation will no longer allow someone to join.", [
       { text: "Cancel", style: "cancel" },
       { text: "Revoke", style: "destructive", onPress: async () => { try { await api.deactivateOrbitInvite(orbitId, invite.id); if (inviteLink.endsWith(invite.token)) setInviteLink(""); await load(); } catch (err) { Alert.alert("Could not revoke invite", err.message); } } },
     ]);
@@ -127,6 +156,20 @@ export default function OrbitMembersScreen() {
             <Text selectable style={[styles.inviteLink, { color: c.primary }]}>{APP_URL}/orbit-invite/{invite.token}</Text>
             <Text style={[styles.handle, { color: c.textSecondary }]}>{invite.uses_count || 0} use{invite.uses_count === 1 ? "" : "s"}{invite.max_uses ? ` of ${invite.max_uses}` : ""}</Text>
             <View style={styles.inviteActions}><AppButton title="Share" variant="ghost" fullWidth={false} onPress={() => shareInvite(invite)} /><AppButton title="Revoke" variant="ghost" fullWidth={false} onPress={() => revokeInvite(invite)} /></View>
+          </AppCard>)}
+        </>}
+        <AppCard style={styles.searchCard}>
+          <Text style={[styles.title, { color: c.text }]}>Invite by email</Text>
+          <Text style={[styles.handle, { color: c.textSecondary }]}>Send a private, single-use invitation. Separate multiple addresses with commas.</Text>
+          <AppInput value={emailText} onChangeText={setEmailText} placeholder="person@example.com" autoCapitalize="none" keyboardType="email-address" style={styles.input} />
+          <AppButton title={sendingEmail ? "Sending..." : "Send invitation"} onPress={sendEmailInvites} disabled={sendingEmail} style={styles.linkButton} />
+        </AppCard>
+        {emailInvites.length > 0 && <>
+          <Text style={[styles.sectionTitle, { color: c.text }]}>Pending email invitations</Text>
+          {emailInvites.map((invite) => <AppCard key={invite.id} style={styles.memberCard}>
+            <Text style={[styles.memberName, { color: c.text }]}>{invite.email}</Text>
+            <Text style={[styles.handle, { color: c.textSecondary }]}>Expires {new Date(invite.expires_at).toLocaleDateString()}</Text>
+            <View style={styles.inviteActions}><AppButton title="Share link" variant="ghost" fullWidth={false} onPress={() => shareInvite(invite)} /><AppButton title="Revoke" variant="ghost" fullWidth={false} onPress={() => revokeInvite(invite)} /></View>
           </AppCard>)}
         </>}
         <AppCard style={styles.searchCard}>

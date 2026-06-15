@@ -361,6 +361,15 @@ function IntroStep({ onNext }) {
           <Feature icon="check-circle" text="Complete habits and tasks" />
           <Feature icon="zap" text="Earn XP and level up" />
           <Feature icon="gift" text="Unlock rewards and themes" />
+          <Feature icon="users" text="Build shared momentum in Orbits" />
+        </View>
+      </AppCard>
+
+      <AppCard style={styles.orbitIntroCard}>
+        <MaterialCommunityIcons name="account-group-outline" size={30} color={c.primary} />
+        <View style={styles.orbitIntroCopy}>
+          <Text style={[styles.featureText, { color: c.text }]}>Create your first Orbit</Text>
+          <Text style={[styles.heroText, { color: c.textSecondary }]}>Share habits, tasks, challenges, and progress after setup.</Text>
         </View>
       </AppCard>
 
@@ -789,4 +798,6 @@ const styles = StyleSheet.create({
   skipButton: {
     marginTop: spacing.sm,
   },
+  orbitIntroCard: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  orbitIntroCopy: { flex: 1 },
 });

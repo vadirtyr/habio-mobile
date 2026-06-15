@@ -599,7 +599,7 @@ function HabitCard({ item, tier, onComplete, onEdit }) {
                 {item.description}
               </Text>
             )}
-            {item.is_orbit_item && <Text style={[styles.orbitLabel, { color: c.primary }]}>Orbit: {item.orbit_name}</Text>}
+            <Text style={[styles.orbitLabel, { color: item.is_orbit_item ? c.primary : c.textMuted }]}>{item.is_orbit_item ? item.orbit_name : "Personal"}</Text>
           </View>
         </View>
 

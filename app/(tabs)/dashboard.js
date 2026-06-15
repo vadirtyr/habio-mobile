@@ -64,6 +64,7 @@ export default function DashboardScreen() {
 
   const [todayHabits, setTodayHabits] = useState([]);
   const [todayTasks, setTodayTasks] = useState([]);
+  const [orbitSummaries, setOrbitSummaries] = useState([]);
   const [orbitCounts, setOrbitCounts] = useState({ habitsTotal: 0, habitsDone: 0, tasksTotal: 0, tasksDone: 0 });
 
   const totalTodayItems = todayHabits.length + todayTasks.length;
@@ -164,6 +165,7 @@ export default function DashboardScreen() {
       const orbitItems = orbitItemsData.status === "fulfilled"
         ? orbitItemsData.value
         : { habits: [], tasks: [] };
+      setOrbitSummaries(orbitItems.orbits || []);
       setOrbitCounts({
         habitsTotal: orbitItems.habits.length,
         habitsDone: orbitItems.habits.filter((item) => item.completed_today).length,
@@ -308,6 +310,33 @@ export default function DashboardScreen() {
         >
           <HeaderWithBell subtitle="Small actions compound into real progress." />
 
+          <SectionTitle title="Your Orbits" subtitle="Shared momentum, right from your dashboard." />
+          {orbitSummaries.length ? <>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.orbitStrip}>
+              {orbitSummaries.map((orbit) => <Pressable key={orbit.id} onPress={() => router.push({ pathname: "/orbit-detail", params: { orbitId: orbit.id } })}>
+                <AppCard style={styles.orbitChip}>
+                  <View style={[styles.orbitIcon, { backgroundColor: c.surfaceAlt }]}><MaterialCommunityIcons name="account-group" size={22} color={c.primary} /></View>
+                  <Text style={[styles.orbitName, { color: c.text }]} numberOfLines={1}>{orbit.name}</Text>
+                  <Text style={[styles.previewBadge, { color: c.textSecondary }]}>Level {orbit.level || 1} · {orbit.member_count || 0} members</Text>
+                </AppCard>
+              </Pressable>)}
+            </ScrollView>
+            <View style={styles.featuredOrbits}>
+              {orbitSummaries.slice(0, 3).map((orbit) => <Pressable key={`featured-${orbit.id}`} onPress={() => router.push({ pathname: "/orbit-detail", params: { orbitId: orbit.id } })}>
+                <AppCard style={styles.featuredOrbitCard}>
+                  <View style={styles.orbitCardHeader}><Text style={[styles.orbitName, { color: c.text }]}>{orbit.name}</Text><Text style={[styles.orbitLevel, { color: c.primary }]}>Level {orbit.level || 1}</Text></View>
+                  <View style={[styles.orbitTrack, { backgroundColor: c.surfaceAlt }]}><View style={[styles.orbitFill, { backgroundColor: c.primary, width: `${Math.min(100, orbit.weekly_completion_rate || 0)}%` }]} /></View>
+                  <Text style={[styles.todayCopy, { color: c.textSecondary }]}>{orbit.weekly_completion_rate || 0}% this week · {orbit.active_challenges_count || 0} challenges · {orbit.due_count || 0} due</Text>
+                </AppCard>
+              </Pressable>)}
+            </View>
+          </> : <AppCard style={styles.noOrbitCard}>
+            <MaterialCommunityIcons name="account-group-outline" size={36} color={c.primary} />
+            <Text style={[styles.todayTitle, { color: c.text }]}>Create your first Orbit</Text>
+            <Text style={[styles.todayCopy, { color: c.textSecondary }]}>Share habits, tasks, challenges, and progress with people who matter.</Text>
+            <View style={styles.actionRow}><AppButton title="Create Orbit" style={styles.actionButton} onPress={() => router.push("/create-orbit")} /><AppButton title="Start from Template" variant="secondary" style={styles.actionButton} onPress={() => router.push("/create-orbit")} /></View>
+          </AppCard>}
+
           <MomentumCard
             name="Explorer"
             level={stats?.level_data?.level || 1}
@@ -395,7 +424,7 @@ export default function DashboardScreen() {
                         key={`habit-${habit.id || habit._id || habit.name}`}
                         icon="repeat"
                         label={habit.name || habit.title || "Habit"}
-                        badge={habit.is_orbit_item ? `Orbit: ${habit.orbit_name}` : null}
+                        badge={habit.is_orbit_item ? habit.orbit_name : "Personal"}
                         accent="cyan"
                         themeColors={c}
                       />
@@ -408,7 +437,7 @@ export default function DashboardScreen() {
                         }`}
                         icon="checkbox-marked-circle-outline"
                         label={task.title || task.name || "Task"}
-                        badge={task.is_orbit_item ? `Orbit: ${task.orbit_name}` : null}
+                        badge={task.is_orbit_item ? task.orbit_name : "Personal"}
                         accent="coral"
                         themeColors={c}
                       />
@@ -598,6 +627,17 @@ const styles = StyleSheet.create({
   },
   previewCopy: { flex: 1 },
   previewBadge: { ...typography.caption, fontWeight: "800", marginTop: 2 },
+  orbitStrip: { gap: spacing.sm, paddingBottom: spacing.sm },
+  orbitChip: { width: 210, minHeight: 120 },
+  orbitIcon: { width: 38, height: 38, borderRadius: radii.md, alignItems: "center", justifyContent: "center", marginBottom: spacing.sm },
+  orbitName: { ...typography.h3 },
+  featuredOrbits: { gap: spacing.sm, marginBottom: spacing.md },
+  featuredOrbitCard: { marginBottom: 0 },
+  orbitCardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
+  orbitLevel: { ...typography.caption, fontWeight: "800" },
+  orbitTrack: { height: 8, borderRadius: radii.pill, overflow: "hidden", marginTop: spacing.md },
+  orbitFill: { height: "100%", borderRadius: radii.pill },
+  noOrbitCard: { marginBottom: spacing.md },
 
   actionRow: {
     flexDirection: "row",
