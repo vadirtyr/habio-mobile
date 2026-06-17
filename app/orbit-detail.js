@@ -25,6 +25,11 @@ const TYPE_LABELS = {
 const CHALLENGE_TYPES = [
   ["actions", "Actions"], ["habits", "Habits"], ["tasks", "Tasks"],
 ];
+const RSVP_OPTIONS = [
+  ["attending", "Attending"],
+  ["maybe", "Maybe"],
+  ["declined", "Declined"],
+];
 const PROOF_EXTENSIONS = {
   "image/jpeg": "jpg",
   "image/png": "png",
@@ -38,6 +43,8 @@ export default function OrbitDetailScreen() {
   const c = theme.colors;
   const [dashboard, setDashboard] = useState(null);
   const [leaderboards, setLeaderboards] = useState(null);
+  const [events, setEvents] = useState([]);
+  const [readinessByEvent, setReadinessByEvent] = useState({});
   const [orbitRecaps, setOrbitRecaps] = useState([]);
   const [insightsError, setInsightsError] = useState(null);
   const [error, setError] = useState(null);
@@ -62,6 +69,17 @@ export default function OrbitDetailScreen() {
   const [rewardTitle, setRewardTitle] = useState("");
   const [rewardDescription, setRewardDescription] = useState("");
   const [rewardCost, setRewardCost] = useState("500");
+  const [showEventForm, setShowEventForm] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
+  const [eventTitle, setEventTitle] = useState("");
+  const [eventDescription, setEventDescription] = useState("");
+  const [eventLocation, setEventLocation] = useState("");
+  const [eventStart, setEventStart] = useState("");
+  const [eventEnd, setEventEnd] = useState("");
+  const [readinessForm, setReadinessForm] = useState(null);
+  const [readinessTitle, setReadinessTitle] = useState("");
+  const [readinessDescription, setReadinessDescription] = useState("");
+  const [readinessRequired, setReadinessRequired] = useState(true);
   const [challengeEndDate, setChallengeEndDate] = useState(() => {
     const end = new Date();
     end.setUTCDate(end.getUTCDate() + 30);
@@ -70,13 +88,26 @@ export default function OrbitDetailScreen() {
 
   const load = useCallback(async () => {
     try {
-      const [dashboardData, recapData, leaderboardData] = await Promise.all([
+      const [dashboardData, recapData, leaderboardData, eventData] = await Promise.all([
         api.getOrbitDashboard(orbitId),
         api.getOrbitWeeklyRecaps(orbitId),
         api.getOrbitLeaderboards(orbitId),
+        api.getOrbitEvents(orbitId),
       ]);
       setDashboard(dashboardData);
       setLeaderboards(leaderboardData);
+      const eventItems = eventData.items || [];
+      setEvents(eventItems);
+      const readinessResults = await Promise.allSettled(
+        eventItems.map((event) => api.getOrbitEventReadiness(orbitId, event.id))
+      );
+      const readinessMap = {};
+      readinessResults.forEach((result, index) => {
+        if (result.status === "fulfilled") {
+          readinessMap[eventItems[index].id] = result.value;
+        }
+      });
+      setReadinessByEvent(readinessMap);
       setOrbitRecaps(recapData.items || []);
       setError(null);
     }
@@ -340,6 +371,132 @@ export default function OrbitDetailScreen() {
     ]);
   }
 
+  function openEventForm(event = null) {
+    setEditingEvent(event);
+    setEventTitle(event?.title || "");
+    setEventDescription(event?.description || "");
+    setEventLocation(event?.location || "");
+    setEventStart(event?.start_time ? event.start_time.slice(0, 16) : "");
+    setEventEnd(event?.end_time ? event.end_time.slice(0, 16) : "");
+    setShowEventForm(true);
+  }
+
+  async function saveEvent() {
+    if (!eventTitle.trim() || !eventStart.trim()) {
+      Alert.alert("Check event details", "Add a title and start date/time.");
+      return;
+    }
+    setBusyItem(editingEvent ? `edit-event-${editingEvent.id}` : "create-event");
+    try {
+      const body = {
+        title: eventTitle.trim(),
+        description: eventDescription.trim(),
+        location: eventLocation.trim(),
+        start_time: eventStart.trim(),
+        end_time: eventEnd.trim() || null,
+      };
+      if (editingEvent) await api.updateOrbitEvent(orbitId, editingEvent.id, body);
+      else await api.createOrbitEvent(orbitId, body);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowEventForm(false);
+      setEditingEvent(null);
+      await load();
+    } catch (err) {
+      Alert.alert("Could not save event", err.message);
+    } finally {
+      setBusyItem(null);
+    }
+  }
+
+  function deleteEvent(event) {
+    Alert.alert("Delete Orbit event?", `Delete “${event.title}”?`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: async () => {
+        try {
+          await api.deleteOrbitEvent(orbitId, event.id);
+          await load();
+        } catch (err) {
+          Alert.alert("Could not delete event", err.message);
+        }
+      } },
+    ]);
+  }
+
+  async function rsvpEvent(event, status) {
+    setBusyItem(`event-rsvp-${event.id}`);
+    try {
+      await api.rsvpOrbitEvent(orbitId, event.id, status);
+      await Haptics.selectionAsync();
+      await load();
+    } catch (err) {
+      Alert.alert("Could not update RSVP", err.message);
+    } finally {
+      setBusyItem(null);
+    }
+  }
+
+  function openReadinessForm(event, item = null) {
+    setReadinessForm({ event, item });
+    setReadinessTitle(item?.title || "");
+    setReadinessDescription(item?.description || "");
+    setReadinessRequired(item?.required !== false);
+  }
+
+  async function saveReadinessItem() {
+    if (!readinessForm?.event || !readinessTitle.trim()) {
+      Alert.alert("Checklist item required", "Add a title for the readiness item.");
+      return;
+    }
+    const { event, item } = readinessForm;
+    setBusyItem(item ? `readiness-edit-${item.id}` : `readiness-create-${event.id}`);
+    try {
+      const body = {
+        title: readinessTitle.trim(),
+        description: readinessDescription.trim(),
+        required: readinessRequired,
+      };
+      const readiness = item
+        ? await api.updateOrbitEventReadinessItem(orbitId, event.id, item.id, body)
+        : await api.createOrbitEventReadinessItem(orbitId, event.id, body);
+      setReadinessByEvent((current) => ({ ...current, [event.id]: readiness }));
+      setReadinessForm(null);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err) {
+      Alert.alert("Could not save checklist item", err.message);
+    } finally {
+      setBusyItem(null);
+    }
+  }
+
+  async function deleteReadinessItem(event, item) {
+    Alert.alert("Delete checklist item?", `Delete “${item.title}”?`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: async () => {
+        try {
+          const readiness = await api.deleteOrbitEventReadinessItem(orbitId, event.id, item.id);
+          setReadinessByEvent((current) => ({ ...current, [event.id]: readiness }));
+        } catch (err) {
+          Alert.alert("Could not delete checklist item", err.message);
+        }
+      } },
+    ]);
+  }
+
+  async function toggleReadinessItem(event, item) {
+    setBusyItem(`readiness-${item.id}`);
+    try {
+      const readiness = item.completed
+        ? await api.uncompleteOrbitEventReadinessItem(orbitId, event.id, item.id)
+        : await api.completeOrbitEventReadinessItem(orbitId, event.id, item.id);
+      setReadinessByEvent((current) => ({ ...current, [event.id]: readiness }));
+      await Haptics.selectionAsync();
+    } catch (err) {
+      Alert.alert("Could not update checklist", err.message);
+    } finally {
+      setBusyItem(null);
+    }
+  }
+
   function leaveOrDelete() {
     const orbit = dashboard.orbit;
     const owner = orbit.viewer_role === "owner";
@@ -433,6 +590,52 @@ export default function OrbitDetailScreen() {
         <AppButton title="Members" variant="secondary" style={styles.action} onPress={() => router.push({ pathname: "/orbit-members", params: { orbitId } })} />
         {canManage && <AppButton title="New goal" style={styles.action} onPress={() => router.push({ pathname: "/create-orbit-goal", params: { orbitId } })} />}
       </View>
+
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, styles.sectionTitleInline, { color: c.text }]}>Orbit Events</Text>
+        {canManage && <AppButton title="Create" variant="ghost" fullWidth={false} style={styles.smallButton} onPress={() => openEventForm()} disabled={!!busyItem} />}
+      </View>
+      {!!showEventForm && <AppCard style={styles.createCard}>
+        <Text style={[styles.title, { color: c.text }]}>{editingEvent ? "Edit Orbit event" : "New Orbit event"}</Text>
+        <AppInput value={eventTitle} onChangeText={setEventTitle} placeholder="Event title" maxLength={120} style={styles.formInput} />
+        <AppInput value={eventDescription} onChangeText={setEventDescription} placeholder="Description (optional)" maxLength={1000} style={styles.formInput} />
+        <AppInput value={eventLocation} onChangeText={setEventLocation} placeholder="Location (optional)" maxLength={240} style={styles.formInput} />
+        <AppInput value={eventStart} onChangeText={setEventStart} placeholder="Start: YYYY-MM-DDTHH:mm" style={styles.formInput} />
+        <AppInput value={eventEnd} onChangeText={setEventEnd} placeholder="End: YYYY-MM-DDTHH:mm (optional)" style={styles.formInput} />
+        <View style={styles.formActions}>
+          <AppButton title="Cancel" variant="secondary" style={styles.formAction} onPress={() => { setShowEventForm(false); setEditingEvent(null); }} disabled={!!busyItem} />
+          <AppButton title="Save" style={styles.formAction} onPress={saveEvent} disabled={!!busyItem} />
+        </View>
+      </AppCard>}
+      {events.length ? events.map((event) => <View key={event.id}>
+        <OrbitEventCard
+          event={event}
+          readiness={readinessByEvent[event.id]}
+          colors={c}
+          canManage={canManage}
+          busy={!!busyItem}
+          onEdit={() => openEventForm(event)}
+          onDelete={() => deleteEvent(event)}
+          onRsvp={(status) => rsvpEvent(event, status)}
+          onCreateReadiness={() => openReadinessForm(event)}
+          onEditReadiness={(item) => openReadinessForm(event, item)}
+          onDeleteReadiness={(item) => deleteReadinessItem(event, item)}
+          onToggleReadiness={(item) => toggleReadinessItem(event, item)}
+        />
+        {readinessForm?.event?.id === event.id && <AppCard style={styles.createCard}>
+          <Text style={[styles.title, { color: c.text }]}>{readinessForm.item ? "Edit readiness item" : "New readiness item"}</Text>
+          <AppInput value={readinessTitle} onChangeText={setReadinessTitle} placeholder="Checklist item" maxLength={140} style={styles.formInput} />
+          <AppInput value={readinessDescription} onChangeText={setReadinessDescription} placeholder="Description (optional)" maxLength={500} style={styles.formInput} />
+          <Pressable onPress={() => setReadinessRequired((value) => !value)} style={[styles.proofToggle, { borderColor: readinessRequired ? c.primary : c.border, backgroundColor: readinessRequired ? `${c.primary}16` : c.surfaceAlt }]}>
+            <MaterialCommunityIcons name={readinessRequired ? "checkbox-marked-circle" : "checkbox-blank-circle-outline"} size={22} color={readinessRequired ? c.primary : c.textMuted} />
+            <Text style={[styles.copy, { color: c.text }]}>Required for readiness percentage</Text>
+          </Pressable>
+          <View style={styles.formActions}>
+            <AppButton title="Cancel" variant="secondary" style={styles.formAction} onPress={() => setReadinessForm(null)} disabled={!!busyItem} />
+            <AppButton title="Save" style={styles.formAction} onPress={saveReadinessItem} disabled={!!busyItem} />
+          </View>
+        </AppCard>}
+      </View>) : <AppCard style={styles.card}><EmptyState compact title="No Orbit events" description="Add meetings, campouts, workouts, or study sessions for this Orbit." icon={<MaterialCommunityIcons name="calendar-month-outline" size={40} color={c.primary} />} /></AppCard>}
 
       <Text style={[styles.sectionTitle, { color: c.text }]}>This week</Text>
       <AppCard style={styles.card}>
@@ -819,6 +1022,86 @@ function OrbitRewardCard({ reward, colors, canManage, busy, onEdit, onDelete, on
   </AppCard>;
 }
 
+function OrbitEventCard({
+  event,
+  readiness,
+  colors,
+  canManage,
+  busy,
+  onEdit,
+  onDelete,
+  onRsvp,
+  onCreateReadiness,
+  onEditReadiness,
+  onDeleteReadiness,
+  onToggleReadiness,
+}) {
+  const counts = event.rsvp_counts || {};
+  const start = event.start_time ? new Date(event.start_time).toLocaleString() : "Time TBD";
+  const end = event.end_time ? new Date(event.end_time).toLocaleString() : null;
+  const readinessItems = readiness?.items || [];
+  return <AppCard style={styles.card}>
+    <View style={styles.row}>
+      <View style={styles.activityCopy}>
+        <Text style={[styles.title, { color: colors.text }]}>{event.title}</Text>
+        <Text style={[styles.time, { color: colors.primary }]}>{start}{end ? ` - ${end}` : ""}</Text>
+      </View>
+      <MaterialCommunityIcons name="calendar-star" size={28} color={colors.primary} />
+    </View>
+    {!!event.location && <Text style={[styles.copy, { color: colors.textSecondary }]}>Location: {event.location}</Text>}
+    {!!event.description && <Text style={[styles.copy, { color: colors.textSecondary }]}>{event.description}</Text>}
+    <Text style={[styles.time, { color: colors.textMuted }]}>
+      {counts.attending || 0} attending · {counts.maybe || 0} maybe · {counts.declined || 0} declined
+    </Text>
+    <View style={styles.formActions}>
+      {RSVP_OPTIONS.map(([value, label]) => (
+        <AppButton
+          key={value}
+          title={event.viewer_rsvp === value ? `✓ ${label}` : label}
+          variant={event.viewer_rsvp === value ? "primary" : "secondary"}
+          style={styles.formAction}
+          onPress={() => onRsvp(value)}
+          disabled={busy}
+        />
+      ))}
+    </View>
+    {canManage && <View style={styles.formActions}>
+      <AppButton title="Edit" variant="secondary" style={styles.formAction} onPress={onEdit} disabled={busy} />
+      <AppButton title="Delete" variant="secondary" style={styles.formAction} onPress={onDelete} disabled={busy} />
+    </View>}
+    <View style={styles.readinessHeader}>
+      <View style={styles.activityCopy}>
+        <Text style={[styles.memberName, { color: colors.text }]}>Readiness checklist</Text>
+        <Text style={[styles.time, { color: colors.textMuted }]}>
+          {readiness ? `${readiness.readiness_percent}% ready · ${readiness.completed_count}/${readiness.total_count}` : "Loading readiness..."}
+        </Text>
+      </View>
+      {canManage && <AppButton title="Add" variant="ghost" fullWidth={false} style={styles.smallButton} onPress={onCreateReadiness} disabled={busy} />}
+    </View>
+    {readiness && <OrbitProgressBar percent={readiness.readiness_percent || 0} style={styles.challengeProgress} />}
+    {readinessItems.length ? readinessItems.map((item) => <View key={item.id} style={styles.readinessItemRow}>
+      <Pressable onPress={() => onToggleReadiness(item)} disabled={busy} style={styles.readinessCheck}>
+        <MaterialCommunityIcons name={item.completed ? "checkbox-marked-circle" : "checkbox-blank-circle-outline"} size={24} color={item.completed ? colors.success : colors.textMuted} />
+      </Pressable>
+      <View style={styles.activityCopy}>
+        <Text style={[styles.memberName, { color: colors.text }]}>{item.title}</Text>
+        <Text style={[styles.time, { color: item.required ? colors.primary : colors.textMuted }]}>{item.required ? "Required" : "Optional"}</Text>
+        {!!item.description && <Text style={[styles.copy, { color: colors.textSecondary }]}>{item.description}</Text>}
+      </View>
+      {canManage && <View style={styles.readinessActions}>
+        <Pressable onPress={() => onEditReadiness(item)} disabled={busy}><Text style={[styles.time, { color: colors.primary }]}>Edit</Text></Pressable>
+        <Pressable onPress={() => onDeleteReadiness(item)} disabled={busy}><Text style={[styles.time, { color: colors.danger }]}>Delete</Text></Pressable>
+      </View>}
+    </View>) : <Text style={[styles.copy, { color: colors.textSecondary }]}>No readiness items yet.</Text>}
+    {canManage && readiness?.member_readiness?.length ? <View style={styles.memberReadiness}>
+      <Text style={[styles.memberName, { color: colors.text }]}>Member readiness</Text>
+      {readiness.member_readiness.slice(0, 5).map((member) => <Text key={member.user_id} style={[styles.time, { color: colors.textSecondary }]}>
+        {member.user?.display_name || member.user?.name || member.user?.username || "Member"}: {member.readiness_percent}% ({member.completed_count}/{member.total_count})
+      </Text>)}
+    </View> : null}
+  </AppCard>;
+}
+
 function OrbitAIRecap({ recap, colors }) {
   const sections = [["Wins", recap.wins], ["Needs attention", recap.needs_attention], ["Suggested focus", recap.suggested_focus]];
   return <View style={styles.aiRecap}>
@@ -886,6 +1169,11 @@ const styles = StyleSheet.create({
   proofImageButton: { marginTop: spacing.md }, selectedProof: { gap: spacing.sm, marginTop: spacing.md }, proofImage: { width: "100%", height: 220, borderRadius: radii.lg, marginTop: spacing.md },
   aiRecommendation: { gap: spacing.xs, borderRadius: radii.lg, padding: spacing.md, marginTop: spacing.md }, aiTitle: { ...typography.bodyBold, textTransform: "capitalize" },
   aiRecap: { gap: spacing.md },
+  readinessHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md, marginTop: spacing.lg },
+  readinessItemRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm, paddingTop: spacing.md, marginTop: spacing.sm, borderTopWidth: 1, borderTopColor: "rgba(127,127,127,0.18)" },
+  readinessCheck: { paddingTop: spacing.xs },
+  readinessActions: { alignItems: "flex-end", gap: spacing.xs },
+  memberReadiness: { gap: spacing.xs, marginTop: spacing.md },
   achievementUnlock: { flexDirection: "row", alignItems: "center", gap: spacing.md, marginTop: spacing.md }, achievementRow: { marginBottom: spacing.md }, achievementTrack: { height: 7, borderRadius: radii.pill, overflow: "hidden", marginTop: spacing.sm },
   milestoneCard: { borderWidth: 1 }, milestoneHeader: { flexDirection: "row", alignItems: "center", gap: spacing.md, marginBottom: spacing.sm }, milestoneRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md, paddingTop: spacing.md, marginTop: spacing.sm, borderTopWidth: 1, borderTopColor: "rgba(127,127,127,0.18)" }, milestoneIcon: { width: 44, height: 44, borderRadius: radii.pill, alignItems: "center", justifyContent: "center" },
   leaderboardIntro: { marginTop: -spacing.sm, marginBottom: spacing.md }, leaderboardGrid: { gap: spacing.sm, marginBottom: spacing.md }, leaderboardCard: { marginBottom: 0 }, leaderboardRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingTop: spacing.md, marginTop: spacing.sm, borderTopWidth: 1, borderTopColor: "rgba(127,127,127,0.18)" }, leaderboardRank: { ...typography.bodyBold, width: 28 }, leaderboardName: { flex: 1 },
