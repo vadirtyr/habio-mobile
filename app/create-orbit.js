@@ -20,6 +20,13 @@ const ORBIT_TEMPLATES = [
     highlights: ["Starter challenges", "Shared rewards", "Family events"],
   },
   {
+    id: "scout_troop",
+    name: "Scout Troop",
+    description: "Meetings, campouts, service projects, leadership, and troop accountability.",
+    nameSuggestion: "Troop 123",
+    highlights: ["Camp readiness", "Service projects", "Troop challenges"],
+  },
+  {
     id: "blank",
     name: "Blank Orbit",
     description: "Start with an empty Orbit and customize everything yourself.",
@@ -35,6 +42,20 @@ export default function CreateOrbitScreen() {
   const [name, setName] = useState(ORBIT_TEMPLATES[0].nameSuggestion);
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
+  const isFamily = selectedTemplate.id === "family";
+  const isScoutTroop = selectedTemplate.id === "scout_troop";
+  const createTitle = saving
+    ? "Creating..."
+    : isFamily
+      ? "Create Family Orbit"
+      : isScoutTroop
+        ? "Create Scout Troop"
+        : "Create Blank Orbit";
+  const namePlaceholder = isFamily
+    ? "Williams Family"
+    : isScoutTroop
+      ? "Troop 123"
+      : "Morning Momentum";
 
   function chooseTemplate(template) {
     setSelectedTemplate(template);
@@ -86,12 +107,12 @@ export default function CreateOrbitScreen() {
 
       <AppCard>
         <Text style={[styles.label, { color: c.text }]}>Name</Text>
-        <AppInput value={name} onChangeText={setName} placeholder={selectedTemplate.id === "family" ? "Williams Family" : "Morning Momentum"} maxLength={80} />
+        <AppInput value={name} onChangeText={setName} placeholder={namePlaceholder} maxLength={80} />
         {selectedTemplate.id === "blank" && <>
           <Text style={[styles.label, { color: c.text }]}>Description</Text>
           <AppInput value={description} onChangeText={setDescription} placeholder="What will this group work toward?" multiline maxLength={500} />
         </>}
-        <AppButton title={saving ? "Creating..." : selectedTemplate.id === "family" ? "Create Family Orbit" : "Create Blank Orbit"} onPress={save} disabled={saving || !name.trim()} style={styles.button} />
+        <AppButton title={createTitle} onPress={save} disabled={saving || !name.trim()} style={styles.button} />
       </AppCard>
     </ScrollView>
   );
