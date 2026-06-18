@@ -1,623 +1,458 @@
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import * as SecureStore from "expo-secure-store";
 import { useMemo, useState } from "react";
 import {
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 
 import { AnimatedPressable } from "../components/AnimatedPressable";
 import { AnimatedScreen } from "../components/AnimatedScreen";
 import { AppButton } from "../components/AppButton";
 import { AppCard } from "../components/AppCard";
-import {
-    BrandBadge,
-    BrandHeader,
-} from "../components/BrandMark";
+import { BrandBadge, BrandHeader } from "../components/BrandMark";
 import { OrbitProgressBar } from "../components/OrbitProgressBar";
-
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../hooks/useTheme";
-
 import { api } from "../lib/api";
+import { radii, spacing, typography } from "../lib/theme";
 
-import {
-    radii,
-    spacing,
-    typography,
-} from "../lib/theme";
+const GOALS = [
+  { id: "family", title: "Family Accountability", template: "family" },
+  { id: "scout", title: "Scout Troop", template: "scout_troop" },
+  { id: "accountability", title: "Accountability Group", template: "accountability_circle" },
+  { id: "fitness", title: "Fitness Goals", template: "fitness_group" },
+  { id: "study", title: "Study Group", template: "study_group" },
+  { id: "personal", title: "Personal Growth", template: "blank" },
+];
 
-const CATEGORIES = [
+const TEMPLATES = [
   {
-    id: "health",
-    title: "Health",
-    icon: "heart",
-    description: "Energy, movement, hydration, and sleep.",
-    habits: [
-      {
-        name: "Drink water",
-        description: "Drink a full glass of water.",
-        icon: "cup-water",
-        category: "Starter",
-      },
-      {
-        name: "Take medication",
-        description: "A low-reward maintenance reminder.",
-        icon: "pill",
-        category: "maintenance",
-        custom_coins: 1,
-      },
-      {
-        name: "Take vitamins",
-        description: "Quick daily wellness reminder.",
-        icon: "pill",
-        category: "maintenance",
-        custom_coins: 1,
-      },
-      {
-        name: "Take a walk",
-        description: "Walk for at least 10 minutes.",
-        icon: "walk",
-        category: "Starter",
-      },
-      {
-        name: "Stretch",
-        description: "Do a short stretch session.",
-        icon: "human-handsup",
-        category: "Starter",
-      },
-    ],
+    id: "family",
+    title: "Family",
+    icon: "home-heart",
+    placeholder: "Williams Family",
+    description: "Shared goals, chores, rewards, and family accountability.",
   },
-
   {
-    id: "mind",
-    title: "Mind",
-    icon: "brain",
-    description: "Focus, reflection, and mental reset.",
-    habits: [
-      {
-        name: "Journal",
-        description: "Write a few thoughts for the day.",
-        icon: "notebook-outline",
-        category: "Starter",
-      },
-      {
-        name: "Meditate",
-        description: "Take 5 quiet minutes.",
-        icon: "meditation",
-        category: "Starter",
-      },
-      {
-        name: "Read",
-        description: "Read for 10 minutes.",
-        icon: "book-open-page-variant",
-        category: "Starter",
-      },
-    ],
+    id: "scout_troop",
+    title: "Scout Troop",
+    icon: "tent",
+    placeholder: "Troop 123",
+    description: "Meetings, campouts, service projects, leadership, and troop accountability.",
   },
-
   {
-    id: "productivity",
-    title: "Productivity",
-    icon: "rocket-launch",
-    description: "Small actions that move your day forward.",
-    habits: [
-      {
-        name: "Plan tomorrow",
-        description: "Pick your top priorities.",
-        icon: "calendar-check",
-        category: "Starter",
-      },
-      {
-        name: "Clean one area",
-        description: "Tidy one small space.",
-        icon: "broom",
-        category: "Starter",
-      },
-      {
-        name: "Water plants",
-        description: "Small recurring care reminder.",
-        icon: "water",
-        category: "maintenance",
-        custom_coins: 1,
-      },
-      {
-        name: "No-phone focus",
-        description: "Do one focused work block.",
-        icon: "cellphone-off",
-        category: "Starter",
-      },
-    ],
+    id: "accountability_circle",
+    title: "Accountability Circle",
+    icon: "account-group",
+    placeholder: "Morning Momentum",
+    description: "Weekly check-ins, shared goals, and group accountability.",
+  },
+  {
+    id: "fitness_group",
+    title: "Fitness Group",
+    icon: "run",
+    placeholder: "Saturday Striders",
+    description: "Workouts, step goals, fitness challenges, and team motivation.",
+  },
+  {
+    id: "study_group",
+    title: "Study Group",
+    icon: "school",
+    placeholder: "Exam Prep Crew",
+    description: "Study sessions, reading goals, exam prep, and group focus.",
+  },
+  {
+    id: "blank",
+    title: "Blank Orbit",
+    icon: "orbit",
+    placeholder: "My Orbit",
+    description: "Start with an empty Orbit and customize everything yourself.",
+    secondary: true,
   },
 ];
 
-export default function OnboardingScreen() {
-  const { token } = useAuth();
-  const { theme } = useTheme();
+const SUCCESS_ACTIONS = {
+  family: ["Invite family members", "Review starter challenges", "Review starter rewards"],
+  scout_troop: ["Invite leaders", "Create first event", "Review patrols"],
+  accountability_circle: ["Invite members", "Schedule check-in"],
+  fitness_group: ["Invite workout partners", "Review challenges"],
+  study_group: ["Invite study group", "Schedule study session"],
+  blank: ["Invite a member", "Create your first challenge", "Add an event"],
+};
 
+const CHECKLIST = [
+  "Create or Join an Orbit",
+  "Invite a Member",
+  "View a Challenge",
+  "View an Event",
+  "Complete a Task or Habit",
+];
+
+export default function OnboardingScreen() {
+  const { refresh } = useAuth();
+  const { theme } = useTheme();
   const c = theme.colors;
 
   const [step, setStep] = useState(0);
-  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
-  const [selectedHabits, setSelectedHabits] = useState([]);
+  const [goal, setGoal] = useState(null);
+  const [mode, setMode] = useState(null);
+  const [templateId, setTemplateId] = useState("family");
+  const [orbitName, setOrbitName] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
+  const [createdOrbit, setCreatedOrbit] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [checklist, setChecklist] = useState({
+    create_or_join_orbit: false,
+    invite_member: false,
+    view_challenge: false,
+    view_event: false,
+    complete_task_or_habit: false,
+  });
 
-  const selectedCategory = useMemo(
-    () =>
-      CATEGORIES.find(
-        (category) => category.id === selectedCategoryId
-      ),
-    [selectedCategoryId]
+  const selectedTemplate = useMemo(
+    () => TEMPLATES.find((item) => item.id === templateId) || TEMPLATES[0],
+    [templateId]
   );
 
-  const progress = step === 0 ? 33 : step === 1 ? 66 : 100;
+  const suggestedActions = SUCCESS_ACTIONS[templateId] || SUCCESS_ACTIONS.blank;
+  const progress = Math.round(((step + 1) / 7) * 100);
 
-  function toggleHabit(habit) {
-    const exists = selectedHabits.some((item) => item.name === habit.name);
+  async function markStep(body) {
+    try {
+      await api.completeOnboardingStep(body);
+    } catch (_error) {}
+  }
 
-    if (exists) {
-      setSelectedHabits((current) =>
-        current.filter((item) => item.name !== habit.name)
-      );
+  function chooseGoal(item) {
+    setGoal(item.id);
+    setTemplateId(item.template);
+    markStep({ step: "goal_selected", onboarding_goal: item.id });
+  }
 
+  function continueFromIntro() {
+    markStep({ step: "welcome" });
+    setStep(1);
+  }
+
+  function chooseMode(nextMode) {
+    setMode(nextMode);
+    markStep({ step: "join_or_create_selected" });
+    setStep(nextMode === "join" ? 5 : 3);
+  }
+
+  async function createOrbit() {
+    const name = orbitName.trim();
+
+    if (!name) {
+      Alert.alert("Orbit name required", "Give your Orbit a name to continue.");
       return;
     }
-
-    setSelectedHabits((current) => [...current, habit]);
-  }
-
-  async function getOnboardingKey() {
-    let email =
-      (await SecureStore.getItemAsync("currentUserEmail")) || null;
-
-    if (!email && token) {
-      try {
-        const me = await api.get("/auth/me");
-
-        email = me?.email?.toLowerCase() || null;
-
-        if (email) {
-          await SecureStore.setItemAsync("currentUserEmail", email);
-        }
-      } catch {}
-    }
-
-    const safeEmail = (email || "default").replace(/[^a-zA-Z0-9]/g, "_");
-
-    return `onboarding_${safeEmail}`;
-  }
-
-  async function finishOnboarding() {
-    if (submitting) return;
 
     setSubmitting(true);
 
     try {
-      if (token && selectedHabits.length > 0) {
-        for (const habit of selectedHabits) {
-          const isMaintenance = habit.category === "maintenance";
+      const data = await api.createOrbit({
+        name,
+        template: templateId,
+      });
+      const orbit = data?.orbit || data;
 
-          await api.post("/habits", {
-            name: habit.name,
-            description: habit.description,
-            frequency: "daily",
-            difficulty: isMaintenance ? "easy" : "easy",
-            custom_coins: isMaintenance ? 1 : null,
-            icon: habit.icon || (isMaintenance ? "pill" : "fire"),
-            category: isMaintenance
-              ? "maintenance"
-              : selectedCategory?.title || "Starter",
-          });
-        }
-      }
+      setCreatedOrbit(orbit);
+      setChecklist((current) => ({ ...current, create_or_join_orbit: true }));
 
-      if (token) {
-        await api.post("/onboarding/complete");
-        }
+      await api.completeOnboardingStep({
+        step: "success",
+        checklist_item: "create_or_join_orbit",
+      });
+      await api.completeOnboarding();
+      await refresh?.();
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-      await Haptics.notificationAsync(
-        Haptics.NotificationFeedbackType.Success
-      );
-
-      router.replace("/(tabs)/dashboard");
+      setStep(5);
     } catch (error) {
-      Alert.alert(
-        "Onboarding error",
-        error?.message || "Unable to finish onboarding."
-      );
+      Alert.alert("Create Orbit failed", error?.message || "Unable to create your Orbit.");
     } finally {
       setSubmitting(false);
     }
   }
 
+  async function joinOrbit() {
+    const code = inviteCode.trim();
+
+    if (!code) {
+      Alert.alert("Invite code required", "Enter an invite code to join an Orbit.");
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const data = await api.joinOrbitByCode(code);
+      const orbitId = data?.orbit_id || data?.orbit?.id;
+
+      setCreatedOrbit({ id: orbitId, name: data?.orbit?.name || "Your Orbit" });
+      setChecklist((current) => ({ ...current, create_or_join_orbit: true }));
+
+      await api.completeOnboardingStep({
+        step: "success",
+        checklist_item: "create_or_join_orbit",
+      });
+      await api.completeOnboarding();
+      await refresh?.();
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      setStep(5);
+    } catch (error) {
+      Alert.alert("Join Orbit failed", error?.message || "Unable to join that Orbit.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function finish() {
+    const orbitId = createdOrbit?.id || createdOrbit?.orbit_id;
+
+    if (orbitId) {
+      router.replace({ pathname: "/orbit-detail", params: { orbitId } });
+      return;
+    }
+
+    router.replace("/(tabs)/dashboard");
+  }
+
+  function renderOption({ active, icon, title, description, onPress, secondary }) {
+    return (
+      <AnimatedPressable key={title} onPress={onPress}>
+        <AppCard
+          style={[
+            styles.optionCard,
+            {
+              borderColor: active ? c.primary : c.border,
+              opacity: secondary ? 0.88 : 1,
+            },
+          ]}
+          elevated={active}
+        >
+          <View style={styles.optionRow}>
+            <View style={[styles.optionIcon, { backgroundColor: `${c.primary}14` }]}>
+              <MaterialCommunityIcons name={icon} size={22} color={c.primary} />
+            </View>
+            <View style={styles.optionText}>
+              <Text style={[styles.optionTitle, { color: c.text }]}>{title}</Text>
+              {!!description && (
+                <Text style={[styles.optionDescription, { color: c.textMuted }]}>
+                  {description}
+                </Text>
+              )}
+            </View>
+            {active && <Feather name="check-circle" size={22} color={c.primary} />}
+          </View>
+        </AppCard>
+      </AnimatedPressable>
+    );
+  }
+
   return (
     <View style={[styles.screen, { backgroundColor: c.background }]}>
-      <View
-        style={[
-          styles.glowOne,
-          {
-            backgroundColor: `${c.cyan || c.primary}14`,
-          },
-        ]}
-      />
-
-      <View
-        style={[
-          styles.glowTwo,
-          {
-            backgroundColor: `${c.coral || c.primary}10`,
-          },
-        ]}
-      />
-
       <AnimatedScreen style={styles.screen}>
-        <ScrollView
-          contentContainerStyle={styles.container}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
           <BrandHeader
-            centered
-            eyebrow="Welcome"
-            title="Start Your Orbit"
-            subtitle="Build momentum through small daily actions."
+            eyebrow="Welcome to OurOrbit"
+            title="Build better habits together"
+            subtitle="Shared goals, real accountability, and a faster path into your first Orbit."
           />
 
-          <View style={styles.progressWrap}>
-            <OrbitProgressBar percent={progress} style={styles.progress} />
+          <OrbitProgressBar percent={progress} />
 
-            <Text style={[styles.progressText, { color: c.textSecondary }]}>
-              Step {step + 1} of 3
-            </Text>
-          </View>
+          {step === 0 && (
+            <AppCard elevated glow style={styles.section}>
+              <BrandBadge label="Onboarding 2.0" />
+              <Text style={[styles.title, { color: c.text }]}>Welcome to OurOrbit</Text>
+              <Text style={[styles.body, { color: c.textMuted }]}>
+                Build better habits together through shared goals and accountability.
+              </Text>
+              <AppButton title="Get Started" onPress={continueFromIntro} />
+            </AppCard>
+          )}
 
-          {step === 0 ? (
-            <IntroStep onNext={() => setStep(1)} />
-          ) : step === 1 ? (
-            <CategoryStep
-              selectedCategoryId={selectedCategoryId}
-              onSelect={(id) => {
-                setSelectedCategoryId(id);
-                setSelectedHabits([]);
-              }}
-              onBack={() => setStep(0)}
-              onNext={() => {
-                if (!selectedCategoryId) {
-                  Alert.alert(
-                    "Choose a category",
-                    "Pick one area to start with."
+          {step === 1 && (
+            <AppCard elevated style={styles.section}>
+              <Text style={[styles.title, { color: c.text }]}>What brings you here?</Text>
+              <View style={styles.stack}>
+                {GOALS.map((item) =>
+                  renderOption({
+                    active: goal === item.id,
+                    icon: "target",
+                    title: item.title,
+                    onPress: () => chooseGoal(item),
+                  })
+                )}
+              </View>
+              <AppButton title="Continue" onPress={() => setStep(2)} disabled={!goal} />
+            </AppCard>
+          )}
+
+          {step === 2 && (
+            <AppCard elevated style={styles.section}>
+              <Text style={[styles.title, { color: c.text }]}>How would you like to get started?</Text>
+              <View style={styles.stack}>
+                {renderOption({
+                  active: mode === "join",
+                  icon: "account-plus",
+                  title: "Join an Existing Orbit",
+                  description: "Use an invite code from your group.",
+                  onPress: () => setMode("join"),
+                })}
+                {renderOption({
+                  active: mode === "create",
+                  icon: "plus-circle",
+                  title: "Create a New Orbit",
+                  description: "Choose a template and invite people after setup.",
+                  onPress: () => setMode("create"),
+                })}
+              </View>
+              <AppButton title="Continue" onPress={() => chooseMode(mode)} disabled={!mode} />
+            </AppCard>
+          )}
+
+          {step === 3 && (
+            <AppCard elevated style={styles.section}>
+              <Text style={[styles.title, { color: c.text }]}>Choose Template</Text>
+              <Text style={[styles.body, { color: c.textMuted }]}>
+                Templates include starter challenges, rewards, events, and readiness checklists.
+              </Text>
+              <View style={styles.stack}>
+                {TEMPLATES.map((template) =>
+                  renderOption({
+                    active: templateId === template.id,
+                    icon: template.icon,
+                    title: template.title,
+                    description: template.description,
+                    secondary: template.secondary,
+                    onPress: () => {
+                      setTemplateId(template.id);
+                      markStep({ step: "template_selected" });
+                    },
+                  })
+                )}
+              </View>
+              <AppButton title="Continue" onPress={() => setStep(4)} />
+            </AppCard>
+          )}
+
+          {step === 4 && (
+            <AppCard elevated style={styles.section}>
+              <Text style={[styles.title, { color: c.text }]}>
+                {templateId === "scout_troop" ? "Troop Name" : "Orbit Name"}
+              </Text>
+              <Text style={[styles.body, { color: c.textMuted }]}>
+                Starter content will be added automatically.
+              </Text>
+              <TextInput
+                value={orbitName}
+                onChangeText={setOrbitName}
+                placeholder={selectedTemplate.placeholder}
+                placeholderTextColor={c.textMuted}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: c.surfaceAlt || c.surface,
+                    borderColor: c.border,
+                    color: c.text,
+                  },
+                ]}
+              />
+              <AppButton
+                title={submitting ? "Creating..." : "Create Orbit"}
+                onPress={createOrbit}
+                disabled={submitting}
+              />
+            </AppCard>
+          )}
+
+          {step === 5 && mode === "join" && !createdOrbit && (
+            <AppCard elevated style={styles.section}>
+              <Text style={[styles.title, { color: c.text }]}>Enter Invite Code</Text>
+              <Text style={[styles.body, { color: c.textMuted }]}>
+                Paste the invite code from your existing Orbit.
+              </Text>
+              <TextInput
+                value={inviteCode}
+                onChangeText={setInviteCode}
+                autoCapitalize="none"
+                placeholder="Invite code"
+                placeholderTextColor={c.textMuted}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: c.surfaceAlt || c.surface,
+                    borderColor: c.border,
+                    color: c.text,
+                  },
+                ]}
+              />
+              <AppButton
+                title={submitting ? "Joining..." : "Join Orbit"}
+                onPress={joinOrbit}
+                disabled={submitting}
+              />
+            </AppCard>
+          )}
+
+          {step === 5 && createdOrbit && (
+            <AppCard elevated glow style={styles.section}>
+              <View style={[styles.successIcon, { backgroundColor: `${c.primary}18` }]}>
+                <Feather name="check" size={30} color={c.primary} />
+              </View>
+              <Text style={[styles.title, { color: c.text }]}>Your Orbit is ready.</Text>
+              <Text style={[styles.body, { color: c.textMuted }]}>
+                Here are the best next actions to build momentum.
+              </Text>
+              <View style={styles.stack}>
+                {suggestedActions.map((action) => (
+                  <View key={action} style={styles.checkRow}>
+                    <Feather name="arrow-right-circle" size={18} color={c.primary} />
+                    <Text style={[styles.checkText, { color: c.text }]}>{action}</Text>
+                  </View>
+                ))}
+              </View>
+              <AppButton title="View Getting Started Checklist" onPress={() => setStep(6)} />
+            </AppCard>
+          )}
+
+          {step === 6 && (
+            <AppCard elevated style={styles.section}>
+              <Text style={[styles.title, { color: c.text }]}>Getting Started Checklist</Text>
+              <Text style={[styles.body, { color: c.textMuted }]}>
+                Starter Badge unlocked. Keep going with these first meaningful actions.
+              </Text>
+              <View style={styles.stack}>
+                {CHECKLIST.map((item, index) => {
+                  const done = index === 0 && checklist.create_or_join_orbit;
+                  return (
+                    <View key={item} style={styles.checkRow}>
+                      <Feather
+                        name={done ? "check-circle" : "circle"}
+                        size={19}
+                        color={done ? c.primary : c.textMuted}
+                      />
+                      <Text style={[styles.checkText, { color: c.text }]}>{item}</Text>
+                    </View>
                   );
-
-                  return;
-                }
-
-                setStep(2);
-              }}
-            />
-          ) : (
-            <HabitStep
-              category={selectedCategory}
-              selectedHabits={selectedHabits}
-              onToggleHabit={toggleHabit}
-              onBack={() => setStep(1)}
-              onFinish={finishOnboarding}
-              submitting={submitting}
-            />
+                })}
+              </View>
+              <AppButton title="Go to My Orbit" onPress={finish} />
+              <AppButton title="Go to Dashboard" variant="ghost" onPress={() => router.replace("/(tabs)/dashboard")} />
+            </AppCard>
           )}
         </ScrollView>
       </AnimatedScreen>
-    </View>
-  );
-}
-
-function IntroStep({ onNext }) {
-  const { theme } = useTheme();
-  const c = theme.colors;
-
-  return (
-    <View style={styles.step}>
-      <AppCard style={styles.heroCard}>
-        <View
-          style={[
-            styles.heroGlow,
-            {
-              backgroundColor: `${c.cyan || c.primary}12`,
-            },
-          ]}
-        />
-
-        <View
-          style={[
-            styles.heroIcon,
-            {
-              backgroundColor: `${c.cyan || c.primary}14`,
-              borderColor: c.border,
-            },
-          ]}
-        >
-          <MaterialCommunityIcons
-            name="orbit"
-            size={42}
-            color={c.cyan || c.primary}
-          />
-        </View>
-
-        <BrandBadge label="Momentum Begins" />
-
-        <Text style={[styles.heroTitle, { color: c.text }]}>
-          Small actions create lasting change.
-        </Text>
-
-        <Text style={[styles.heroText, { color: c.textSecondary }]}>
-          Build habits, complete tasks, earn rewards, and level up your progress
-          one day at a time.
-        </Text>
-
-        <View style={styles.featureList}>
-          <Feature icon="check-circle" text="Complete habits and tasks" />
-          <Feature icon="zap" text="Earn XP and level up" />
-          <Feature icon="gift" text="Unlock rewards and themes" />
-          <Feature icon="users" text="Build shared momentum in Orbits" />
-        </View>
-      </AppCard>
-
-      <AppCard style={styles.orbitIntroCard}>
-        <MaterialCommunityIcons name="account-group-outline" size={30} color={c.primary} />
-        <View style={styles.orbitIntroCopy}>
-          <Text style={[styles.featureText, { color: c.text }]}>Create your first Orbit</Text>
-          <Text style={[styles.heroText, { color: c.textSecondary }]}>Share habits, tasks, challenges, and progress after setup.</Text>
-        </View>
-      </AppCard>
-
-      <AppButton title="Get Started" onPress={onNext} style={styles.button} />
-    </View>
-  );
-}
-
-function Feature({ icon, text }) {
-  const { theme } = useTheme();
-  const c = theme.colors;
-
-  return (
-    <View style={styles.feature}>
-      <Feather name={icon} size={18} color={c.success} />
-
-      <Text style={[styles.featureText, { color: c.text }]}>
-        {text}
-      </Text>
-    </View>
-  );
-}
-
-function CategoryStep({
-  selectedCategoryId,
-  onSelect,
-  onBack,
-  onNext,
-}) {
-  const { theme } = useTheme();
-  const c = theme.colors;
-
-  return (
-    <View style={styles.step}>
-      <Text style={[styles.sectionTitle, { color: c.text }]}>
-        Choose your starting focus
-      </Text>
-
-      <Text style={[styles.helperText, { color: c.textSecondary }]}>
-        Start small. You can always expand later.
-      </Text>
-
-      {CATEGORIES.map((category) => {
-        const selected = selectedCategoryId === category.id;
-
-        return (
-          <AnimatedPressable
-            key={category.id}
-            onPress={() => onSelect(category.id)}
-          >
-            <AppCard
-              style={[
-                styles.optionCard,
-                selected && {
-                  borderColor: c.cyan || c.primary,
-                },
-              ]}
-            >
-              <View style={styles.optionRow}>
-                <View
-                  style={[
-                    styles.optionIcon,
-                    {
-                      backgroundColor: selected
-                        ? `${c.cyan || c.primary}18`
-                        : c.surfaceAlt,
-                    },
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    name={category.icon}
-                    size={26}
-                    color={selected ? c.cyan || c.primary : c.textMuted}
-                  />
-                </View>
-
-                <View style={styles.optionCopy}>
-                  <Text style={[styles.optionTitle, { color: c.text }]}>
-                    {category.title}
-                  </Text>
-
-                  <Text
-                    style={[
-                      styles.optionText,
-                      {
-                        color: c.textSecondary,
-                      },
-                    ]}
-                  >
-                    {category.description}
-                  </Text>
-                </View>
-
-                <Feather
-                  name={selected ? "check-circle" : "circle"}
-                  size={22}
-                  color={selected ? c.cyan || c.primary : c.textMuted}
-                />
-              </View>
-            </AppCard>
-          </AnimatedPressable>
-        );
-      })}
-
-      <View style={styles.actions}>
-        <AppButton
-          title="Back"
-          variant="secondary"
-          onPress={onBack}
-          style={styles.actionButton}
-        />
-
-        <AppButton title="Next" onPress={onNext} style={styles.actionButton} />
-      </View>
-    </View>
-  );
-}
-
-function HabitStep({
-  category,
-  selectedHabits,
-  onToggleHabit,
-  onBack,
-  onFinish,
-  submitting,
-}) {
-  const { theme } = useTheme();
-  const c = theme.colors;
-
-  return (
-    <View style={styles.step}>
-      <Text style={[styles.sectionTitle, { color: c.text }]}>
-        Pick your starter habits
-      </Text>
-
-      <Text style={[styles.helperText, { color: c.textSecondary }]}>
-        Choose one or more habits to begin building momentum.
-      </Text>
-
-      {(category?.habits || []).map((habit) => {
-        const selected = selectedHabits.some((item) => item.name === habit.name);
-        const isMaintenance = habit.category === "maintenance";
-
-        return (
-          <AnimatedPressable
-            key={habit.name}
-            onPress={() => onToggleHabit(habit)}
-          >
-            <AppCard
-              style={[
-                styles.optionCard,
-                selected && {
-                  borderColor: c.success,
-                },
-              ]}
-            >
-              <View style={styles.optionRow}>
-                <View
-                  style={[
-                    styles.optionIcon,
-                    {
-                      backgroundColor: selected
-                        ? `${c.success}18`
-                        : c.surfaceAlt,
-                    },
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    name={habit.icon}
-                    size={25}
-                    color={selected ? c.success : c.textMuted}
-                  />
-                </View>
-
-                <View style={styles.optionCopy}>
-                  <View style={styles.habitTitleRow}>
-                    <Text style={[styles.optionTitle, { color: c.text }]}>
-                      {habit.name}
-                    </Text>
-
-                    {isMaintenance ? (
-                      <View
-                        style={[
-                          styles.maintenancePill,
-                          {
-                            backgroundColor: `${c.cyan || c.primary}12`,
-                            borderColor: `${c.cyan || c.primary}40`,
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.maintenancePillText,
-                            { color: c.cyan || c.primary },
-                          ]}
-                        >
-                          +1
-                        </Text>
-                      </View>
-                    ) : null}
-                  </View>
-
-                  <Text
-                    style={[
-                      styles.optionText,
-                      {
-                        color: c.textSecondary,
-                      },
-                    ]}
-                  >
-                    {habit.description}
-                  </Text>
-                </View>
-
-                <Feather
-                  name={selected ? "check-circle" : "circle"}
-                  size={22}
-                  color={selected ? c.success : c.textMuted}
-                />
-              </View>
-            </AppCard>
-          </AnimatedPressable>
-        );
-      })}
-
-      <View style={styles.actions}>
-        <AppButton
-          title="Back"
-          variant="secondary"
-          onPress={onBack}
-          style={styles.actionButton}
-        />
-
-        <AppButton
-          title={submitting ? "Starting..." : "Start My Orbit"}
-          onPress={onFinish}
-          disabled={submitting}
-          style={styles.actionButton}
-        />
-      </View>
-
-      <AppButton
-        title="Skip for Now"
-        variant="ghost"
-        onPress={onFinish}
-        disabled={submitting}
-        style={styles.skipButton}
-      />
     </View>
   );
 }
@@ -626,178 +461,72 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
-
-  glowOne: {
-    position: "absolute",
-    width: 260,
-    height: 260,
-    borderRadius: 999,
-    top: -120,
-    right: -90,
-  },
-
-  glowTwo: {
-    position: "absolute",
-    width: 220,
-    height: 220,
-    borderRadius: 999,
-    bottom: -100,
-    left: -70,
-  },
-
   container: {
-    padding: spacing.xl,
-    paddingTop: 56,
-    paddingBottom: 80,
+    padding: spacing.lg,
+    paddingBottom: spacing["3xl"] || 48,
+    gap: spacing.lg,
   },
-
-  progressWrap: {
-    marginTop: spacing.lg,
-    marginBottom: spacing.xl,
+  section: {
+    gap: spacing.lg,
   },
-
-  progress: {
-    marginBottom: spacing.sm,
-  },
-
-  progressText: {
-    ...typography.caption,
-    textAlign: "right",
-  },
-
-  step: {
-    gap: spacing.md,
-  },
-
-  heroCard: {
-    alignItems: "center",
-    overflow: "hidden",
-  },
-
-  heroGlow: {
-    position: "absolute",
-    width: 240,
-    height: 240,
-    borderRadius: 999,
-    top: -140,
-    right: -120,
-  },
-
-  heroIcon: {
-    width: 82,
-    height: 82,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: spacing.lg,
-  },
-
-  heroTitle: {
-    ...typography.h1,
-    textAlign: "center",
-    marginTop: spacing.lg,
-  },
-
-  heroText: {
-    ...typography.body,
-    textAlign: "center",
-    marginTop: spacing.sm,
-    lineHeight: 22,
-  },
-
-  featureList: {
-    width: "100%",
-    marginTop: spacing.xl,
-    gap: spacing.sm,
-  },
-
-  feature: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-
-  featureText: {
-    ...typography.bodyBold,
-  },
-
-  sectionTitle: {
+  title: {
     ...typography.h2,
   },
-
-  helperText: {
+  body: {
     ...typography.body,
-    marginBottom: spacing.sm,
+    lineHeight: 22,
   },
-
+  stack: {
+    gap: spacing.md,
+  },
   optionCard: {
-    marginBottom: spacing.md,
+    borderWidth: 1.5,
   },
-
   optionRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
   },
-
   optionIcon: {
-    width: 52,
-    height: 52,
+    width: 42,
+    height: 42,
+    borderRadius: radii.lg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  optionText: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  optionTitle: {
+    ...typography.subtitle,
+    fontWeight: "800",
+  },
+  optionDescription: {
+    ...typography.caption,
+    lineHeight: 18,
+  },
+  input: {
+    minHeight: 54,
+    borderWidth: 1,
+    borderRadius: radii.lg,
+    paddingHorizontal: spacing.md,
+    ...typography.body,
+  },
+  successIcon: {
+    width: 58,
+    height: 58,
     borderRadius: radii.pill,
     alignItems: "center",
     justifyContent: "center",
   },
-
-  optionCopy: {
-    flex: 1,
-  },
-
-  habitTitleRow: {
+  checkRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
   },
-
-  optionTitle: {
-    ...typography.h3,
-  },
-
-  optionText: {
+  checkText: {
     ...typography.body,
-    marginTop: spacing.xs,
-  },
-
-  maintenancePill: {
-    borderWidth: 1,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-  },
-
-  maintenancePillText: {
-    fontSize: 11,
-    fontWeight: "900",
-  },
-
-  actions: {
-    marginTop: spacing.lg,
-    flexDirection: "row",
-    gap: spacing.sm,
-    width: "100%",
-  },
-
-  actionButton: {
     flex: 1,
   },
-
-  button: {
-    marginTop: spacing.lg,
-  },
-
-  skipButton: {
-    marginTop: spacing.sm,
-  },
-  orbitIntroCard: { flexDirection: "row", alignItems: "center", gap: spacing.md },
-  orbitIntroCopy: { flex: 1 },
 });

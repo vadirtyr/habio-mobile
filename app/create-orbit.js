@@ -14,6 +14,7 @@ import { spacing, typography } from "../lib/theme";
 const ORBIT_TEMPLATES = [
   {
     id: "family",
+    icon: "👨‍👩‍👧‍👦",
     name: "Family",
     description: "Shared goals, chores, rewards, and family accountability.",
     nameSuggestion: "Williams Family",
@@ -21,47 +22,103 @@ const ORBIT_TEMPLATES = [
   },
   {
     id: "scout_troop",
+    icon: "🏕",
     name: "Scout Troop",
     description: "Meetings, campouts, service projects, leadership, and troop accountability.",
     nameSuggestion: "Troop 123",
     highlights: ["Camp readiness", "Service projects", "Troop challenges"],
   },
   {
+    id: "accountability_circle",
+    icon: "🎯",
+    name: "Accountability Circle",
+    description: "Weekly check-ins, shared goals, and group accountability.",
+    nameSuggestion: "Weekly Accountability Circle",
+    highlights: ["Weekly check-ins", "Shared goals", "Consistency challenges"],
+  },
+  {
+    id: "fitness_group",
+    icon: "🏃",
+    name: "Fitness Group",
+    description: "Workouts, step goals, fitness challenges, and team motivation.",
+    nameSuggestion: "Morning Fitness Group",
+    highlights: ["Workout challenges", "Step goals", "Team motivation"],
+  },
+  {
+    id: "study_group",
+    icon: "📚",
+    name: "Study Group",
+    description: "Study sessions, reading goals, exam prep, and group focus.",
+    nameSuggestion: "Exam Prep Study Group",
+    highlights: ["Study sessions", "Reading goals", "Exam prep"],
+  },
+  {
     id: "blank",
+    icon: "✨",
     name: "Blank Orbit",
     description: "Start with an empty Orbit and customize everything yourself.",
-    nameSuggestion: "",
+    nameSuggestion: "My Orbit",
     highlights: ["Private invite-only Orbit", "Add your own habits, tasks, and goals"],
   },
 ];
 
+const BLANK_TEMPLATE_ID = "blank";
+const STARTER_TEMPLATE_COUNT = ORBIT_TEMPLATES.filter((template) => template.id !== BLANK_TEMPLATE_ID).length;
+
 export default function CreateOrbitScreen() {
   const { theme } = useTheme();
   const c = theme.colors;
+  const [step, setStep] = useState(0);
   const [selectedTemplate, setSelectedTemplate] = useState(ORBIT_TEMPLATES[0]);
   const [name, setName] = useState(ORBIT_TEMPLATES[0].nameSuggestion);
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const isFamily = selectedTemplate.id === "family";
   const isScoutTroop = selectedTemplate.id === "scout_troop";
+  const isAccountabilityCircle = selectedTemplate.id === "accountability_circle";
+  const isFitnessGroup = selectedTemplate.id === "fitness_group";
+  const isStudyGroup = selectedTemplate.id === "study_group";
   const createTitle = saving
     ? "Creating..."
     : isFamily
       ? "Create Family Orbit"
       : isScoutTroop
         ? "Create Scout Troop"
-        : "Create Blank Orbit";
+        : isAccountabilityCircle
+          ? "Create Accountability Circle"
+          : isFitnessGroup
+            ? "Create Fitness Group"
+            : isStudyGroup
+              ? "Create Study Group"
+              : "Create Blank Orbit";
   const namePlaceholder = isFamily
     ? "Williams Family"
     : isScoutTroop
       ? "Troop 123"
-      : "Morning Momentum";
+      : isAccountabilityCircle
+        ? "Weekly Accountability Circle"
+        : isFitnessGroup
+          ? "Morning Fitness Group"
+          : isStudyGroup
+            ? "Exam Prep Study Group"
+            : "My Orbit";
+  const progressText = `Step ${step + 1} of 3`;
+  const nextTitle = selectedTemplate.id === BLANK_TEMPLATE_ID
+    ? "Continue with Blank Orbit"
+    : `Continue with ${selectedTemplate.name}`;
 
   function chooseTemplate(template) {
     setSelectedTemplate(template);
     if (!name.trim() || ORBIT_TEMPLATES.some((item) => item.nameSuggestion === name)) {
       setName(template.nameSuggestion);
     }
+  }
+
+  function goToNameStep() {
+    if (!name.trim()) {
+      setName(selectedTemplate.nameSuggestion);
+    }
+    setStep(1);
   }
 
   async function save() {
@@ -84,49 +141,115 @@ export default function CreateOrbitScreen() {
 
   return (
     <ScrollView style={[styles.screen, { backgroundColor: c.background }]} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-      <ScreenHeader title="Create Shared Orbit" subtitle="Private and invite-only for this first version." />
-      <Text style={[styles.sectionTitle, { color: c.text }]}>Choose Template</Text>
-      {ORBIT_TEMPLATES.map((template) => (
-        <Pressable key={template.id} onPress={() => chooseTemplate(template)}>
-          <AppCard style={[styles.templateCard, selectedTemplate.id === template.id && { borderColor: c.primary }]}>
-            <View style={styles.templateHeader}>
-              <Text style={[styles.templateTitle, { color: c.text }]}>{template.name}</Text>
-              {selectedTemplate.id === template.id && <Text style={[styles.selectedBadge, { color: c.primary }]}>Selected</Text>}
-            </View>
-            <Text style={[styles.copy, { color: c.textSecondary }]}>{template.description}</Text>
-            <View style={styles.highlightRow}>
-              {template.highlights.map((item) => (
-                <Text key={item} style={[styles.highlight, { color: c.textSecondary, borderColor: c.border }]}>
-                  {item}
-                </Text>
-              ))}
-            </View>
-          </AppCard>
-        </Pressable>
-      ))}
+      <ScreenHeader title="Create an Orbit" subtitle="Build better habits together with templates for families, troops, fitness groups, study groups, and accountability circles." />
+      <Text style={[styles.progressText, { color: c.textSecondary }]}>{progressText}</Text>
 
-      <AppCard>
+      {step === 0 && <>
+        <Text style={[styles.sectionTitle, { color: c.text }]}>Choose Template</Text>
+        <Text style={[styles.helperText, { color: c.textSecondary }]}>Choose a template to start with recommended challenges, rewards, events, and readiness checklists.</Text>
+        <Text style={[styles.templateCount, { color: c.textMuted }]}>{STARTER_TEMPLATE_COUNT} recommended templates, plus a blank custom Orbit.</Text>
+        {ORBIT_TEMPLATES.map((template) => {
+          const isBlank = template.id === BLANK_TEMPLATE_ID;
+          const isSelected = selectedTemplate.id === template.id;
+          return (
+          <Pressable key={template.id} onPress={() => chooseTemplate(template)}>
+            <AppCard style={[
+              styles.templateCard,
+              isBlank && styles.blankTemplateCard,
+              isSelected && { borderColor: c.primary, backgroundColor: c.surfaceAlt },
+            ]}>
+              <View style={styles.templateHeader}>
+                <View style={styles.templateTitleRow}>
+                  <Text style={styles.templateIcon}>{template.icon}</Text>
+                  <View style={styles.templateTitleCopy}>
+                    <Text style={[styles.templateTitle, { color: c.text }]}>{template.name}</Text>
+                    {isBlank && <Text style={[styles.optionLabel, { color: c.textMuted }]}>Custom option</Text>}
+                  </View>
+                </View>
+                {isSelected && <Text style={[styles.selectedBadge, { color: c.primary }]}>Selected</Text>}
+              </View>
+              <Text style={[styles.copy, { color: c.textSecondary }]}>{template.description}</Text>
+              {!isBlank && <Text style={[styles.note, { color: c.primary }]}>Recommended starter content will be added automatically. You can customize everything later.</Text>}
+              {isBlank && <Text style={[styles.note, { color: c.textMuted }]}>Start empty if you already know exactly what your group needs.</Text>}
+              <View style={styles.highlightRow}>
+                {template.highlights.map((item) => (
+                  <Text key={item} style={[styles.highlight, { color: c.textSecondary, borderColor: c.border }]}>
+                    {item}
+                  </Text>
+                ))}
+              </View>
+            </AppCard>
+          </Pressable>
+        );})}
+        <AppButton title={nextTitle} onPress={goToNameStep} style={styles.button} />
+      </>}
+
+      {step === 1 && <AppCard>
+        <Text style={[styles.sectionTitle, { color: c.text }]}>Name Your Orbit</Text>
+        <View style={styles.selectedSummary}>
+          <Text style={styles.templateIcon}>{selectedTemplate.icon}</Text>
+          <View style={styles.summaryCopy}>
+            <Text style={[styles.templateTitle, { color: c.text }]}>{selectedTemplate.name}</Text>
+            <Text style={[styles.copy, { color: c.textSecondary }]}>{selectedTemplate.description}</Text>
+          </View>
+        </View>
+        {selectedTemplate.id !== "blank" && <Text style={[styles.note, { color: c.primary }]}>Starter content will be added automatically without overwhelming your group. You can edit or delete it later.</Text>}
         <Text style={[styles.label, { color: c.text }]}>Name</Text>
         <AppInput value={name} onChangeText={setName} placeholder={namePlaceholder} maxLength={80} />
         {selectedTemplate.id === "blank" && <>
           <Text style={[styles.label, { color: c.text }]}>Description</Text>
           <AppInput value={description} onChangeText={setDescription} placeholder="What will this group work toward?" multiline maxLength={500} />
         </>}
-        <AppButton title={createTitle} onPress={save} disabled={saving || !name.trim()} style={styles.button} />
-      </AppCard>
+        <View style={styles.actions}>
+          <AppButton title="Back" variant="secondary" onPress={() => setStep(0)} style={styles.actionButton} />
+          <AppButton title="Next" onPress={() => setStep(2)} disabled={!name.trim()} style={styles.actionButton} />
+        </View>
+      </AppCard>}
+
+      {step === 2 && <AppCard>
+        <Text style={[styles.sectionTitle, { color: c.text }]}>Create Orbit</Text>
+        <View style={styles.selectedSummary}>
+          <Text style={styles.templateIcon}>{selectedTemplate.icon}</Text>
+          <View style={styles.summaryCopy}>
+            <Text style={[styles.templateTitle, { color: c.text }]}>{name.trim()}</Text>
+            <Text style={[styles.copy, { color: c.textSecondary }]}>{selectedTemplate.name}</Text>
+            {selectedTemplate.id !== "blank" && <Text style={[styles.note, { color: c.primary }]}>Starter content will be added automatically. Customize from there as your group finds its rhythm.</Text>}
+            {selectedTemplate.id === "blank" && !!description.trim() && (
+              <Text style={[styles.copy, { color: c.textSecondary }]}>{description.trim()}</Text>
+            )}
+          </View>
+        </View>
+        <View style={styles.actions}>
+          <AppButton title="Back" variant="secondary" onPress={() => setStep(1)} style={styles.actionButton} disabled={saving} />
+          <AppButton title={createTitle} onPress={save} disabled={saving || !name.trim()} style={styles.actionButton} />
+        </View>
+      </AppCard>}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 }, container: { padding: spacing.xl, paddingBottom: 80 },
+  progressText: { ...typography.caption, marginBottom: spacing.sm, textTransform: "uppercase" },
   sectionTitle: { ...typography.h3, marginBottom: spacing.md },
+  helperText: { ...typography.body, marginBottom: spacing.lg },
+  templateCount: { ...typography.caption, marginTop: -spacing.sm, marginBottom: spacing.md },
   templateCard: { marginBottom: spacing.sm, borderWidth: 2, borderColor: "transparent" },
+  blankTemplateCard: { opacity: 0.92 },
   templateHeader: { flexDirection: "row", justifyContent: "space-between", gap: spacing.md },
+  templateTitleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flex: 1 },
+  templateTitleCopy: { flex: 1 },
+  templateIcon: { fontSize: 28 },
   templateTitle: { ...typography.h3 }, copy: { ...typography.body, marginTop: spacing.xs }, previewLabel: { ...typography.caption, marginTop: spacing.md },
+  optionLabel: { ...typography.caption, marginTop: 2 },
   selectedBadge: { ...typography.caption, textTransform: "uppercase" },
+  note: { ...typography.caption, marginTop: spacing.sm },
   highlightRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, marginTop: spacing.md },
   highlight: { ...typography.caption, borderWidth: 1, borderRadius: 999, paddingHorizontal: spacing.sm, paddingVertical: 4 },
+  selectedSummary: { flexDirection: "row", gap: spacing.md, alignItems: "flex-start", marginBottom: spacing.md },
+  summaryCopy: { flex: 1 },
+  actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.xl },
+  actionButton: { flex: 1 },
   label: { ...typography.bodyBold, marginBottom: spacing.sm, marginTop: spacing.lg },
   button: { marginTop: spacing.xl },
 });

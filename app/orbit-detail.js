@@ -42,9 +42,13 @@ export default function OrbitDetailScreen() {
   const { theme } = useTheme();
   const c = theme.colors;
   const [dashboard, setDashboard] = useState(null);
+  const [parentDashboard, setParentDashboard] = useState(null);
+  const [troopMilestones, setTroopMilestones] = useState([]);
   const [leaderboards, setLeaderboards] = useState(null);
+  const [patrolLeaderboard, setPatrolLeaderboard] = useState([]);
   const [events, setEvents] = useState([]);
   const [readinessByEvent, setReadinessByEvent] = useState({});
+  const [patrolReadinessByEvent, setPatrolReadinessByEvent] = useState({});
   const [orbitRecaps, setOrbitRecaps] = useState([]);
   const [insightsError, setInsightsError] = useState(null);
   const [error, setError] = useState(null);
@@ -80,6 +84,9 @@ export default function OrbitDetailScreen() {
   const [readinessTitle, setReadinessTitle] = useState("");
   const [readinessDescription, setReadinessDescription] = useState("");
   const [readinessRequired, setReadinessRequired] = useState(true);
+  const [showPatrolForm, setShowPatrolForm] = useState(false);
+  const [patrolName, setPatrolName] = useState("");
+  const [patrolDescription, setPatrolDescription] = useState("");
   const [challengeEndDate, setChallengeEndDate] = useState(() => {
     const end = new Date();
     end.setUTCDate(end.getUTCDate() + 30);
@@ -88,19 +95,22 @@ export default function OrbitDetailScreen() {
 
   const load = useCallback(async () => {
     try {
-      const [dashboardData, recapData, leaderboardData, eventData] = await Promise.all([
+      const [dashboardData, recapData, leaderboardData, patrolLeaderboardData, eventData] = await Promise.all([
         api.getOrbitDashboard(orbitId),
         api.getOrbitWeeklyRecaps(orbitId),
         api.getOrbitLeaderboards(orbitId),
+        api.getOrbitPatrolLeaderboard(orbitId),
         api.getOrbitEvents(orbitId),
       ]);
       setDashboard(dashboardData);
       setLeaderboards(leaderboardData);
+      setPatrolLeaderboard(patrolLeaderboardData.items || []);
       const eventItems = eventData.items || [];
       setEvents(eventItems);
-      const readinessResults = await Promise.allSettled(
-        eventItems.map((event) => api.getOrbitEventReadiness(orbitId, event.id))
-      );
+      const [readinessResults, patrolReadinessResults] = await Promise.all([
+        Promise.allSettled(eventItems.map((event) => api.getOrbitEventReadiness(orbitId, event.id))),
+        Promise.allSettled(eventItems.map((event) => api.getOrbitEventPatrolReadiness(orbitId, event.id))),
+      ]);
       const readinessMap = {};
       readinessResults.forEach((result, index) => {
         if (result.status === "fulfilled") {
@@ -108,6 +118,24 @@ export default function OrbitDetailScreen() {
         }
       });
       setReadinessByEvent(readinessMap);
+      const patrolReadinessMap = {};
+      patrolReadinessResults.forEach((result, index) => {
+        if (result.status === "fulfilled") {
+          patrolReadinessMap[eventItems[index].id] = result.value;
+        }
+      });
+      setPatrolReadinessByEvent(patrolReadinessMap);
+      if (dashboardData.orbit?.template === "scout_troop") {
+        api.getOrbitParentDashboard(orbitId)
+          .then(setParentDashboard)
+          .catch(() => setParentDashboard(null));
+        api.getOrbitMilestones(orbitId)
+          .then((result) => setTroopMilestones((result.items || []).filter((item) => item.template === "scout_troop")))
+          .catch(() => setTroopMilestones([]));
+      } else {
+        setParentDashboard(null);
+        setTroopMilestones([]);
+      }
       setOrbitRecaps(recapData.items || []);
       setError(null);
     }
@@ -176,6 +204,88 @@ export default function OrbitDetailScreen() {
       await load();
     } catch (err) {
       Alert.alert(`Could not create ${createType}`, err.message);
+    } finally {
+      setBusyItem(null);
+    }
+  }
+
+  async function createPatrol() {
+    const name = patrolName.trim();
+    if (!name) {
+      Alert.alert("Patrol name required", "Enter a name for this patrol.");
+      return;
+    }
+    setBusyItem("create-patrol");
+    try {
+      await api.createOrbitPatrol(orbitId, {
+        name,
+        description: patrolDescription.trim(),
+      });
+      setPatrolName("");
+      setPatrolDescription("");
+      setShowPatrolForm(false);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await load();
+    } catch (err) {
+      Alert.alert("Could not create patrol", err.message);
+    } finally {
+      setBusyItem(null);
+    }
+  }
+
+  function deletePatrol(patrol) {
+    Alert.alert("Delete patrol?", `Delete ${patrol.name}? Members will be unassigned from this patrol.`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          setBusyItem(`delete-patrol-${patrol.id}`);
+          try {
+            await api.deleteOrbitPatrol(orbitId, patrol.id);
+            await load();
+          } catch (err) {
+            Alert.alert("Could not delete patrol", err.message);
+          } finally {
+            setBusyItem(null);
+          }
+        },
+      },
+    ]);
+  }
+
+  function assignPatrolMember(patrol, members) {
+    const candidates = members.filter((member) => member.patrol_id !== patrol.id);
+    if (!candidates.length) {
+      Alert.alert("No members available", "Everyone is already assigned to this patrol.");
+      return;
+    }
+    Alert.alert("Assign member", `Choose a member for ${patrol.name}.`, [
+      { text: "Cancel", style: "cancel" },
+      ...candidates.slice(0, 8).map((member) => ({
+        text: member.user?.display_name || member.user?.name || member.user?.username || "Member",
+        onPress: async () => {
+          setBusyItem(`assign-patrol-${patrol.id}`);
+          try {
+            await api.assignOrbitPatrolMember(orbitId, patrol.id, member.user_id);
+            await load();
+          } catch (err) {
+            Alert.alert("Could not assign member", err.message);
+          } finally {
+            setBusyItem(null);
+          }
+        },
+      })),
+    ]);
+  }
+
+  async function removePatrolMember(patrol, member) {
+    setBusyItem(`remove-patrol-${patrol.id}-${member.user_id}`);
+    try {
+      await api.removeOrbitPatrolMember(orbitId, patrol.id, member.user_id);
+      await load();
+    } catch (err) {
+      Alert.alert("Could not remove member", err.message);
     } finally {
       setBusyItem(null);
     }
@@ -521,6 +631,7 @@ export default function OrbitDetailScreen() {
     orbit,
     stats,
     members = [],
+    patrols = [],
     recent_activity: recentActivity = [],
     shared_habits: sharedHabits = [],
     shared_tasks: sharedTasks = [],
@@ -546,6 +657,7 @@ export default function OrbitDetailScreen() {
   const xpNeeded = orbit.xp_needed_for_next_level || 100;
   const xpPercent = orbit.xp_progress_percent || 0;
   const canManage = orbit.viewer_role === "owner" || orbit.viewer_role === "admin";
+  const showPatrols = orbit.template === "scout_troop" || patrols.length > 0;
 
   return (
     <ScrollView style={[styles.screen, { backgroundColor: c.background }]} contentContainerStyle={styles.container}>
@@ -591,6 +703,60 @@ export default function OrbitDetailScreen() {
         {canManage && <AppButton title="New goal" style={styles.action} onPress={() => router.push({ pathname: "/create-orbit-goal", params: { orbitId } })} />}
       </View>
 
+      {showPatrols && <>
+        <ParentDashboardCard parentDashboard={parentDashboard} colors={c} />
+        <TroopMilestonesCard milestones={troopMilestones} colors={c} />
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, styles.sectionTitleInline, { color: c.text }]}>Patrols</Text>
+          {canManage && <AppButton title="Create" variant="ghost" fullWidth={false} style={styles.smallButton} onPress={() => setShowPatrolForm((value) => !value)} disabled={!!busyItem} />}
+        </View>
+        {!!patrolLeaderboard.length && <AppCard style={styles.card}>
+          <Text style={[styles.title, { color: c.text }]}>Patrol Leaderboard</Text>
+          {patrolLeaderboard.slice(0, 5).map((item) => (
+            <View key={item.patrol_id} style={styles.patrolLeaderboardRow}>
+              <Text style={[styles.leaderboardRank, { color: item.rank === 1 ? c.primary : c.textMuted }]}>#{item.rank}</Text>
+              <View style={styles.activityCopy}>
+                <Text style={[styles.memberName, { color: c.text }]}>{item.patrol_name}</Text>
+                <Text style={[styles.time, { color: c.textSecondary }]}>{item.member_count} member{item.member_count === 1 ? "" : "s"} · {item.average_xp} avg XP</Text>
+              </View>
+              <Text style={[styles.memberName, { color: c.primary }]}>{item.total_xp} XP</Text>
+            </View>
+          ))}
+        </AppCard>}
+        {!!showPatrolForm && <AppCard style={styles.createCard}>
+          <Text style={[styles.title, { color: c.text }]}>New patrol</Text>
+          <AppInput value={patrolName} onChangeText={setPatrolName} placeholder="Patrol name" maxLength={80} style={styles.formInput} />
+          <AppInput value={patrolDescription} onChangeText={setPatrolDescription} placeholder="Description (optional)" maxLength={500} style={styles.formInput} />
+          <View style={styles.formActions}>
+            <AppButton title="Cancel" variant="secondary" style={styles.formAction} onPress={() => setShowPatrolForm(false)} disabled={!!busyItem} />
+            <AppButton title="Create" style={styles.formAction} onPress={createPatrol} disabled={!!busyItem || !patrolName.trim()} />
+          </View>
+        </AppCard>}
+        {patrols.length ? patrols.map((patrol) => (
+          <AppCard key={patrol.id} style={styles.card}>
+            <View style={styles.row}>
+              <View style={styles.activityCopy}>
+                <Text style={[styles.title, { color: c.text }]}>{patrol.name}</Text>
+                {!!patrol.description && <Text style={[styles.copy, { color: c.textSecondary }]}>{patrol.description}</Text>}
+                {!!patrol.leader && <Text style={[styles.time, { color: c.textMuted }]}>Leader: {patrol.leader.display_name || patrol.leader.name || patrol.leader.username}</Text>}
+              </View>
+              <Text style={[styles.status, { color: c.primary }]}>{patrol.member_count || 0}</Text>
+            </View>
+            {(patrol.members || []).map((member) => (
+              <View key={member.user_id} style={styles.patrolMemberRow}>
+                <UserAvatar user={member.user} size={28} icon="account-circle" color={c.primary} backgroundColor={c.surfaceAlt} />
+                <Text style={[styles.memberName, styles.patrolMemberName, { color: c.text }]}>{member.user?.display_name || member.user?.name || member.user?.username || "Member"}</Text>
+                {canManage && <AppButton title="Remove" variant="ghost" fullWidth={false} onPress={() => removePatrolMember(patrol, member)} disabled={!!busyItem} />}
+              </View>
+            ))}
+            {canManage && <View style={styles.formActions}>
+              <AppButton title="Assign member" variant="secondary" style={styles.formAction} onPress={() => assignPatrolMember(patrol, members)} disabled={!!busyItem} />
+              <AppButton title="Delete" variant="secondary" style={styles.formAction} onPress={() => deletePatrol(patrol)} disabled={!!busyItem} />
+            </View>}
+          </AppCard>
+        )) : <AppCard style={styles.card}><EmptyState compact title="No patrols yet" description="Create patrols to organize this Scout Troop Orbit." icon={<MaterialCommunityIcons name="account-group-outline" size={40} color={c.primary} />} /></AppCard>}
+      </>}
+
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, styles.sectionTitleInline, { color: c.text }]}>Orbit Events</Text>
         {canManage && <AppButton title="Create" variant="ghost" fullWidth={false} style={styles.smallButton} onPress={() => openEventForm()} disabled={!!busyItem} />}
@@ -611,6 +777,7 @@ export default function OrbitDetailScreen() {
         <OrbitEventCard
           event={event}
           readiness={readinessByEvent[event.id]}
+          patrolReadiness={patrolReadinessByEvent[event.id]}
           colors={c}
           canManage={canManage}
           busy={!!busyItem}
@@ -1022,9 +1189,98 @@ function OrbitRewardCard({ reward, colors, canManage, busy, onEdit, onDelete, on
   </AppCard>;
 }
 
+function ParentDashboardCard({ parentDashboard, colors }) {
+  if (!parentDashboard) {
+    return <AppCard style={styles.card}>
+      <View style={styles.row}>
+        <View style={styles.activityCopy}>
+          <Text style={[styles.title, { color: colors.text }]}>Parent Dashboard</Text>
+          <Text style={[styles.copy, { color: colors.textSecondary }]}>Loading troop visibility...</Text>
+        </View>
+        <MaterialCommunityIcons name="account-heart-outline" size={28} color={colors.primary} />
+      </View>
+    </AppCard>;
+  }
+  const events = parentDashboard.upcoming_events || [];
+  const patrols = parentDashboard.patrols || [];
+  const challenges = parentDashboard.challenges || [];
+  const activity = parentDashboard.recent_activity || [];
+  return <AppCard style={styles.card}>
+    <View style={styles.row}>
+      <View style={styles.activityCopy}>
+        <Text style={[styles.smallLabel, { color: colors.textSecondary }]}>Read-only troop view</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Parent Dashboard</Text>
+        <Text style={[styles.copy, { color: colors.textSecondary }]}>Upcoming events, readiness, patrol progress, and recent troop activity.</Text>
+      </View>
+      <MaterialCommunityIcons name="account-heart-outline" size={28} color={colors.primary} />
+    </View>
+    <View style={styles.parentDashboardGrid}>
+      <View style={styles.parentDashboardSection}>
+        <Text style={[styles.memberName, { color: colors.text }]}>Upcoming events</Text>
+        {events.length ? events.map((event) => <Text key={event.id} style={[styles.time, { color: colors.textSecondary }]}>
+          {event.title}: {event.readiness_percent ?? 0}% ready{event.viewer_rsvp ? ` · ${event.viewer_rsvp}` : ""}{event.location ? ` · ${event.location}` : ""}
+        </Text>) : <Text style={[styles.time, { color: colors.textMuted }]}>No upcoming events.</Text>}
+      </View>
+      <View style={styles.parentDashboardSection}>
+        <Text style={[styles.memberName, { color: colors.text }]}>Patrol standings</Text>
+        {patrols.length ? patrols.slice(0, 5).map((patrol) => <Text key={patrol.id} style={[styles.time, { color: colors.textSecondary }]}>
+          {patrol.leaderboard_rank ? `#${patrol.leaderboard_rank} ` : ""}{patrol.name}: {patrol.readiness_percent ?? "No"}{patrol.readiness_percent == null ? " readiness yet" : "% ready"}
+        </Text>) : <Text style={[styles.time, { color: colors.textMuted }]}>No patrols yet.</Text>}
+      </View>
+      <View style={styles.parentDashboardSection}>
+        <Text style={[styles.memberName, { color: colors.text }]}>Active challenges</Text>
+        {challenges.length ? challenges.map((challenge) => <Text key={challenge.id} style={[styles.time, { color: colors.textSecondary }]}>
+          {challenge.title}: {challenge.progress_percent}%
+        </Text>) : <Text style={[styles.time, { color: colors.textMuted }]}>No active challenges.</Text>}
+      </View>
+      <View style={styles.parentDashboardSection}>
+        <Text style={[styles.memberName, { color: colors.text }]}>Recent activity</Text>
+        {activity.length ? activity.slice(0, 4).map((item) => <Text key={item.id} style={[styles.time, { color: colors.textSecondary }]}>
+          {item.message || item.type || "Orbit activity"}
+        </Text>) : <Text style={[styles.time, { color: colors.textMuted }]}>No recent activity.</Text>}
+      </View>
+    </View>
+  </AppCard>;
+}
+
+function TroopMilestonesCard({ milestones, colors }) {
+  return <AppCard style={styles.card}>
+    <View style={styles.row}>
+      <View style={styles.activityCopy}>
+        <Text style={[styles.smallLabel, { color: colors.textSecondary }]}>Scout Troop</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Troop Milestones</Text>
+        <Text style={[styles.copy, { color: colors.textSecondary }]}>Celebrate campouts, service projects, patrol readiness, and troop XP.</Text>
+      </View>
+      <MaterialCommunityIcons name="flag-variant" size={28} color={colors.primary} />
+    </View>
+    {milestones.length ? milestones.map((milestone) => {
+      const percent = milestone.target ? Math.min(100, Math.round((milestone.progress / milestone.target) * 100)) : 0;
+      return <View key={milestone.id} style={styles.troopMilestoneRow}>
+        <View style={[styles.milestoneIcon, { backgroundColor: `${milestone.color || colors.primary}20`, opacity: milestone.unlocked ? 1 : 0.55 }]}>
+          <MaterialCommunityIcons name={milestone.unlocked ? (milestone.icon || "star-four-points") : "lock-outline"} size={24} color={milestone.unlocked ? (milestone.color || colors.primary) : colors.textMuted} />
+        </View>
+        <View style={styles.activityCopy}>
+          <View style={styles.row}>
+            <Text style={[styles.memberName, { color: colors.text }]}>{milestone.title}</Text>
+            <Text style={[styles.status, { color: milestone.unlocked ? colors.primary : colors.textMuted }]}>
+              {milestone.unlocked ? "Unlocked" : "Locked"}
+            </Text>
+          </View>
+          <Text style={[styles.copy, { color: colors.textSecondary }]}>{milestone.description}</Text>
+          <OrbitProgressBar percent={percent} style={styles.troopMilestoneProgress} />
+          <Text style={[styles.time, { color: colors.textMuted }]}>
+            {milestone.progress} / {milestone.target}{milestone.unlocked_at ? ` · Unlocked ${new Date(milestone.unlocked_at).toLocaleDateString()}` : ""}
+          </Text>
+        </View>
+      </View>;
+    }) : <Text style={[styles.copy, { color: colors.textSecondary }]}>Troop milestone progress will appear here after the next sync.</Text>}
+  </AppCard>;
+}
+
 function OrbitEventCard({
   event,
   readiness,
+  patrolReadiness,
   colors,
   canManage,
   busy,
@@ -1040,6 +1296,7 @@ function OrbitEventCard({
   const start = event.start_time ? new Date(event.start_time).toLocaleString() : "Time TBD";
   const end = event.end_time ? new Date(event.end_time).toLocaleString() : null;
   const readinessItems = readiness?.items || [];
+  const patrolReadinessItems = patrolReadiness?.items || [];
   return <AppCard style={styles.card}>
     <View style={styles.row}>
       <View style={styles.activityCopy}>
@@ -1098,6 +1355,23 @@ function OrbitEventCard({
       {readiness.member_readiness.slice(0, 5).map((member) => <Text key={member.user_id} style={[styles.time, { color: colors.textSecondary }]}>
         {member.user?.display_name || member.user?.name || member.user?.username || "Member"}: {member.readiness_percent}% ({member.completed_count}/{member.total_count})
       </Text>)}
+    </View> : null}
+    {patrolReadinessItems.length ? <View style={styles.memberReadiness}>
+      <Text style={[styles.memberName, { color: colors.text }]}>Patrol readiness</Text>
+      {patrolReadinessItems.slice(0, 5).map((patrol) => <View key={patrol.patrol_id} style={styles.patrolRollupRow}>
+        <View style={styles.activityCopy}>
+          <View style={styles.row}>
+            <Text style={[styles.memberName, { color: colors.text }]}>{patrol.patrol_name}</Text>
+            <Text style={[styles.status, { color: colors.primary }]}>{patrol.readiness_percent}%</Text>
+          </View>
+          <Text style={[styles.time, { color: colors.textSecondary }]}>
+            {patrol.completed_count}/{patrol.required_count} ready · {patrol.member_count} {patrol.member_count === 1 ? "member" : "members"}
+          </Text>
+          {patrol.items?.slice(0, 3).map((item) => <Text key={item.item_id} style={[styles.time, { color: colors.textMuted }]}>
+            {item.title}: {item.completed_count}/{item.required_count} ({item.readiness_percent}%)
+          </Text>)}
+        </View>
+      </View>)}
     </View> : null}
   </AppCard>;
 }
@@ -1162,6 +1436,11 @@ const styles = StyleSheet.create({
   statGrid: { flexDirection: "row", flexWrap: "wrap", rowGap: spacing.lg }, stat: { width: "50%" }, statValue: { ...typography.h2 }, statLabel: { ...typography.caption, marginTop: 2 },
   contribute: { marginTop: spacing.lg }, activityCard: { marginBottom: spacing.sm }, activityRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md }, activityCopy: { flex: 1 }, activityMessage: { ...typography.bodyBold }, time: { ...typography.caption, marginTop: spacing.xs },
   memberCard: { marginBottom: spacing.sm }, memberRow: { flexDirection: "row", alignItems: "center", gap: spacing.md }, memberCopy: { flex: 1 }, memberName: { ...typography.bodyBold }, memberMetaRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.xs }, roleBadge: { borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 2 }, dangerButton: { marginTop: spacing.xxl },
+  patrolMemberRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.sm },
+  patrolMemberName: { flex: 1 },
+  patrolLeaderboardRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingTop: spacing.md, marginTop: spacing.sm, borderTopWidth: 1, borderTopColor: "rgba(127,127,127,0.18)" },
+  parentDashboardGrid: { gap: spacing.md, marginTop: spacing.md },
+  parentDashboardSection: { gap: spacing.xs },
   smallButton: { minHeight: 40, paddingHorizontal: spacing.md }, sharedItemCard: { marginBottom: spacing.sm }, sharedItemRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md }, sharedItemCopy: { flex: 1 }, completeButton: { marginTop: spacing.md },
   createCard: { marginTop: spacing.md, marginBottom: spacing.lg }, formInput: { marginTop: spacing.md }, formActions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md }, formAction: { flex: 1 },
   formLabel: { ...typography.caption, marginTop: spacing.md, marginBottom: spacing.sm }, chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }, chip: { borderWidth: 1, borderRadius: radii.pill, paddingVertical: spacing.sm, paddingHorizontal: spacing.md }, challengeProgress: { marginTop: spacing.md }, completedLabel: { marginTop: spacing.sm, marginBottom: spacing.sm },
@@ -1174,7 +1453,10 @@ const styles = StyleSheet.create({
   readinessCheck: { paddingTop: spacing.xs },
   readinessActions: { alignItems: "flex-end", gap: spacing.xs },
   memberReadiness: { gap: spacing.xs, marginTop: spacing.md },
+  patrolRollupRow: { paddingTop: spacing.sm, marginTop: spacing.xs, borderTopWidth: 1, borderTopColor: "rgba(127,127,127,0.14)" },
   achievementUnlock: { flexDirection: "row", alignItems: "center", gap: spacing.md, marginTop: spacing.md }, achievementRow: { marginBottom: spacing.md }, achievementTrack: { height: 7, borderRadius: radii.pill, overflow: "hidden", marginTop: spacing.sm },
   milestoneCard: { borderWidth: 1 }, milestoneHeader: { flexDirection: "row", alignItems: "center", gap: spacing.md, marginBottom: spacing.sm }, milestoneRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md, paddingTop: spacing.md, marginTop: spacing.sm, borderTopWidth: 1, borderTopColor: "rgba(127,127,127,0.18)" }, milestoneIcon: { width: 44, height: 44, borderRadius: radii.pill, alignItems: "center", justifyContent: "center" },
+  troopMilestoneRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md, paddingTop: spacing.md, marginTop: spacing.md, borderTopWidth: 1, borderTopColor: "rgba(127,127,127,0.18)" },
+  troopMilestoneProgress: { marginTop: spacing.sm },
   leaderboardIntro: { marginTop: -spacing.sm, marginBottom: spacing.md }, leaderboardGrid: { gap: spacing.sm, marginBottom: spacing.md }, leaderboardCard: { marginBottom: 0 }, leaderboardRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingTop: spacing.md, marginTop: spacing.sm, borderTopWidth: 1, borderTopColor: "rgba(127,127,127,0.18)" }, leaderboardRank: { ...typography.bodyBold, width: 28 }, leaderboardName: { flex: 1 },
 });

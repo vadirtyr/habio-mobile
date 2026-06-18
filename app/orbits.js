@@ -69,7 +69,7 @@ export default function OrbitsScreen() {
     <ScrollView style={[styles.screen, { backgroundColor: c.background }]} contentContainerStyle={styles.container}>
       <ScreenHeader
         title="Shared Orbits"
-        subtitle="Small groups for shared momentum."
+        subtitle="Build better habits together. Shared goals, real accountability."
         right={<AppButton title="Create" fullWidth={false} onPress={() => router.push("/create-orbit")} />}
       />
 
@@ -102,7 +102,7 @@ export default function OrbitsScreen() {
         <Text style={[styles.copy, { color: c.textSecondary }]}>Loading...</Text>
       ) : orbits.length === 0 ? (
         <AppCard>
-          <EmptyState title="No Shared Orbits yet" description="Create one or accept an invite to start building momentum together." icon={<MaterialCommunityIcons name="account-group-outline" size={42} color={c.primary} />} />
+          <EmptyState title="Create your first Orbit" description="Create an Orbit for your family, troop, fitness group, study group, or accountability circle. Start with a template and customize from there." icon={<MaterialCommunityIcons name="account-group-outline" size={42} color={c.primary} />} />
         </AppCard>
       ) : (
         orbits.map((orbit) => (
