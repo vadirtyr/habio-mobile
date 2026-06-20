@@ -4,7 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { ActivityIndicator, Image, StyleSheet, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 import { AuthProvider } from "../context/AuthContext";
 import { ThemeProvider } from "../context/ThemeContext";
@@ -16,49 +16,60 @@ function AppShell() {
 
   if (!ready) {
     return (
-      <View
+      <SafeAreaView
+        edges={["top"]}
         style={[
-          styles.loadingScreen,
+          styles.safeArea,
           {
             backgroundColor: theme.colors.background,
           },
         ]}
       >
-        <View
-          style={[
-            styles.loadingLogoWrap,
-            {
-              backgroundColor: theme.colors.surface,
-              borderColor: theme.colors.border,
-              shadowColor: theme.colors.text,
-            },
-          ]}
-        >
-          <Image
-            source={require("../assets/images/icon.png")}
-            style={styles.loadingLogo}
-            resizeMode="contain"
+        <View style={styles.loadingScreen}>
+          <View
+            style={[
+              styles.loadingLogoWrap,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border,
+                shadowColor: theme.colors.text,
+              },
+            ]}
+          >
+            <Image
+              source={require("../assets/images/icon.png")}
+              style={styles.loadingLogo}
+              resizeMode="contain"
+            />
+          </View>
+
+          <Text style={[styles.loadingTitle, { color: theme.colors.text }]}>
+            OurOrbit
+          </Text>
+
+          <Text style={[styles.loadingSubtitle, { color: theme.colors.muted }]}>
+            Preparing your orbit...
+          </Text>
+
+          <ActivityIndicator
+            color={theme.colors.primary}
+            style={styles.loader}
           />
         </View>
-
-        <Text style={[styles.loadingTitle, { color: theme.colors.text }]}>
-          OurOrbit
-        </Text>
-
-        <Text style={[styles.loadingSubtitle, { color: theme.colors.muted }]}>
-          Preparing your orbit...
-        </Text>
-
-        <ActivityIndicator
-          color={theme.colors.primary}
-          style={styles.loader}
-        />
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <>
+    <SafeAreaView
+      edges={["top"]}
+      style={[
+        styles.safeArea,
+        {
+          backgroundColor: theme.colors.background,
+        },
+      ]}
+    >
       <StatusBar style={themeName === "dark" ? "light" : "dark"} />
 
       <Stack
@@ -99,7 +110,7 @@ function AppShell() {
 
         <Stack.Screen name="(tabs)" />
       </Stack>
-    </>
+    </SafeAreaView>
   );
 }
 
@@ -156,6 +167,10 @@ export default function RootLayout() {
 
 const styles = StyleSheet.create({
   root: {
+    flex: 1,
+  },
+
+  safeArea: {
     flex: 1,
   },
 

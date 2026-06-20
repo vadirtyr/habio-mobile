@@ -3,7 +3,6 @@ import { useState } from "react";
 import {
     Alert,
     Pressable,
-    SafeAreaView,
     StyleSheet,
     Text,
     TextInput,
@@ -56,7 +55,7 @@ export default function ChangePasswordScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: c.background }]}>
+    <View style={[styles.safe, { backgroundColor: c.background }]}>
       <View style={styles.container}>
         <Pressable style={styles.backButton} onPress={() => router.back()}>
           <Text style={[styles.backText, { color: c.primary }]}>← Back</Text>
@@ -99,7 +98,7 @@ export default function ChangePasswordScreen() {
           />
         </AppCard>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 

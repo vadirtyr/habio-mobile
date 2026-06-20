@@ -23,7 +23,7 @@ export function AchievementStrip({ achievements = [] }) {
   return (
     <AppCard style={styles.card}>
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerCopy}>
           <Text style={[styles.eyebrow, { color: c.primary }]}>
             Recent Wins
           </Text>
@@ -37,6 +37,7 @@ export function AchievementStrip({ achievements = [] }) {
           title="View"
           variant="secondary"
           onPress={() => router.push("/(tabs)/achievements")}
+          fullWidth={false}
           style={styles.viewButton}
         />
       </View>
@@ -136,6 +137,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
 
+  headerCopy: {
+    flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+
   eyebrow: {
     ...typography.caption,
     fontWeight: "900",
@@ -150,7 +157,10 @@ const styles = StyleSheet.create({
   },
 
   viewButton: {
-    minWidth: 92,
+    flexShrink: 0,
+    minHeight: 44,
+    minWidth: 78,
+    paddingHorizontal: spacing.lg,
   },
 
   strip: {

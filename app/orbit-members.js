@@ -23,6 +23,7 @@ export default function OrbitMembersScreen() {
   const [inviteLink, setInviteLink] = useState("");
   const [linkInvites, setLinkInvites] = useState([]);
   const [emailInvites, setEmailInvites] = useState([]);
+  const [inviteSummary, setInviteSummary] = useState({ pending: 0, accepted: 0, expired: 0 });
   const [emailText, setEmailText] = useState("");
   const [sendingEmail, setSendingEmail] = useState(false);
 
@@ -34,9 +35,15 @@ export default function OrbitMembersScreen() {
         const inviteData = await api.listOrbitInvites(orbitId);
         setLinkInvites(inviteData.link_invites || []);
         setEmailInvites(inviteData.email_invites || []);
+        setInviteSummary({
+          pending: inviteData.pending || 0,
+          accepted: inviteData.accepted || 0,
+          expired: inviteData.expired || 0,
+        });
       } else {
         setLinkInvites([]);
         setEmailInvites([]);
+        setInviteSummary({ pending: 0, accepted: 0, expired: 0 });
       }
     }
     catch (err) { Alert.alert("Unable to load members", err.message); }
@@ -64,7 +71,7 @@ export default function OrbitMembersScreen() {
       const link = `${APP_URL}/orbit-invite/${invite.token}`;
       setInviteLink(link);
       await load();
-      await Share.share({ message: `Join ${orbit.name} on OurOrbit: ${link}`, url: link });
+      Alert.alert("Invite link ready", "Use Share Invite to send it by text, email, or messaging app.");
     } catch (err) {
       Alert.alert("Could not create invite link", err.message);
     }
@@ -101,8 +108,8 @@ export default function OrbitMembersScreen() {
     ]);
   }
 
-  function shareInvite(invite) {
-    const link = `${APP_URL}/orbit-invite/${invite.token}`;
+  function shareInvite(inviteOrLink) {
+    const link = typeof inviteOrLink === "string" ? inviteOrLink : `${APP_URL}/orbit-invite/${inviteOrLink.token}`;
     return Share.share({ message: `Join ${orbit.name} on OurOrbit: ${link}`, url: link });
   }
 
@@ -145,31 +152,46 @@ export default function OrbitMembersScreen() {
       <ScreenHeader title="Members" subtitle={`${orbit.member_count} people in ${orbit.name}`} />
       {canManage && <>
         <AppCard style={styles.searchCard}>
+          <Text style={[styles.title, { color: c.text }]}>Orbit Invite Hub</Text>
+          <Text style={[styles.handle, { color: c.textSecondary }]}>Invite people, share the Orbit code, and track invite progress.</Text>
+          <View style={styles.statsRow}>
+            <InviteStat label="Pending" value={inviteSummary.pending} colors={c} />
+            <InviteStat label="Accepted" value={inviteSummary.accepted} colors={c} />
+            <InviteStat label="Expired" value={inviteSummary.expired} colors={c} />
+          </View>
+          {orbit.invite_code ? <View style={[styles.codeBox, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}>
+            <Text style={[styles.handle, { color: c.textSecondary }]}>Invite code</Text>
+            <Text selectable style={[styles.codeText, { color: c.text }]}>{orbit.invite_code}</Text>
+          </View> : null}
+        </AppCard>
+        <AppCard style={styles.searchCard}>
           <Text style={[styles.title, { color: c.text }]}>Invite link</Text>
           <Text style={[styles.handle, { color: c.textSecondary }]}>Create a reusable link for someone to join as a member.</Text>
           {inviteLink ? <Text selectable style={[styles.inviteLink, { color: c.primary }]}>{inviteLink}</Text> : null}
-          <AppButton title={inviteLink ? "Share again" : "Create invite link"} onPress={inviteLink ? () => Share.share({ message: `Join ${orbit.name} on OurOrbit: ${inviteLink}`, url: inviteLink }) : createInviteLink} style={styles.linkButton} />
+          <View style={styles.inviteActions}>
+            <AppButton title={inviteLink ? "Share Invite" : "Create invite link"} onPress={inviteLink ? () => shareInvite(inviteLink) : createInviteLink} style={styles.linkButton} fullWidth={false} />
+          </View>
         </AppCard>
         {linkInvites.length > 0 && <>
           <Text style={[styles.sectionTitle, { color: c.text }]}>Active invite links</Text>
           {linkInvites.map((invite) => <AppCard key={invite.id} style={styles.memberCard}>
             <Text selectable style={[styles.inviteLink, { color: c.primary }]}>{APP_URL}/orbit-invite/{invite.token}</Text>
             <Text style={[styles.handle, { color: c.textSecondary }]}>{invite.uses_count || 0} use{invite.uses_count === 1 ? "" : "s"}{invite.max_uses ? ` of ${invite.max_uses}` : ""}</Text>
-            <View style={styles.inviteActions}><AppButton title="Share" variant="ghost" fullWidth={false} onPress={() => shareInvite(invite)} /><AppButton title="Revoke" variant="ghost" fullWidth={false} onPress={() => revokeInvite(invite)} /></View>
+            <View style={styles.inviteActions}><AppButton title="Share Invite" variant="ghost" fullWidth={false} onPress={() => shareInvite(invite)} /><AppButton title="Revoke" variant="ghost" fullWidth={false} onPress={() => revokeInvite(invite)} /></View>
           </AppCard>)}
         </>}
         <AppCard style={styles.searchCard}>
           <Text style={[styles.title, { color: c.text }]}>Invite by email</Text>
-          <Text style={[styles.handle, { color: c.textSecondary }]}>Send a private, single-use invitation. Separate multiple addresses with commas.</Text>
-          <AppInput value={emailText} onChangeText={setEmailText} placeholder="person@example.com" autoCapitalize="none" keyboardType="email-address" style={styles.input} />
-          <AppButton title={sendingEmail ? "Sending..." : "Send invitation"} onPress={sendEmailInvites} disabled={sendingEmail} style={styles.linkButton} />
+          <Text style={[styles.handle, { color: c.textSecondary }]}>Send private, single-use invitations. Enter one or more emails separated by commas, spaces, or new lines.</Text>
+          <AppInput value={emailText} onChangeText={setEmailText} placeholder={"parent1@example.com\nparent2@example.com\nleader@example.com"} autoCapitalize="none" keyboardType="email-address" style={styles.input} multiline />
+          <AppButton title={sendingEmail ? "Sending..." : "Send invitations"} onPress={sendEmailInvites} disabled={sendingEmail} style={styles.linkButton} />
         </AppCard>
         {emailInvites.length > 0 && <>
           <Text style={[styles.sectionTitle, { color: c.text }]}>Pending email invitations</Text>
           {emailInvites.map((invite) => <AppCard key={invite.id} style={styles.memberCard}>
             <Text style={[styles.memberName, { color: c.text }]}>{invite.email}</Text>
             <Text style={[styles.handle, { color: c.textSecondary }]}>Expires {new Date(invite.expires_at).toLocaleDateString()}</Text>
-            <View style={styles.inviteActions}><AppButton title="Share link" variant="ghost" fullWidth={false} onPress={() => shareInvite(invite)} /><AppButton title="Revoke" variant="ghost" fullWidth={false} onPress={() => revokeInvite(invite)} /></View>
+            <View style={styles.inviteActions}><AppButton title="Share Invite" variant="ghost" fullWidth={false} onPress={() => shareInvite(invite)} /><AppButton title="Revoke" variant="ghost" fullWidth={false} onPress={() => revokeInvite(invite)} /></View>
           </AppCard>)}
         </>}
         <AppCard style={styles.searchCard}>
@@ -204,9 +226,23 @@ export default function OrbitMembersScreen() {
   );
 }
 
+function InviteStat({ label, value, colors }) {
+  return (
+    <View style={[styles.statCard, { backgroundColor: colors.surfaceAlt }]}>
+      <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
+      <Text style={[styles.handle, { color: colors.textSecondary }]}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1 }, center: { flex: 1, alignItems: "center", justifyContent: "center" }, container: { padding: spacing.xl, paddingBottom: 100 },
   searchCard: { marginBottom: spacing.xl }, title: { ...typography.h3 }, input: { marginTop: spacing.md },
+  statsRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md },
+  statCard: { flex: 1, borderRadius: 16, padding: spacing.md, alignItems: "center" },
+  statValue: { ...typography.h3 },
+  codeBox: { borderWidth: 1, borderRadius: 16, padding: spacing.md, marginTop: spacing.md },
+  codeText: { ...typography.h2, letterSpacing: 2, marginTop: spacing.xs },
   result: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.md, borderTopWidth: 1 }, resultCopy: { flex: 1 },
   memberName: { ...typography.bodyBold }, handle: { ...typography.caption, marginTop: 2 }, sectionTitle: { ...typography.h3, marginBottom: spacing.md, marginTop: spacing.md },
   memberCard: { marginBottom: spacing.sm }, row: { flexDirection: "row", alignItems: "center", gap: spacing.md },
