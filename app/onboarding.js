@@ -30,6 +30,7 @@ const GOALS = [
   { id: "accountability", title: "Accountability Group", template: "accountability_circle" },
   { id: "fitness", title: "Fitness Goals", template: "fitness_group" },
   { id: "study", title: "Study Group", template: "study_group" },
+  { id: "couples", title: "Couples", template: "couples" },
   { id: "personal", title: "Personal Growth", template: "blank" },
 ];
 
@@ -70,6 +71,13 @@ const TEMPLATES = [
     description: "Study sessions, reading goals, exam prep, and group focus.",
   },
   {
+    id: "couples",
+    title: "Couples",
+    icon: "heart-multiple",
+    placeholder: "Our Shared Orbit",
+    description: "Strengthen your relationship with shared goals, date nights, gratitude, and milestones.",
+  },
+  {
     id: "blank",
     title: "Blank Orbit",
     icon: "orbit",
@@ -85,6 +93,7 @@ const SUCCESS_ACTIONS = {
   accountability_circle: ["Invite members", "Schedule check-in"],
   fitness_group: ["Invite workout partners", "Review challenges"],
   study_group: ["Invite study group", "Schedule study session"],
+  couples: ["Invite your partner", "Review starter rewards", "Schedule your first date night", "Review shared goals"],
   blank: ["Invite a member", "Create your first challenge", "Add an event"],
 };
 
@@ -94,6 +103,7 @@ const INVITE_MESSAGES = {
   accountability_circle: "Invite accountability partners.",
   fitness_group: "Invite workout partners.",
   study_group: "Invite study group members.",
+  couples: "Invite your partner.",
   blank: "Invite members into your Orbit.",
 };
 
@@ -127,6 +137,12 @@ const REWARD_SUGGESTIONS = {
     "Group Celebration",
     "Focus Champion",
   ],
+  couples: [
+    "Date Night Choice",
+    "Favorite Restaurant Night",
+    "Weekend Adventure",
+    "Special Celebration",
+  ],
   blank: [
     "Group Celebration",
     "Milestone Reward",
@@ -139,9 +155,142 @@ const CUSTOM_REWARD_PLACEHOLDERS = {
   scout_troop: "Patrol pizza party",
   fitness_group: "Group celebration meal",
   study_group: "Exam celebration",
+  couples: "Weekend adventure",
   accountability_circle: "Coffee shop celebration",
   blank: "Group celebration",
 };
+
+const HABIT_SUGGESTIONS = {
+  family: ["Daily Reading", "Chores", "Family Dinner"],
+  scout_troop: ["Physical Fitness", "Scout Skill Practice", "Daily Scout Spirit"],
+  accountability_circle: ["Daily Check-In", "Goal Progress", "Encouragement"],
+  fitness_group: ["Workout", "Stretching", "Hydration"],
+  study_group: ["Reading", "Study Session", "Practice Questions"],
+  couples: ["Gratitude", "Quality Time", "Shared Goal Progress"],
+  blank: ["Check-In", "Practice", "Progress"],
+};
+
+const TASK_SUGGESTIONS = {
+  family: ["Homework", "Chores", "Room Cleaning"],
+  scout_troop: ["Permission Slips", "Medical Forms", "Gear Check"],
+  accountability_circle: ["Weekly Reflection", "Next Step", "Goal Review"],
+  fitness_group: ["Weekly Weigh-In", "Workout Plan Review"],
+  study_group: ["Study Materials Ready", "Practice Exam"],
+  couples: ["Date Night Planning", "Shared Goal Review"],
+  blank: ["Plan First Goal", "Invite Members", "Review Progress"],
+};
+
+const EVENT_SETUP = {
+  family: {
+    prompt: "Would you like to create your first family event?",
+    intro: "These are suggestions. Pick one and add the real date when your family is ready.",
+    options: [
+      { key: "family_vacation", action: "Create Family Vacation", defaultTitle: "Family Vacation", time: "09:00", readiness: ["Packing Complete"] },
+      { key: "family_meeting", action: "Create Family Meeting", defaultTitle: "Family Meeting", time: "18:00", readiness: [] },
+      { key: "family_activity", action: "Create Family Activity", defaultTitle: "Family Activity", time: "14:00", readiness: [] },
+    ],
+  },
+  scout_troop: {
+    prompt: "Let's get your troop started.",
+    intro: "Create a real first event now, or skip and add one later from the Orbit.",
+    options: [
+      { key: "troop_meeting", action: "Create Troop Meeting", defaultTitle: "Troop Meeting", time: "19:00", readiness: [] },
+      { key: "campout", action: "Create Campout", defaultTitle: "Campout", time: "17:00", includeEndDate: true, readiness: ["Permission Slip", "Medical Form", "Packing Complete", "Transportation Confirmed"] },
+      { key: "service_project", action: "Create Service Project", defaultTitle: "Service Project", time: "09:00", readiness: ["Volunteers Assigned", "Materials Ready", "Tools Ready"] },
+    ],
+  },
+  accountability_circle: {
+    prompt: "Would you like to schedule your first check-in?",
+    intro: "Use this to put your first real group touchpoint on the calendar.",
+    options: [
+      { key: "weekly_check_in", action: "Create Weekly Check-In", defaultTitle: "Weekly Check-In", time: "18:00", readiness: ["Goal Update Submitted", "Progress Reflection Completed", "Next Step Chosen"] },
+      { key: "monthly_goal_review", action: "Create Monthly Goal Review", defaultTitle: "Monthly Goal Review", time: "18:00", readiness: [] },
+    ],
+  },
+  fitness_group: {
+    prompt: "Would you like to schedule your first workout event?",
+    intro: "Pick a real workout or prep event to get the group moving.",
+    options: [
+      { key: "group_workout", action: "Create Group Workout", defaultTitle: "Group Workout", time: "07:00", readiness: [] },
+      { key: "race_prep", action: "Create Race Prep", defaultTitle: "Race or Event Prep", time: "08:00", readiness: ["Training Plan Started", "Gear Ready", "Registration Complete", "Hydration Plan Ready"] },
+      { key: "fitness_check_in", action: "Create Fitness Check-In", defaultTitle: "Fitness Check-In", time: "18:00", readiness: [] },
+    ],
+  },
+  study_group: {
+    prompt: "Would you like to schedule your first study session?",
+    intro: "Put a real study session or exam prep meeting on the calendar.",
+    options: [
+      { key: "study_session", action: "Create Study Session", defaultTitle: "Study Session", time: "18:00", readiness: [] },
+      { key: "exam_prep", action: "Create Exam Prep", defaultTitle: "Exam Prep Session", time: "18:00", readiness: ["Reading Complete", "Notes Reviewed", "Practice Questions Complete", "Study Materials Ready"] },
+      { key: "reading_group", action: "Create Reading Group", defaultTitle: "Reading Group", time: "18:00", readiness: [] },
+    ],
+  },
+  couples: {
+    prompt: "Would you like to schedule your first date night?",
+    intro: "Create a real shared event now, or skip and add it later.",
+    options: [
+      { key: "date_night", action: "Create Date Night", defaultTitle: "Date Night", time: "19:00", readiness: ["Reservation Made", "Childcare Arranged", "Plans Confirmed"] },
+      { key: "goal_review", action: "Create Goal Review", defaultTitle: "Shared Goal Review", time: "18:00", readiness: [] },
+      { key: "weekend_adventure", action: "Create Weekend Adventure", defaultTitle: "Weekend Adventure", time: "09:00", includeEndDate: true, readiness: ["Destination Chosen", "Packing Complete", "Reservations Confirmed"] },
+    ],
+  },
+  blank: {
+    prompt: "Would you like to create your first event?",
+    intro: "Add a real event now, or skip and customize your Orbit later.",
+    options: [
+      { key: "first_event", action: "Create First Event", defaultTitle: "First Orbit Event", time: "18:00", readiness: [] },
+    ],
+  },
+};
+
+const CHALLENGE_SUGGESTIONS = {
+  family: [
+    { title: "Family Consistency Challenge", goal_type: "actions", goal_value: 30, reward_xp: 300, duration_days: 30 },
+    { title: "Reading Challenge", goal_type: "habits", goal_value: 20, reward_xp: 250, duration_days: 30 },
+    { title: "Chore Completion Challenge", goal_type: "tasks", goal_value: 20, reward_xp: 250, duration_days: 30 },
+  ],
+  scout_troop: [
+    { title: "Service Hours Challenge", goal_type: "actions", goal_value: 40, reward_xp: 500, duration_days: 60 },
+    { title: "Physical Fitness Challenge", goal_type: "habits", goal_value: 30, reward_xp: 350, duration_days: 30 },
+    { title: "Camping Preparation Challenge", goal_type: "tasks", goal_value: 35, reward_xp: 400, duration_days: 45 },
+  ],
+  accountability_circle: [
+    { title: "Weekly Check-In Challenge", goal_type: "actions", goal_value: 12, reward_xp: 250, duration_days: 30 },
+    { title: "Consistency Challenge", goal_type: "habits", goal_value: 21, reward_xp: 300, duration_days: 30 },
+  ],
+  fitness_group: [
+    { title: "Weekly Workout Challenge", goal_type: "habits", goal_value: 20, reward_xp: 300, duration_days: 30 },
+    { title: "Step Goal Challenge", goal_type: "actions", goal_value: 50, reward_xp: 350, duration_days: 30 },
+    { title: "Monthly Fitness Goal", goal_type: "tasks", goal_value: 25, reward_xp: 400, duration_days: 30 },
+  ],
+  study_group: [
+    { title: "Weekly Study Challenge", goal_type: "habits", goal_value: 20, reward_xp: 300, duration_days: 30 },
+    { title: "Reading Goal Challenge", goal_type: "tasks", goal_value: 15, reward_xp: 250, duration_days: 30 },
+    { title: "Exam Prep Challenge", goal_type: "tasks", goal_value: 25, reward_xp: 400, duration_days: 45 },
+  ],
+  couples: [
+    { title: "Weekly Date Night Challenge", goal_type: "actions", goal_value: 4, reward_xp: 250, duration_days: 30 },
+    { title: "Daily Gratitude Challenge", goal_type: "habits", goal_value: 30, reward_xp: 350, duration_days: 30 },
+    { title: "Shared Goal Challenge", goal_type: "tasks", goal_value: 10, reward_xp: 300, duration_days: 30 },
+  ],
+  blank: [
+    { title: "First Orbit Challenge", goal_type: "actions", goal_value: 10, reward_xp: 200, duration_days: 30 },
+  ],
+};
+
+const SEASON_SUGGESTIONS = {
+  family: [{ title: "Summer Family Goals", days: 60 }],
+  scout_troop: [{ title: "Summer Camp Season", days: 90 }, { title: "Fall Campout Season", days: 90 }],
+  accountability_circle: [{ title: "New Year Accountability Sprint", days: 30 }],
+  fitness_group: [{ title: "30-Day Fitness Sprint", days: 30 }, { title: "Race Prep Season", days: 90 }],
+  study_group: [{ title: "Exam Prep Season", days: 45 }, { title: "Certification Sprint", days: 60 }],
+  couples: [{ title: "Date Night Season", days: 60 }, { title: "Shared Goals Season", days: 60 }],
+  blank: [{ title: "Custom Season", days: 30 }],
+};
+
+function titlesFor(map, templateId) {
+  return (map[templateId] || map.blank).map((item) => (typeof item === "string" ? item : item.title));
+}
 
 const CHECKLIST = [
   "Create or Join an Orbit",
@@ -150,6 +299,12 @@ const CHECKLIST = [
   "View an Event",
   "Complete a Task or Habit",
 ];
+
+function dateInputValue(daysFromNow = 7) {
+  const date = new Date();
+  date.setDate(date.getDate() + daysFromNow);
+  return date.toISOString().slice(0, 10);
+}
 
 export default function OnboardingScreen() {
   const { refresh } = useAuth();
@@ -165,11 +320,22 @@ export default function OnboardingScreen() {
   const [createdOrbit, setCreatedOrbit] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [selectedRewards, setSelectedRewards] = useState(REWARD_SUGGESTIONS.family);
+  const [selectedHabits, setSelectedHabits] = useState(titlesFor(HABIT_SUGGESTIONS, "family"));
+  const [selectedTasks, setSelectedTasks] = useState(titlesFor(TASK_SUGGESTIONS, "family"));
+  const [selectedChallenges, setSelectedChallenges] = useState(titlesFor(CHALLENGE_SUGGESTIONS, "family"));
+  const [selectedSeasons, setSelectedSeasons] = useState(titlesFor(SEASON_SUGGESTIONS, "family"));
   const [customReward, setCustomReward] = useState("");
   const [rewardsAdded, setRewardsAdded] = useState(false);
   const [inviteLink, setInviteLink] = useState("");
   const [inviteEmails, setInviteEmails] = useState("");
   const [inviteBusy, setInviteBusy] = useState(false);
+  const [setupEventKey, setSetupEventKey] = useState(null);
+  const [setupEventTitle, setSetupEventTitle] = useState("");
+  const [setupEventDate, setSetupEventDate] = useState(dateInputValue());
+  const [setupEventEndDate, setSetupEventEndDate] = useState(dateInputValue(8));
+  const [setupEventTime, setSetupEventTime] = useState("18:00");
+  const [setupEventLocation, setSetupEventLocation] = useState("");
+  const [eventSetupBusy, setEventSetupBusy] = useState(false);
   const [checklist, setChecklist] = useState({
     create_or_join_orbit: false,
     invite_member: false,
@@ -185,7 +351,9 @@ export default function OnboardingScreen() {
 
   const rewardSuggestions = REWARD_SUGGESTIONS[templateId] || REWARD_SUGGESTIONS.blank;
   const suggestedActions = SUCCESS_ACTIONS[templateId] || SUCCESS_ACTIONS.blank;
-  const progress = Math.round(((step + 1) / 9) * 100);
+  const eventSetup = EVENT_SETUP[templateId];
+  const selectedSetupEvent = eventSetup?.options.find((item) => item.key === setupEventKey);
+  const progress = Math.round(((step + 1) / 14) * 100);
 
   async function markStep(body) {
     try {
@@ -197,7 +365,35 @@ export default function OnboardingScreen() {
     setGoal(item.id);
     setTemplateId(item.template);
     setSelectedRewards(REWARD_SUGGESTIONS[item.template] || REWARD_SUGGESTIONS.blank);
+    resetGuidedSelections(item.template);
+    resetSetupEvent();
     markStep({ step: "goal_selected", onboarding_goal: item.id });
+  }
+
+  function resetGuidedSelections(nextTemplateId) {
+    setSelectedHabits(titlesFor(HABIT_SUGGESTIONS, nextTemplateId));
+    setSelectedTasks(titlesFor(TASK_SUGGESTIONS, nextTemplateId));
+    setSelectedChallenges(titlesFor(CHALLENGE_SUGGESTIONS, nextTemplateId));
+    setSelectedSeasons(titlesFor(SEASON_SUGGESTIONS, nextTemplateId));
+    setSelectedRewards(REWARD_SUGGESTIONS[nextTemplateId] || REWARD_SUGGESTIONS.blank);
+  }
+
+  function resetSetupEvent() {
+    setSetupEventKey(null);
+    setSetupEventTitle("");
+    setSetupEventDate(dateInputValue());
+    setSetupEventEndDate(dateInputValue(8));
+    setSetupEventTime("18:00");
+    setSetupEventLocation("");
+  }
+
+  function chooseSetupEvent(option) {
+    setSetupEventKey(option.key);
+    setSetupEventTitle(option.defaultTitle);
+    setSetupEventDate(dateInputValue());
+    setSetupEventEndDate(dateInputValue(8));
+    setSetupEventTime(option.time || "18:00");
+    setSetupEventLocation("");
   }
 
   function continueFromIntro() {
@@ -266,7 +462,9 @@ export default function OnboardingScreen() {
       });
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-      setStep(5);
+      await api.completeOnboarding();
+      await refresh?.();
+      setStep(12);
     } catch (error) {
       Alert.alert("Join Orbit failed", error?.message || "Unable to join that Orbit.");
     } finally {
@@ -280,6 +478,105 @@ export default function OnboardingScreen() {
         ? current.filter((item) => item !== title)
         : [...current, title]
     );
+  }
+
+  function toggleSelected(setter, title) {
+    setter((current) =>
+      current.includes(title)
+        ? current.filter((item) => item !== title)
+        : [...current, title]
+    );
+  }
+
+  async function createGuidedHabits() {
+    const orbitId = createdOrbit?.id || createdOrbit?.orbit_id;
+    if (!orbitId) return;
+    setSubmitting(true);
+    try {
+      for (const name of selectedHabits) {
+        await api.createOrbitHabit(orbitId, {
+          name,
+          description: "Added during guided template setup.",
+          requires_proof: false,
+        });
+      }
+      setStep(6);
+    } catch (error) {
+      Alert.alert("Could not create habits", error?.message || "You can skip and add habits later.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function createGuidedTasks() {
+    const orbitId = createdOrbit?.id || createdOrbit?.orbit_id;
+    if (!orbitId) return;
+    setSubmitting(true);
+    try {
+      for (const name of selectedTasks) {
+        await api.createOrbitTask(orbitId, {
+          name,
+          description: "Added during guided template setup.",
+          requires_proof: false,
+        });
+      }
+      setStep(7);
+    } catch (error) {
+      Alert.alert("Could not create tasks", error?.message || "You can skip and add tasks later.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function createSetupEvent() {
+    const orbitId = createdOrbit?.id || createdOrbit?.orbit_id;
+    const title = setupEventTitle.trim();
+
+    if (!orbitId || !selectedSetupEvent) {
+      Alert.alert("Choose an event", "Pick an event suggestion or skip for now.");
+      return;
+    }
+
+    if (!title || !setupEventDate.trim()) {
+      Alert.alert("Event details required", "Add an event title and date to continue.");
+      return;
+    }
+
+    setEventSetupBusy(true);
+
+    try {
+      const startTime = `${setupEventDate.trim()}T${setupEventTime.trim() || "09:00"}:00`;
+      const endTime = selectedSetupEvent.includeEndDate && setupEventEndDate.trim()
+        ? `${setupEventEndDate.trim()}T${setupEventTime.trim() || "09:00"}:00`
+        : null;
+      const event = await api.createOrbitEvent(orbitId, {
+        title,
+        description: "Created during template setup.",
+        location: setupEventLocation.trim(),
+        start_time: startTime,
+        end_time: endTime,
+      });
+      const eventId = event?.id || event?.event?.id;
+
+      if (eventId) {
+        for (const item of selectedSetupEvent.readiness || []) {
+          await api.createOrbitEventReadinessItem(orbitId, eventId, {
+            title: item,
+            description: "",
+            required: true,
+          });
+        }
+      }
+
+      setChecklist((current) => ({ ...current, view_event: true }));
+      await api.completeOnboardingStep({ checklist_item: "view_event" });
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setStep(9);
+    } catch (error) {
+      Alert.alert("Could not create event", error?.message || "You can skip this and add an event later.");
+    } finally {
+      setEventSetupBusy(false);
+    }
   }
 
   async function continueToSuccess({ addRewards = false } = {}) {
@@ -328,10 +625,64 @@ export default function OnboardingScreen() {
       }
     }
 
+    setStep(8);
+  }
+
+  async function createGuidedChallenges() {
+    const orbitId = createdOrbit?.id || createdOrbit?.orbit_id;
+    if (!orbitId) return;
+    const suggestions = CHALLENGE_SUGGESTIONS[templateId] || CHALLENGE_SUGGESTIONS.blank;
+    const selected = suggestions.filter((item) => selectedChallenges.includes(item.title));
+    setSubmitting(true);
+    try {
+      for (const item of selected) {
+        await api.createOrbitChallenge(orbitId, {
+          title: item.title,
+          description: "Added during guided template setup.",
+          goal_type: item.goal_type,
+          goal_value: item.goal_value,
+          start_date: dateInputValue(0),
+          end_date: dateInputValue(item.duration_days || 30),
+          reward_xp: item.reward_xp,
+        });
+      }
+      setStep(10);
+    } catch (error) {
+      Alert.alert("Could not create challenges", error?.message || "You can skip and add challenges later.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function createGuidedSeasons() {
+    const orbitId = createdOrbit?.id || createdOrbit?.orbit_id;
+    if (!orbitId) return;
+    const suggestions = SEASON_SUGGESTIONS[templateId] || SEASON_SUGGESTIONS.blank;
+    const selected = suggestions.filter((item) => selectedSeasons.includes(item.title));
+    setSubmitting(true);
+    try {
+      for (const item of selected) {
+        await api.createOrbitSeason(orbitId, {
+          title: item.title,
+          description: "Added during guided template setup.",
+          start_date: dateInputValue(0),
+          end_date: dateInputValue(item.days || 30),
+          template: templateId,
+        });
+      }
+      setStep(11);
+    } catch (error) {
+      Alert.alert("Could not create seasons", error?.message || "You can skip and add seasons later.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function showSuccess() {
     await api.completeOnboardingStep({ step: "success" });
     await api.completeOnboarding();
     await refresh?.();
-    setStep(mode === "create" ? 6 : 7);
+    setStep(12);
   }
 
   async function createOnboardingInviteLink({ share = false } = {}) {
@@ -442,6 +793,31 @@ export default function OnboardingScreen() {
     );
   }
 
+  function renderGuidedChecklist({ items, selected, onToggle }) {
+    return (
+      <View style={styles.stack}>
+        {items.map((item) => {
+          const title = typeof item === "string" ? item : item.title;
+          const isSelected = selected.includes(title);
+          return (
+            <AnimatedPressable key={title} onPress={() => onToggle(title)}>
+              <AppCard style={[styles.optionCard, { borderColor: isSelected ? c.primary : c.border }]}>
+                <View style={styles.optionRow}>
+                  <Feather
+                    name={isSelected ? "check-circle" : "circle"}
+                    size={20}
+                    color={isSelected ? c.primary : c.textMuted}
+                  />
+                  <Text style={[styles.optionTitle, { color: c.text, flex: 1 }]}>{title}</Text>
+                </View>
+              </AppCard>
+            </AnimatedPressable>
+          );
+        })}
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.screen, { backgroundColor: c.background }]}>
       <AnimatedScreen style={styles.screen}>
@@ -509,7 +885,7 @@ export default function OnboardingScreen() {
             <AppCard elevated style={styles.section}>
               <Text style={[styles.title, { color: c.text }]}>Choose Template</Text>
               <Text style={[styles.body, { color: c.textMuted }]}>
-                Templates include starter challenges, rewards, events, and readiness checklists.
+                Choose a template to start with recommended challenges, rewards, and guided event/readiness setup.
               </Text>
               <View style={styles.stack}>
                 {TEMPLATES.map((template) =>
@@ -522,6 +898,7 @@ export default function OnboardingScreen() {
                     onPress: () => {
                       setTemplateId(template.id);
                       setSelectedRewards(REWARD_SUGGESTIONS[template.id] || REWARD_SUGGESTIONS.blank);
+                      resetSetupEvent();
                       markStep({ step: "template_selected" });
                     },
                   })
@@ -537,7 +914,7 @@ export default function OnboardingScreen() {
                 {templateId === "scout_troop" ? "Troop Name" : "Orbit Name"}
               </Text>
               <Text style={[styles.body, { color: c.textMuted }]}>
-                Starter content will be added automatically.
+                Starter challenges, rewards, roles, and suggestions will be added automatically.
               </Text>
               <TextInput
                 value={orbitName}
@@ -590,7 +967,41 @@ export default function OnboardingScreen() {
             </AppCard>
           )}
 
-          {step === 5 && createdOrbit && (
+          {step === 5 && createdOrbit && mode === "create" && (
+            <AppCard elevated style={styles.section}>
+              <BrandBadge label="Guided Setup" />
+              <Text style={[styles.title, { color: c.text }]}>Would you like to add shared habits?</Text>
+              <Text style={[styles.body, { color: c.textMuted }]}>
+                Start with habits that match your template, or skip and add your own later.
+              </Text>
+              {renderGuidedChecklist({
+                items: HABIT_SUGGESTIONS[templateId] || HABIT_SUGGESTIONS.blank,
+                selected: selectedHabits,
+                onToggle: (title) => toggleSelected(setSelectedHabits, title),
+              })}
+              <AppButton title={submitting ? "Creating..." : "Create Selected"} onPress={createGuidedHabits} disabled={submitting} />
+              <AppButton title="Skip" variant="ghost" onPress={() => setStep(6)} disabled={submitting} />
+            </AppCard>
+          )}
+
+          {step === 6 && createdOrbit && mode === "create" && (
+            <AppCard elevated style={styles.section}>
+              <BrandBadge label="Guided Setup" />
+              <Text style={[styles.title, { color: c.text }]}>Would you like to add shared tasks?</Text>
+              <Text style={[styles.body, { color: c.textMuted }]}>
+                These are concrete one-time tasks your group can complete together.
+              </Text>
+              {renderGuidedChecklist({
+                items: TASK_SUGGESTIONS[templateId] || TASK_SUGGESTIONS.blank,
+                selected: selectedTasks,
+                onToggle: (title) => toggleSelected(setSelectedTasks, title),
+              })}
+              <AppButton title={submitting ? "Creating..." : "Create Selected"} onPress={createGuidedTasks} disabled={submitting} />
+              <AppButton title="Skip" variant="ghost" onPress={() => setStep(7)} disabled={submitting} />
+            </AppCard>
+          )}
+
+          {step === 7 && createdOrbit && (
             <AppCard elevated style={styles.section}>
               <BrandBadge label="Rewards" />
               <Text style={[styles.title, { color: c.text }]}>Why Rewards Matter</Text>
@@ -650,13 +1061,13 @@ export default function OnboardingScreen() {
               />
               {mode === "create" ? (
                 <AppButton
-                  title={submitting ? "Adding Rewards..." : "Add Selected Rewards"}
+                  title={submitting ? "Adding Rewards..." : "Create Selected"}
                   onPress={() => continueToSuccess({ addRewards: true })}
                   disabled={submitting}
                 />
               ) : null}
               <AppButton
-                title={mode === "create" ? "Skip For Now" : "Continue"}
+                title={mode === "create" ? "Skip" : "Continue"}
                 variant={mode === "create" ? "ghost" : "primary"}
                 onPress={() => continueToSuccess({ addRewards: false })}
                 disabled={submitting}
@@ -664,7 +1075,151 @@ export default function OnboardingScreen() {
             </AppCard>
           )}
 
-          {step === 6 && createdOrbit && mode === "create" && (
+          {step === 8 && createdOrbit && mode === "create" && eventSetup && (
+            <AppCard elevated style={styles.section}>
+              <BrandBadge label="First Event" />
+              <Text style={[styles.title, { color: c.text }]}>{eventSetup.prompt}</Text>
+              <Text style={[styles.body, { color: c.textMuted }]}>{eventSetup.intro}</Text>
+              <View style={styles.stack}>
+                {eventSetup.options.map((option) =>
+                  renderOption({
+                    active: setupEventKey === option.key,
+                    icon: "calendar-plus",
+                    title: option.action,
+                    description: option.readiness?.length
+                      ? `Includes readiness: ${option.readiness.join(", ")}`
+                      : "No readiness checklist required.",
+                    onPress: () => chooseSetupEvent(option),
+                  })
+                )}
+              </View>
+
+              {selectedSetupEvent ? (
+                <>
+                  <TextInput
+                    value={setupEventTitle}
+                    onChangeText={setSetupEventTitle}
+                    placeholder="Event name"
+                    placeholderTextColor={c.textMuted}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: c.surfaceAlt || c.surface,
+                        borderColor: c.border,
+                        color: c.text,
+                      },
+                    ]}
+                  />
+                  <TextInput
+                    value={setupEventDate}
+                    onChangeText={setSetupEventDate}
+                    placeholder="Start date (YYYY-MM-DD)"
+                    placeholderTextColor={c.textMuted}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: c.surfaceAlt || c.surface,
+                        borderColor: c.border,
+                        color: c.text,
+                      },
+                    ]}
+                  />
+                  {selectedSetupEvent.includeEndDate ? (
+                    <TextInput
+                      value={setupEventEndDate}
+                      onChangeText={setSetupEventEndDate}
+                      placeholder="End date (YYYY-MM-DD)"
+                      placeholderTextColor={c.textMuted}
+                      style={[
+                        styles.input,
+                        {
+                          backgroundColor: c.surfaceAlt || c.surface,
+                          borderColor: c.border,
+                          color: c.text,
+                        },
+                      ]}
+                    />
+                  ) : null}
+                  <TextInput
+                    value={setupEventTime}
+                    onChangeText={setSetupEventTime}
+                    placeholder="Time (HH:MM)"
+                    placeholderTextColor={c.textMuted}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: c.surfaceAlt || c.surface,
+                        borderColor: c.border,
+                        color: c.text,
+                      },
+                    ]}
+                  />
+                  <TextInput
+                    value={setupEventLocation}
+                    onChangeText={setSetupEventLocation}
+                    placeholder="Location"
+                    placeholderTextColor={c.textMuted}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: c.surfaceAlt || c.surface,
+                        borderColor: c.border,
+                        color: c.text,
+                      },
+                    ]}
+                  />
+                  <AppButton
+                    title={eventSetupBusy ? "Creating Event..." : "Create Event"}
+                    onPress={createSetupEvent}
+                    disabled={eventSetupBusy}
+                  />
+                </>
+              ) : null}
+
+              <AppButton
+                title="Skip For Now"
+                variant="ghost"
+                onPress={() => setStep(9)}
+                disabled={eventSetupBusy}
+              />
+            </AppCard>
+          )}
+
+          {step === 9 && createdOrbit && mode === "create" && (
+            <AppCard elevated style={styles.section}>
+              <BrandBadge label="Guided Setup" />
+              <Text style={[styles.title, { color: c.text }]}>Would you like to add challenges?</Text>
+              <Text style={[styles.body, { color: c.textMuted }]}>
+                Challenges give the Orbit a clear shared target from day one.
+              </Text>
+              {renderGuidedChecklist({
+                items: CHALLENGE_SUGGESTIONS[templateId] || CHALLENGE_SUGGESTIONS.blank,
+                selected: selectedChallenges,
+                onToggle: (title) => toggleSelected(setSelectedChallenges, title),
+              })}
+              <AppButton title={submitting ? "Creating..." : "Create Selected"} onPress={createGuidedChallenges} disabled={submitting} />
+              <AppButton title="Skip" variant="ghost" onPress={() => setStep(10)} disabled={submitting} />
+            </AppCard>
+          )}
+
+          {step === 10 && createdOrbit && mode === "create" && (
+            <AppCard elevated style={styles.section}>
+              <BrandBadge label="Guided Setup" />
+              <Text style={[styles.title, { color: c.text }]}>Would you like to add a season?</Text>
+              <Text style={[styles.body, { color: c.textMuted }]}>
+                Seasons group events, rewards, milestones, and goals around a time-bound focus.
+              </Text>
+              {renderGuidedChecklist({
+                items: SEASON_SUGGESTIONS[templateId] || SEASON_SUGGESTIONS.blank,
+                selected: selectedSeasons,
+                onToggle: (title) => toggleSelected(setSelectedSeasons, title),
+              })}
+              <AppButton title={submitting ? "Creating..." : "Create Selected"} onPress={createGuidedSeasons} disabled={submitting} />
+              <AppButton title="Skip" variant="ghost" onPress={() => setStep(11)} disabled={submitting} />
+            </AppCard>
+          )}
+
+          {step === 11 && createdOrbit && mode === "create" && (
             <AppCard elevated style={styles.section}>
               <BrandBadge label="Invite" />
               <Text style={[styles.title, { color: c.text }]}>Invite members now?</Text>
@@ -725,13 +1280,13 @@ export default function OnboardingScreen() {
               <AppButton
                 title="Skip"
                 variant="ghost"
-                onPress={() => setStep(7)}
+                onPress={showSuccess}
                 disabled={inviteBusy}
               />
             </AppCard>
           )}
 
-          {step === 7 && createdOrbit && (
+          {step === 12 && createdOrbit && (
             <AppCard elevated glow style={styles.section}>
               <View style={[styles.successIcon, { backgroundColor: `${c.primary}18` }]}>
                 <Feather name="check" size={30} color={c.primary} />
@@ -750,11 +1305,11 @@ export default function OnboardingScreen() {
                   </View>
                 ))}
               </View>
-              <AppButton title="View Getting Started Checklist" onPress={() => setStep(8)} />
+              <AppButton title="View Getting Started Checklist" onPress={() => setStep(13)} />
             </AppCard>
           )}
 
-          {step === 8 && (
+          {step === 13 && (
             <AppCard elevated style={styles.section}>
               <Text style={[styles.title, { color: c.text }]}>Getting Started Checklist</Text>
               <Text style={[styles.body, { color: c.textMuted }]}>

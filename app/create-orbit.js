@@ -53,6 +53,14 @@ const ORBIT_TEMPLATES = [
     highlights: ["Study sessions", "Reading goals", "Exam prep"],
   },
   {
+    id: "couples",
+    icon: "💕",
+    name: "Couples",
+    description: "Strengthen your relationship with shared goals, date nights, gratitude, and milestones.",
+    nameSuggestion: "Our Shared Orbit",
+    highlights: ["Date nights", "Daily gratitude", "Shared milestones"],
+  },
+  {
     id: "blank",
     icon: "✨",
     name: "Blank Orbit",
@@ -78,6 +86,7 @@ export default function CreateOrbitScreen() {
   const isAccountabilityCircle = selectedTemplate.id === "accountability_circle";
   const isFitnessGroup = selectedTemplate.id === "fitness_group";
   const isStudyGroup = selectedTemplate.id === "study_group";
+  const isCouples = selectedTemplate.id === "couples";
   const createTitle = saving
     ? "Creating..."
     : isFamily
@@ -90,7 +99,9 @@ export default function CreateOrbitScreen() {
             ? "Create Fitness Group"
             : isStudyGroup
               ? "Create Study Group"
-              : "Create Blank Orbit";
+              : isCouples
+                ? "Create Couples Orbit"
+                : "Create Blank Orbit";
   const namePlaceholder = isFamily
     ? "Williams Family"
     : isScoutTroop
@@ -101,7 +112,9 @@ export default function CreateOrbitScreen() {
           ? "Morning Fitness Group"
           : isStudyGroup
             ? "Exam Prep Study Group"
-            : "My Orbit";
+            : isCouples
+              ? "Our Shared Orbit"
+              : "My Orbit";
   const progressText = `Step ${step + 1} of 3`;
   const nextTitle = selectedTemplate.id === BLANK_TEMPLATE_ID
     ? "Continue with Blank Orbit"

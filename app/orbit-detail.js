@@ -46,6 +46,7 @@ export default function OrbitDetailScreen() {
   const [troopMilestones, setTroopMilestones] = useState([]);
   const [leaderboards, setLeaderboards] = useState(null);
   const [patrolLeaderboard, setPatrolLeaderboard] = useState([]);
+  const [seasons, setSeasons] = useState([]);
   const [events, setEvents] = useState([]);
   const [readinessByEvent, setReadinessByEvent] = useState({});
   const [patrolReadinessByEvent, setPatrolReadinessByEvent] = useState({});
@@ -68,11 +69,13 @@ export default function OrbitDetailScreen() {
   const [challengeType, setChallengeType] = useState("actions");
   const [challengeGoal, setChallengeGoal] = useState("100");
   const [challengeReward, setChallengeReward] = useState("500");
+  const [challengeSeasonId, setChallengeSeasonId] = useState("");
   const [showRewardForm, setShowRewardForm] = useState(false);
   const [editingReward, setEditingReward] = useState(null);
   const [rewardTitle, setRewardTitle] = useState("");
   const [rewardDescription, setRewardDescription] = useState("");
   const [rewardCost, setRewardCost] = useState("500");
+  const [rewardSeasonId, setRewardSeasonId] = useState("");
   const [showEventForm, setShowEventForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [eventTitle, setEventTitle] = useState("");
@@ -80,6 +83,17 @@ export default function OrbitDetailScreen() {
   const [eventLocation, setEventLocation] = useState("");
   const [eventStart, setEventStart] = useState("");
   const [eventEnd, setEventEnd] = useState("");
+  const [eventSeasonId, setEventSeasonId] = useState("");
+  const [showSeasonForm, setShowSeasonForm] = useState(false);
+  const [editingSeason, setEditingSeason] = useState(null);
+  const [seasonTitle, setSeasonTitle] = useState("");
+  const [seasonDescription, setSeasonDescription] = useState("");
+  const [seasonStartDate, setSeasonStartDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [seasonEndDate, setSeasonEndDate] = useState(() => {
+    const end = new Date();
+    end.setUTCDate(end.getUTCDate() + 30);
+    return end.toISOString().slice(0, 10);
+  });
   const [readinessForm, setReadinessForm] = useState(null);
   const [readinessTitle, setReadinessTitle] = useState("");
   const [readinessDescription, setReadinessDescription] = useState("");
@@ -95,18 +109,20 @@ export default function OrbitDetailScreen() {
 
   const load = useCallback(async () => {
     try {
-      const [dashboardData, recapData, leaderboardData, patrolLeaderboardData, eventData] = await Promise.all([
+      const [dashboardData, recapData, leaderboardData, patrolLeaderboardData, eventData, seasonData] = await Promise.all([
         api.getOrbitDashboard(orbitId),
         api.getOrbitWeeklyRecaps(orbitId),
         api.getOrbitLeaderboards(orbitId),
         api.getOrbitPatrolLeaderboard(orbitId),
         api.getOrbitEvents(orbitId),
+        api.getOrbitSeasons(orbitId),
       ]);
       setDashboard(dashboardData);
       setLeaderboards(leaderboardData);
       setPatrolLeaderboard(patrolLeaderboardData.items || []);
       const eventItems = eventData.items || [];
       setEvents(eventItems);
+      setSeasons(seasonData.items || []);
       const [readinessResults, patrolReadinessResults] = await Promise.all([
         Promise.allSettled(eventItems.map((event) => api.getOrbitEventReadiness(orbitId, event.id))),
         Promise.allSettled(eventItems.map((event) => api.getOrbitEventPatrolReadiness(orbitId, event.id))),
@@ -404,6 +420,56 @@ export default function OrbitDetailScreen() {
     }
   }
 
+  function openSeasonForm(season = null) {
+    setEditingSeason(season);
+    setSeasonTitle(season?.title || "");
+    setSeasonDescription(season?.description || "");
+    setSeasonStartDate(season?.start_date || new Date().toISOString().slice(0, 10));
+    setSeasonEndDate(season?.end_date || (() => {
+      const end = new Date();
+      end.setUTCDate(end.getUTCDate() + 30);
+      return end.toISOString().slice(0, 10);
+    })());
+    setShowSeasonForm(true);
+  }
+
+  async function saveSeason() {
+    if (!seasonTitle.trim() || !seasonStartDate.trim() || !seasonEndDate.trim()) {
+      Alert.alert("Check season details", "Add a title, start date, and end date.");
+      return;
+    }
+    setBusyItem(editingSeason ? `edit-season-${editingSeason.id}` : "create-season");
+    try {
+      const body = {
+        title: seasonTitle.trim(),
+        description: seasonDescription.trim(),
+        start_date: seasonStartDate.trim(),
+        end_date: seasonEndDate.trim(),
+        template: dashboard?.orbit?.template || null,
+      };
+      if (editingSeason) await api.updateOrbitSeason(orbitId, editingSeason.id, body);
+      else await api.createOrbitSeason(orbitId, body);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowSeasonForm(false);
+      setEditingSeason(null);
+      await load();
+    } catch (err) {
+      Alert.alert("Could not save season", err.message);
+    } finally {
+      setBusyItem(null);
+    }
+  }
+
+  function deleteSeason(season) {
+    Alert.alert("Archive season?", `Archive “${season.title}”? Existing linked items will keep working.`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Archive", style: "destructive", onPress: async () => {
+        try { await api.deleteOrbitSeason(orbitId, season.id); await load(); }
+        catch (err) { Alert.alert("Could not archive season", err.message); }
+      } },
+    ]);
+  }
+
   async function createChallenge() {
     const goalValue = Number(challengeGoal);
     const rewardXp = Number(challengeReward);
@@ -421,11 +487,13 @@ export default function OrbitDetailScreen() {
         reward_xp: rewardXp,
         start_date: new Date().toISOString().slice(0, 10),
         end_date: challengeEndDate.trim(),
+        season_id: challengeSeasonId || null,
       });
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowChallengeForm(false);
       setChallengeTitle("");
       setChallengeDescription("");
+      setChallengeSeasonId("");
       await load();
     } catch (err) {
       Alert.alert("Could not create challenge", err.message);
@@ -439,6 +507,7 @@ export default function OrbitDetailScreen() {
     setRewardTitle(reward?.title || "");
     setRewardDescription(reward?.description || "");
     setRewardCost(String(reward?.xp_cost || 500));
+    setRewardSeasonId(reward?.season_id || "");
     setShowRewardForm(true);
   }
 
@@ -450,7 +519,7 @@ export default function OrbitDetailScreen() {
     }
     setBusyItem(editingReward ? `edit-reward-${editingReward.id}` : "create-reward");
     try {
-      const body = { title: rewardTitle.trim(), description: rewardDescription.trim(), xp_cost: xpCost };
+      const body = { title: rewardTitle.trim(), description: rewardDescription.trim(), xp_cost: xpCost, season_id: rewardSeasonId || null };
       if (editingReward) await api.updateOrbitReward(orbitId, editingReward.id, body);
       else await api.createOrbitReward(orbitId, body);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -488,6 +557,7 @@ export default function OrbitDetailScreen() {
     setEventLocation(event?.location || "");
     setEventStart(event?.start_time ? event.start_time.slice(0, 16) : "");
     setEventEnd(event?.end_time ? event.end_time.slice(0, 16) : "");
+    setEventSeasonId(event?.season_id || "");
     setShowEventForm(true);
   }
 
@@ -504,6 +574,7 @@ export default function OrbitDetailScreen() {
         location: eventLocation.trim(),
         start_time: eventStart.trim(),
         end_time: eventEnd.trim() || null,
+        season_id: eventSeasonId || null,
       };
       if (editingEvent) await api.updateOrbitEvent(orbitId, editingEvent.id, body);
       else await api.createOrbitEvent(orbitId, body);
@@ -703,6 +774,44 @@ export default function OrbitDetailScreen() {
         {canManage && <AppButton title="New goal" style={styles.action} onPress={() => router.push({ pathname: "/create-orbit-goal", params: { orbitId } })} />}
       </View>
 
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, styles.sectionTitleInline, { color: c.text }]}>Seasons</Text>
+        {canManage && <AppButton title="Create" variant="ghost" fullWidth={false} style={styles.smallButton} onPress={() => openSeasonForm()} disabled={!!busyItem} />}
+      </View>
+      {!!showSeasonForm && <AppCard style={styles.createCard}>
+        <Text style={[styles.title, { color: c.text }]}>{editingSeason ? "Edit season" : "New season"}</Text>
+        <AppInput value={seasonTitle} onChangeText={setSeasonTitle} placeholder="Season title" maxLength={120} style={styles.formInput} />
+        <AppInput value={seasonDescription} onChangeText={setSeasonDescription} placeholder="Description (optional)" maxLength={1000} style={styles.formInput} />
+        <AppInput value={seasonStartDate} onChangeText={setSeasonStartDate} placeholder="Start date: YYYY-MM-DD" style={styles.formInput} />
+        <AppInput value={seasonEndDate} onChangeText={setSeasonEndDate} placeholder="End date: YYYY-MM-DD" style={styles.formInput} />
+        <View style={styles.formActions}>
+          <AppButton title="Cancel" variant="secondary" style={styles.formAction} onPress={() => { setShowSeasonForm(false); setEditingSeason(null); }} disabled={!!busyItem} />
+          <AppButton title="Save" style={styles.formAction} onPress={saveSeason} disabled={!!busyItem || !seasonTitle.trim()} />
+        </View>
+      </AppCard>}
+      {seasons.length ? seasons.map((season) => (
+        <AppCard key={season.id} style={styles.card}>
+          <View style={styles.row}>
+            <View style={styles.activityCopy}>
+              <Text style={[styles.title, { color: c.text }]}>{season.title}</Text>
+              {!!season.description && <Text style={[styles.copy, { color: c.textSecondary }]}>{season.description}</Text>}
+              <Text style={[styles.time, { color: c.textMuted }]}>{season.start_date} → {season.end_date}</Text>
+            </View>
+            <Text style={[styles.status, { color: c.primary }]}>{season.days_remaining}d</Text>
+          </View>
+          <View style={styles.seasonStats}>
+            <Stat label="Challenges" value={season.challenge_count || 0} color={c.text} labelColor={c.textSecondary} />
+            <Stat label="Events" value={season.event_count || 0} color={c.text} labelColor={c.textSecondary} />
+            <Stat label="Milestones" value={season.milestone_count || 0} color={c.text} labelColor={c.textSecondary} />
+            <Stat label="Rewards" value={season.reward_count || 0} color={c.text} labelColor={c.textSecondary} />
+          </View>
+          {canManage && <View style={styles.formActions}>
+            <AppButton title="Edit" variant="secondary" style={styles.formAction} onPress={() => openSeasonForm(season)} disabled={!!busyItem} />
+            <AppButton title="Archive" variant="secondary" style={styles.formAction} onPress={() => deleteSeason(season)} disabled={!!busyItem} />
+          </View>}
+        </AppCard>
+      )) : <AppCard style={styles.card}><EmptyState compact title="No seasons yet" description="Create a time-bound season to group challenges, events, rewards, and milestones." icon={<MaterialCommunityIcons name="calendar-star" size={40} color={c.primary} />} /></AppCard>}
+
       {showPatrols && <>
         <ParentDashboardCard parentDashboard={parentDashboard} colors={c} />
         <TroopMilestonesCard milestones={troopMilestones} colors={c} />
@@ -768,6 +877,7 @@ export default function OrbitDetailScreen() {
         <AppInput value={eventLocation} onChangeText={setEventLocation} placeholder="Location (optional)" maxLength={240} style={styles.formInput} />
         <AppInput value={eventStart} onChangeText={setEventStart} placeholder="Start: YYYY-MM-DDTHH:mm" style={styles.formInput} />
         <AppInput value={eventEnd} onChangeText={setEventEnd} placeholder="End: YYYY-MM-DDTHH:mm (optional)" style={styles.formInput} />
+        <SeasonSelector seasons={seasons} selectedId={eventSeasonId} onSelect={setEventSeasonId} colors={c} />
         <View style={styles.formActions}>
           <AppButton title="Cancel" variant="secondary" style={styles.formAction} onPress={() => { setShowEventForm(false); setEditingEvent(null); }} disabled={!!busyItem} />
           <AppButton title="Save" style={styles.formAction} onPress={saveEvent} disabled={!!busyItem} />
@@ -842,6 +952,7 @@ export default function OrbitDetailScreen() {
         <AppInput value={rewardTitle} onChangeText={setRewardTitle} placeholder="Reward title" maxLength={100} style={styles.formInput} />
         <AppInput value={rewardDescription} onChangeText={setRewardDescription} placeholder="Description (optional)" maxLength={500} style={styles.formInput} />
         <AppInput value={rewardCost} onChangeText={setRewardCost} placeholder="XP cost" keyboardType="number-pad" style={styles.formInput} />
+        <SeasonSelector seasons={seasons} selectedId={rewardSeasonId} onSelect={setRewardSeasonId} colors={c} />
         <View style={styles.formActions}>
           <AppButton title="Cancel" variant="secondary" style={styles.formAction} onPress={() => { setShowRewardForm(false); setEditingReward(null); }} disabled={!!busyItem} />
           <AppButton title="Save" style={styles.formAction} onPress={saveReward} disabled={!!busyItem} />
@@ -920,6 +1031,7 @@ export default function OrbitDetailScreen() {
         <AppInput value={challengeGoal} onChangeText={setChallengeGoal} placeholder="Goal value" keyboardType="number-pad" style={styles.formInput} />
         <AppInput value={challengeReward} onChangeText={setChallengeReward} placeholder="Reward XP" keyboardType="number-pad" style={styles.formInput} />
         <AppInput value={challengeEndDate} onChangeText={setChallengeEndDate} placeholder="End date: YYYY-MM-DD" style={styles.formInput} />
+        <SeasonSelector seasons={seasons} selectedId={challengeSeasonId} onSelect={setChallengeSeasonId} colors={c} />
         <View style={styles.formActions}>
           <AppButton title="Cancel" variant="secondary" style={styles.formAction} onPress={() => setShowChallengeForm(false)} disabled={!!busyItem} />
           <AppButton title="Create" style={styles.formAction} onPress={createChallenge} disabled={!!busyItem} />
@@ -1089,6 +1201,44 @@ function Stat({ label, value, color, labelColor }) {
     <View style={styles.stat}>
       <Text style={[styles.statValue, { color }]}>{value}</Text>
       <Text style={[styles.statLabel, { color: labelColor }]}>{label}</Text>
+    </View>
+  );
+}
+
+function SeasonSelector({ seasons, selectedId, onSelect, colors }) {
+  if (!seasons.length) return null;
+  return (
+    <View style={styles.seasonSelector}>
+      <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Season</Text>
+      <View style={styles.chips}>
+        <Pressable
+          onPress={() => onSelect("")}
+          style={[
+            styles.chip,
+            {
+              borderColor: !selectedId ? colors.primary : colors.border,
+              backgroundColor: !selectedId ? `${colors.primary}16` : colors.surfaceAlt,
+            },
+          ]}
+        >
+          <Text style={[styles.time, { color: colors.text }]}>None</Text>
+        </Pressable>
+        {seasons.map((season) => (
+          <Pressable
+            key={season.id}
+            onPress={() => onSelect(season.id)}
+            style={[
+              styles.chip,
+              {
+                borderColor: selectedId === season.id ? colors.primary : colors.border,
+                backgroundColor: selectedId === season.id ? `${colors.primary}16` : colors.surfaceAlt,
+              },
+            ]}
+          >
+            <Text style={[styles.time, { color: colors.text }]}>{season.title}</Text>
+          </Pressable>
+        ))}
+      </View>
     </View>
   );
 }
@@ -1434,6 +1584,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", justifyContent: "space-between", gap: spacing.md }, title: { ...typography.h3, flex: 1 }, status: { ...typography.caption, textTransform: "uppercase" },
   copy: { ...typography.body, marginTop: spacing.xs }, track: { height: 9, borderRadius: radii.pill, overflow: "hidden", marginTop: spacing.lg }, fill: { height: "100%" },
   statGrid: { flexDirection: "row", flexWrap: "wrap", rowGap: spacing.lg }, stat: { width: "50%" }, statValue: { ...typography.h2 }, statLabel: { ...typography.caption, marginTop: 2 },
+  seasonStats: { flexDirection: "row", flexWrap: "wrap", rowGap: spacing.md, marginTop: spacing.md },
+  seasonSelector: { marginTop: spacing.md },
   contribute: { marginTop: spacing.lg }, activityCard: { marginBottom: spacing.sm }, activityRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md }, activityCopy: { flex: 1 }, activityMessage: { ...typography.bodyBold }, time: { ...typography.caption, marginTop: spacing.xs },
   memberCard: { marginBottom: spacing.sm }, memberRow: { flexDirection: "row", alignItems: "center", gap: spacing.md }, memberCopy: { flex: 1 }, memberName: { ...typography.bodyBold }, memberMetaRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.xs }, roleBadge: { borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 2 }, dangerButton: { marginTop: spacing.xxl },
   patrolMemberRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.sm },
