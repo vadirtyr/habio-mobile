@@ -34,6 +34,13 @@ export default function MoreScreen() {
         />
 
         <MoreRow
+          icon="clipboard-list-outline"
+          label="Projects"
+          description="Plan bigger personal and Orbit goals with subtasks."
+          onPress={() => router.push("/projects")}
+        />
+
+        <MoreRow
           icon="account-group-outline"
           label="Friend Feed"
           description="See progress from people in your orbit."

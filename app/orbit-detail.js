@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
@@ -16,7 +17,8 @@ import { ScreenHeader } from "../components/ScreenHeader";
 import { UserAvatar } from "../components/UserAvatar";
 import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
-import { radii, spacing, typography } from "../lib/theme";
+import { getOrbitTheme } from "../lib/orbitThemes";
+import { gradientContrastInfo, radii, spacing, typography } from "../lib/theme";
 
 const TYPE_LABELS = {
   habit_completions: "habit completions", task_completions: "task completions",
@@ -729,24 +731,30 @@ export default function OrbitDetailScreen() {
   const xpPercent = orbit.xp_progress_percent || 0;
   const canManage = orbit.viewer_role === "owner" || orbit.viewer_role === "admin";
   const showPatrols = orbit.template === "scout_troop" || patrols.length > 0;
+  const orbitTheme = getOrbitTheme(orbit.theme || orbit.theme_id);
+  const bannerContrast = gradientContrastInfo(orbitTheme.gradient);
+  const bannerTextColor = orbitTheme.text_color || bannerContrast.textColor;
+  const bannerSecondaryColor = bannerContrast.secondaryTextColor || bannerTextColor;
+  const bannerAccent = orbitTheme.accent || bannerTextColor;
 
   return (
     <ScrollView style={[styles.screen, { backgroundColor: c.background }]} contentContainerStyle={styles.container}>
       <ScreenHeader title={orbit.name} subtitle={orbit.description || "A private Shared Orbit."} />
-      <AppCard style={styles.heroCard}>
-        <View style={styles.heroRow}>
+      <LinearGradient colors={orbitTheme.gradient} style={styles.orbitBanner}>
+        {bannerContrast.needsScrim ? <View style={styles.orbitBannerScrim} /> : null}
+        <View style={styles.orbitBannerContent}>
           <View style={styles.heroCopy}>
-            <Text style={[styles.smallLabel, { color: c.textSecondary }]}>Shared Orbit</Text>
-            <Text style={[styles.heroTitle, { color: c.text }]}>Level {level}</Text>
-            <Text style={[styles.copy, { color: c.textSecondary }]}>
-              {stats.member_count} member{stats.member_count === 1 ? "" : "s"} · {xp} XP
+            <Text style={[styles.smallLabel, { color: bannerSecondaryColor }]}>Shared Orbit</Text>
+            <Text style={[styles.orbitBannerTitle, { color: bannerTextColor }]}>{orbit.name}</Text>
+            <Text style={[styles.copy, { color: bannerSecondaryColor }]}>
+              Level {level} · {stats.member_count} member{stats.member_count === 1 ? "" : "s"} · {xp} XP
             </Text>
           </View>
-          <MaterialCommunityIcons name="orbit" size={44} color={c.primary} />
+          <MaterialCommunityIcons name="orbit" size={44} color={bannerAccent} />
         </View>
-        <OrbitProgressBar percent={xpPercent} style={styles.progressBar} glow />
-        <Text style={[styles.time, { color: c.textMuted }]}>{xpProgress} / {xpNeeded} XP to next level</Text>
-      </AppCard>
+        <OrbitProgressBar percent={xpPercent} style={styles.progressBar} glow color={bannerAccent} />
+        <Text style={[styles.time, { color: bannerSecondaryColor }]}>{xpProgress} / {xpNeeded} XP to next level</Text>
+      </LinearGradient>
 
       <AppCard style={styles.healthCard}>
         <View style={styles.row}>
@@ -771,6 +779,9 @@ export default function OrbitDetailScreen() {
 
       <View style={styles.actions}>
         <AppButton title="Members" variant="secondary" style={styles.action} onPress={() => router.push({ pathname: "/orbit-members", params: { orbitId } })} />
+        <AppButton title="Projects" variant="secondary" style={styles.action} onPress={() => router.push({ pathname: "/projects", params: { orbitId, orbitName: orbit.name } })} />
+        {canManage && <AppButton title={pendingProofCount ? `Verify (${pendingProofCount})` : "Verify"} variant="secondary" style={styles.action} onPress={() => router.push({ pathname: "/orbit-verifications", params: { orbitId, orbitName: orbit.name } })} />}
+        {canManage && <AppButton title="Theme" variant="secondary" style={styles.action} onPress={() => router.push({ pathname: "/orbit-theme-settings", params: { orbitId } })} />}
         {canManage && <AppButton title="New goal" style={styles.action} onPress={() => router.push({ pathname: "/create-orbit-goal", params: { orbitId } })} />}
       </View>
 
@@ -964,7 +975,23 @@ export default function OrbitDetailScreen() {
         {redeemedRewards.slice(0, 3).map((reward) => <OrbitRewardCard key={reward.id} reward={reward} colors={c} canManage={false} busy={false} />)}
       </>}
 
-      <Text style={[styles.sectionTitle, { color: c.text }]}>Orbit Milestones</Text>
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, styles.sectionTitleInline, { color: c.text }]}>Orbit Milestones</Text>
+        <AppButton
+          title="View all"
+          variant="ghost"
+          fullWidth={false}
+          style={styles.smallButton}
+          onPress={() => router.push({
+            pathname: "/orbit-milestones",
+            params: {
+              orbitId,
+              orbitName: orbit.name,
+              canSync: canManage ? "true" : "false",
+            },
+          })}
+        />
+      </View>
       {recentMilestones.length ? <AppCard style={[styles.card, styles.milestoneCard, { borderColor: c.primary }] }>
         <View style={styles.milestoneHeader}>
           <MaterialCommunityIcons name="party-popper" size={28} color={c.primary} />
@@ -984,7 +1011,7 @@ export default function OrbitDetailScreen() {
           </View>
         </View>)}
       </AppCard> : <AppCard style={styles.card}>
-        <Text style={[styles.copy, { color: c.textSecondary }]}>Major shared accomplishments will be celebrated here.</Text>
+        <Text style={[styles.copy, { color: c.textSecondary }]}>Major shared accomplishments will be celebrated here. View all milestones to see what this Orbit is working toward next.</Text>
       </AppCard>}
 
       <Text style={[styles.sectionTitle, { color: c.text }]}>Orbit Achievements</Text>
@@ -1575,8 +1602,11 @@ function ProofImage({ objectKey, colors }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 }, center: { flex: 1, alignItems: "center", justifyContent: "center" }, container: { padding: spacing.xl, paddingBottom: 100 },
-  actions: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.lg }, action: { flex: 1 },
-  heroCard: { marginBottom: spacing.lg }, heroRow: { flexDirection: "row", alignItems: "center", gap: spacing.md }, heroCopy: { flex: 1 }, heroTitle: { ...typography.h2, marginTop: spacing.xs }, progressBar: { marginTop: spacing.lg },
+  actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginBottom: spacing.lg }, action: { flex: 1, minWidth: "30%" },
+  orbitBanner: { borderRadius: radii.xxl, padding: spacing.xl, marginBottom: spacing.lg, overflow: "hidden", minHeight: 190 },
+  orbitBannerScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.28)" },
+  orbitBannerContent: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  heroCard: { marginBottom: spacing.lg }, heroRow: { flexDirection: "row", alignItems: "center", gap: spacing.md }, heroCopy: { flex: 1 }, heroTitle: { ...typography.h2, marginTop: spacing.xs }, orbitBannerTitle: { ...typography.h1, marginTop: spacing.xs }, progressBar: { marginTop: spacing.lg },
   healthCard: { marginBottom: spacing.lg }, healthScore: { ...typography.h1, marginTop: spacing.xs }, healthTrend: { flexDirection: "row", alignItems: "center", gap: spacing.xs, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm }, healthBreakdown: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md }, healthMetric: { minWidth: "30%" },
   inviteCard: { marginBottom: spacing.xl }, smallLabel: { ...typography.caption }, code: { ...typography.h2, marginTop: spacing.xs },
   sectionTitle: { ...typography.h3, marginTop: spacing.lg, marginBottom: spacing.md }, card: { marginBottom: spacing.md },

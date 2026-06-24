@@ -7,6 +7,7 @@ import {
 } from "react-native";
 
 import {
+    gradientContrastInfo,
     radii,
     shadows,
     spacing
@@ -50,43 +51,35 @@ export function MomentumCard({
       0
     );
 
-  const textPrimary =
-    theme.isDark
-      ? "#FFFFFF"
-      : "#111827";
+  const gradientColors = theme.gradient || [
+    c.primary,
+    c.cyan || c.primary,
+  ];
+  const contrast = gradientContrastInfo(gradientColors);
+  const textPrimary = contrast.textColor;
+  const textSecondary = contrast.secondaryTextColor;
+  const usesDarkText = textPrimary === "#111827";
 
-  const textSecondary =
-    theme.isDark
-      ? "rgba(255,255,255,0.82)"
-      : "rgba(17,24,39,0.72)";
+  const badgeBackground = usesDarkText
+    ? "rgba(255,255,255,0.45)"
+    : "rgba(255,255,255,0.14)";
 
-  const badgeBackground =
-    theme.isDark
-      ? "rgba(255,255,255,0.14)"
-      : "rgba(255,255,255,0.45)";
+  const progressTrack = usesDarkText
+    ? "rgba(255,255,255,0.38)"
+    : "rgba(255,255,255,0.18)";
 
-  const progressTrack =
-    theme.isDark
-      ? "rgba(255,255,255,0.18)"
-      : "rgba(255,255,255,0.38)";
-
-  const progressFill =
-    theme.isDark
-      ? "rgba(255,255,255,0.95)"
-      : "#111827";
+  const progressFill = usesDarkText
+    ? "#111827"
+    : "rgba(255,255,255,0.95)";
 
   return (
     <LinearGradient
-      colors={
-        theme.gradient || [
-          c.primary,
-          c.cyan || c.primary,
-        ]
-      }
+      colors={gradientColors}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.card}
     >
+      {contrast.needsScrim ? <View style={styles.scrim} /> : null}
       <View style={styles.glow} />
 
       <View style={styles.topRow}>
@@ -304,6 +297,11 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     overflow: "hidden",
     ...shadows.card,
+  },
+
+  scrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.16)",
   },
 
   glow: {

@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
@@ -12,7 +13,8 @@ import { ErrorState } from "../components/ErrorState";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
-import { spacing, typography } from "../lib/theme";
+import { getOrbitTheme } from "../lib/orbitThemes";
+import { gradientContrastInfo, radii, spacing, typography } from "../lib/theme";
 
 export default function OrbitsScreen() {
   const { theme } = useTheme();
@@ -106,28 +108,60 @@ export default function OrbitsScreen() {
         </AppCard>
       ) : (
         orbits.map((orbit) => (
-          <Pressable key={orbit.id} onPress={() => router.push({ pathname: "/orbit-detail", params: { orbitId: orbit.id } })}>
-            <AppCard style={styles.card}>
-              <View style={styles.row}>
-                <View style={styles.copyWrap}>
-                  <Text style={[styles.title, { color: c.text }]}>{orbit.name}</Text>
-                  <Text style={[styles.copy, { color: c.textSecondary }]}>{orbit.member_count} member{orbit.member_count === 1 ? "" : "s"} · {orbit.viewer_role}</Text>
-                </View>
-                <MaterialCommunityIcons name="chevron-right" size={24} color={c.textMuted} />
-              </View>
-            </AppCard>
-          </Pressable>
+          <ThemedOrbitCard
+            key={orbit.id}
+            orbit={orbit}
+            onPress={() => router.push({ pathname: "/orbit-detail", params: { orbitId: orbit.id } })}
+          />
         ))
       )}
     </ScrollView>
   );
 }
 
+function ThemedOrbitCard({ orbit, onPress }) {
+  const orbitTheme = getOrbitTheme(orbit.theme || orbit.theme_id);
+  const contrast = gradientContrastInfo(orbitTheme.gradient);
+  const textColor = orbitTheme.text_color || contrast.textColor;
+  const secondaryColor = contrast.secondaryTextColor || textColor;
+  const accentColor = orbitTheme.accent || textColor;
+  const memberCount = orbit.member_count ?? orbit.members?.length ?? 0;
+  const level = orbit.level || 1;
+  const healthScore = orbit.health_score ?? orbit.stats?.health_score;
+  const hasHealthScore = healthScore !== undefined && healthScore !== null;
+
+  return <Pressable onPress={onPress} style={styles.themedCardPressable}>
+    <LinearGradient colors={orbitTheme.gradient} style={styles.themedCard}>
+      {contrast.needsScrim ? <View style={styles.gradientScrim} /> : null}
+      <View style={styles.row}>
+        <View style={styles.copyWrap}>
+          <Text style={[styles.themedTitle, { color: textColor }]}>{orbit.name}</Text>
+          <Text style={[styles.themedCopy, { color: secondaryColor }]}>Level {level} · {memberCount} member{memberCount === 1 ? "" : "s"}</Text>
+          {hasHealthScore ? <View style={[styles.healthPill, { borderColor: secondaryColor }]}> 
+            <MaterialCommunityIcons name="heart-pulse" size={14} color={accentColor} />
+            <Text style={[styles.healthText, { color: secondaryColor }]}>Health {healthScore}/100</Text>
+          </View> : null}
+        </View>
+        <View style={[styles.orbitIcon, { borderColor: secondaryColor }]}> 
+          <MaterialCommunityIcons name="chevron-right" size={24} color={accentColor} />
+        </View>
+      </View>
+    </LinearGradient>
+  </Pressable>;
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1 }, container: { padding: spacing.xl, paddingBottom: 100 },
   section: { marginBottom: spacing.xl }, sectionTitle: { ...typography.h3, marginBottom: spacing.md },
   card: { marginBottom: spacing.md }, joinCard: { marginBottom: spacing.xl },
+  themedCardPressable: { marginBottom: spacing.md },
+  themedCard: { borderRadius: radii.xl, padding: spacing.lg, overflow: "hidden", minHeight: 132, justifyContent: "center" },
+  gradientScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.28)" },
   title: { ...typography.h3 }, copy: { ...typography.body, marginTop: spacing.xs },
+  themedTitle: { ...typography.h3 }, themedCopy: { ...typography.body, marginTop: spacing.xs },
   input: { marginVertical: spacing.md }, actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.lg },
-  action: { flex: 1 }, row: { flexDirection: "row", alignItems: "center" }, copyWrap: { flex: 1 },
+  action: { flex: 1 }, row: { flexDirection: "row", alignItems: "center", gap: spacing.md }, copyWrap: { flex: 1 },
+  healthPill: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: spacing.xs, borderWidth: 1, borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 4, marginTop: spacing.md },
+  healthText: { ...typography.caption },
+  orbitIcon: { width: 38, height: 38, borderRadius: radii.pill, borderWidth: 1, alignItems: "center", justifyContent: "center" },
 });

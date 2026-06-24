@@ -88,6 +88,7 @@ export default function CreateHabitScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderTime, setReminderTime] = useState("20:00");
+  const [weeklyTarget, setWeeklyTarget] = useState("1");
   const [schedule, setSchedule] = useState({
     recurrence_type: "daily",
     interval: "1",
@@ -142,6 +143,10 @@ export default function CreateHabitScreen() {
           description: cleanDescription,
           frequency: schedule.recurrence_type,
           ...recurrencePayload(schedule),
+          weekly_target:
+            schedule.recurrence_type === "weekly"
+              ? Math.max(1, Number.parseInt(weeklyTarget, 10) || 1)
+              : 1,
           difficulty: habitType === "maintenance" ? "easy" : difficulty,
           custom_coins: habitType === "maintenance" ? 1 : null,
           icon,
@@ -477,6 +482,29 @@ export default function CreateHabitScreen() {
           </View>
 
           <RecurrenceFields value={schedule} onChange={setSchedule} />
+
+          {schedule.recurrence_type === "weekly" ? (
+            <>
+              <Text style={[styles.label, { color: c.textSecondary }]}>
+                Target times per week
+              </Text>
+              <TextInput
+                value={weeklyTarget}
+                onChangeText={setWeeklyTarget}
+                placeholder="1"
+                placeholderTextColor={c.textMuted || c.muted}
+                keyboardType="number-pad"
+                style={[
+                  styles.input,
+                  {
+                    borderColor: c.border,
+                    backgroundColor: c.surfaceAlt,
+                    color: c.text,
+                  },
+                ]}
+              />
+            </>
+          ) : null}
         </AppCard>
 
         <AppButton

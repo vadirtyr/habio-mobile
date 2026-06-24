@@ -37,14 +37,14 @@ const GOALS = [
 const TEMPLATES = [
   {
     id: "family",
-    title: "Family",
+    title: "Family Orbit",
     icon: "home-heart",
     placeholder: "Williams Family",
     description: "Shared goals, chores, rewards, and family accountability.",
   },
   {
     id: "scout_troop",
-    title: "Scout Troop",
+    title: "Scout Troop Orbit",
     icon: "tent",
     placeholder: "Troop 123",
     description: "Meetings, campouts, service projects, leadership, and troop accountability.",
@@ -72,7 +72,7 @@ const TEMPLATES = [
   },
   {
     id: "couples",
-    title: "Couples",
+    title: "Couples Orbit",
     icon: "heart-multiple",
     placeholder: "Our Shared Orbit",
     description: "Strengthen your relationship with shared goals, date nights, gratitude, and milestones.",
@@ -168,6 +168,29 @@ const HABIT_SUGGESTIONS = {
   study_group: ["Reading", "Study Session", "Practice Questions"],
   couples: ["Gratitude", "Quality Time", "Shared Goal Progress"],
   blank: ["Check-In", "Practice", "Progress"],
+};
+
+
+const PROJECT_SUGGESTIONS = {
+  family: [
+    { title: "Family Routines Setup", subtasks: ["Choose weekly priorities", "Review chores", "Plan first reward"] },
+  ],
+  scout_troop: [
+    { title: "Troop Launch Plan", subtasks: ["Invite leaders", "Create first event", "Review patrol setup"] },
+  ],
+  accountability_circle: [
+    { title: "First Check-In Setup", subtasks: ["Invite members", "Choose weekly check-in time", "Pick first shared goal"] },
+  ],
+  fitness_group: [
+    { title: "Fitness Group Kickoff", subtasks: ["Invite workout partners", "Choose first workout", "Review starter challenges"] },
+  ],
+  study_group: [
+    { title: "Study Group Kickoff", subtasks: ["Invite study members", "Schedule first session", "Choose study goal"] },
+  ],
+  couples: [
+    { title: "Shared Goals Kickoff", subtasks: ["Invite your partner", "Schedule first date night", "Choose first shared goal"] },
+  ],
+  blank: [],
 };
 
 const TASK_SUGGESTIONS = {
@@ -313,7 +336,7 @@ export default function OnboardingScreen() {
 
   const [step, setStep] = useState(0);
   const [goal, setGoal] = useState(null);
-  const [mode, setMode] = useState(null);
+  const [mode, setMode] = useState("create");
   const [templateId, setTemplateId] = useState("family");
   const [orbitName, setOrbitName] = useState("");
   const [inviteCode, setInviteCode] = useState("");
@@ -353,7 +376,15 @@ export default function OnboardingScreen() {
   const suggestedActions = SUCCESS_ACTIONS[templateId] || SUCCESS_ACTIONS.blank;
   const eventSetup = EVENT_SETUP[templateId];
   const selectedSetupEvent = eventSetup?.options.find((item) => item.key === setupEventKey);
-  const progress = Math.round(((step + 1) / 14) * 100);
+  const progress = step === 0
+    ? 20
+    : step === 3
+      ? 40
+      : step === 4
+        ? 60
+        : step === 11
+          ? 80
+          : 100;
 
   async function markStep(body) {
     try {
@@ -398,13 +429,88 @@ export default function OnboardingScreen() {
 
   function continueFromIntro() {
     markStep({ step: "welcome" });
-    setStep(1);
+    setMode("create");
+    setStep(3);
   }
 
   function chooseMode(nextMode) {
     setMode(nextMode);
     markStep({ step: "join_or_create_selected" });
     setStep(nextMode === "join" ? 4 : 3);
+  }
+
+
+  async function provisionStarterContent(orbit) {
+    const orbitId = orbit?.id || orbit?.orbit_id;
+    if (!orbitId || templateId === "blank") return;
+
+    const habitTitles = titlesFor(HABIT_SUGGESTIONS, templateId);
+    const taskTitles = titlesFor(TASK_SUGGESTIONS, templateId);
+    const rewardTitles = REWARD_SUGGESTIONS[templateId] || REWARD_SUGGESTIONS.blank;
+    const challengeSuggestions = CHALLENGE_SUGGESTIONS[templateId] || CHALLENGE_SUGGESTIONS.blank;
+    const seasonSuggestions = SEASON_SUGGESTIONS[templateId] || SEASON_SUGGESTIONS.blank;
+    const projectSuggestions = PROJECT_SUGGESTIONS[templateId] || [];
+
+    try {
+      for (const name of habitTitles) {
+        await api.createOrbitHabit(orbitId, {
+          name,
+          description: "Starter habit added from your Orbit template.",
+          requires_proof: false,
+        });
+      }
+      for (const name of taskTitles) {
+        await api.createOrbitTask(orbitId, {
+          name,
+          description: "Starter task added from your Orbit template.",
+          requires_proof: false,
+        });
+      }
+      for (const title of rewardTitles) {
+        await api.createOrbitReward(orbitId, {
+          title,
+          description: "Starter reward added from your Orbit template.",
+          xp_cost: 500,
+        });
+      }
+      for (const item of challengeSuggestions) {
+        await api.createOrbitChallenge(orbitId, {
+          title: item.title,
+          description: "Starter challenge added from your Orbit template.",
+          goal_type: item.goal_type,
+          goal_value: item.goal_value,
+          start_date: dateInputValue(0),
+          end_date: dateInputValue(item.duration_days || 30),
+          reward_xp: item.reward_xp,
+        });
+      }
+      for (const item of seasonSuggestions) {
+        await api.createOrbitSeason(orbitId, {
+          title: item.title,
+          description: "Starter season added from your Orbit template.",
+          start_date: dateInputValue(0),
+          end_date: dateInputValue(item.days || 30),
+          template: templateId,
+        });
+      }
+      for (const item of projectSuggestions) {
+        await api.createProject({
+          title: item.title,
+          description: "Starter project added from your Orbit template.",
+          orbit_id: orbitId,
+          xp_reward: 50,
+          coin_reward: 0,
+          subtasks: (item.subtasks || []).map((title) => ({
+            title,
+            assigned_user_id: null,
+            xp_reward: 0,
+            coin_reward: 0,
+          })),
+        });
+      }
+    } catch (error) {
+      throw new Error(error?.message || "Your Orbit was created, but starter content could not be added. Please try again or customize the Orbit later.");
+    }
   }
 
   async function createOrbit() {
@@ -430,9 +536,10 @@ export default function OnboardingScreen() {
       await api.completeOnboardingStep({
         checklist_item: "create_or_join_orbit",
       });
+      await provisionStarterContent(orbit);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-      setStep(5);
+      setStep(11);
     } catch (error) {
       Alert.alert("Create Orbit failed", error?.message || "Unable to create your Orbit.");
     } finally {
@@ -682,7 +789,7 @@ export default function OnboardingScreen() {
     await api.completeOnboardingStep({ step: "success" });
     await api.completeOnboarding();
     await refresh?.();
-    setStep(12);
+    finish();
   }
 
   async function createOnboardingInviteLink({ share = false } = {}) {
@@ -832,7 +939,7 @@ export default function OnboardingScreen() {
 
           {step === 0 && (
             <AppCard elevated glow style={styles.section}>
-              <BrandBadge label="Onboarding 2.0" />
+              <BrandBadge label="Onboarding" />
               <Text style={[styles.title, { color: c.text }]}>Welcome to OurOrbit</Text>
               <Text style={[styles.body, { color: c.textMuted }]}>
                 Build better habits together through shared goals and accountability.
@@ -841,7 +948,7 @@ export default function OnboardingScreen() {
             </AppCard>
           )}
 
-          {step === 1 && (
+          {false && step === 1 && (
             <AppCard elevated style={styles.section}>
               <Text style={[styles.title, { color: c.text }]}>What brings you here?</Text>
               <View style={styles.stack}>
@@ -858,7 +965,7 @@ export default function OnboardingScreen() {
             </AppCard>
           )}
 
-          {step === 2 && (
+          {false && step === 2 && (
             <AppCard elevated style={styles.section}>
               <Text style={[styles.title, { color: c.text }]}>How would you like to get started?</Text>
               <View style={styles.stack}>
@@ -883,9 +990,9 @@ export default function OnboardingScreen() {
 
           {step === 3 && (
             <AppCard elevated style={styles.section}>
-              <Text style={[styles.title, { color: c.text }]}>Choose Template</Text>
+              <Text style={[styles.title, { color: c.text }]}>Choose your Orbit template</Text>
               <Text style={[styles.body, { color: c.textMuted }]}>
-                Choose a template to start with recommended challenges, rewards, and guided event/readiness setup.
+                Choose a template to start with recommended habits, tasks, projects, rewards, challenges, roles, and a matching theme.
               </Text>
               <View style={styles.stack}>
                 {TEMPLATES.map((template) =>
@@ -897,14 +1004,14 @@ export default function OnboardingScreen() {
                     secondary: template.secondary,
                     onPress: () => {
                       setTemplateId(template.id);
-                      setSelectedRewards(REWARD_SUGGESTIONS[template.id] || REWARD_SUGGESTIONS.blank);
+                      resetGuidedSelections(template.id);
                       resetSetupEvent();
                       markStep({ step: "template_selected" });
                     },
                   })
                 )}
               </View>
-              <AppButton title="Continue" onPress={() => setStep(4)} />
+              <AppButton title="Continue" onPress={() => { markStep({ step: "template_selected" }); setStep(4); }} />
             </AppCard>
           )}
 
@@ -914,7 +1021,7 @@ export default function OnboardingScreen() {
                 {templateId === "scout_troop" ? "Troop Name" : "Orbit Name"}
               </Text>
               <Text style={[styles.body, { color: c.textMuted }]}>
-                Starter challenges, rewards, roles, and suggestions will be added automatically.
+                Template defaults will be added automatically. You can customize everything later.
               </Text>
               <TextInput
                 value={orbitName}
@@ -1278,7 +1385,7 @@ export default function OnboardingScreen() {
                 disabled={inviteBusy}
               />
               <AppButton
-                title="Skip"
+                title="Skip for now"
                 variant="ghost"
                 onPress={showSuccess}
                 disabled={inviteBusy}

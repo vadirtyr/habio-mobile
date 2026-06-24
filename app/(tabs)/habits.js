@@ -32,6 +32,14 @@ import { api } from "../../lib/api";
 import { getOrbitItems, mergeUnique } from "../../lib/orbitItems";
 import { radii, spacing, typography } from "../../lib/theme";
 
+function isWeeklyTargetHabit(item) {
+  return item?.frequency === "weekly" && Number(item?.weekly_target || 1) > 1;
+}
+
+function weeklyProgressText(item) {
+  return `${item.weekly_completed_count || 0} / ${item.weekly_target || 1} this week`;
+}
+
 export default function HabitsScreen() {
   const { token } = useAuth();
   const { theme } = useTheme();
@@ -131,11 +139,23 @@ export default function HabitsScreen() {
     }
 
     setHabits((current) =>
-      current.map((h) =>
-        h._list_key === habit._list_key || (!h._list_key && h.id === habit.id)
-          ? { ...h, completed_today: true, streak: (h.streak || 0) + 1 }
-          : h
-      )
+      current.map((h) => {
+        const matches = h._list_key === habit._list_key || (!h._list_key && h.id === habit.id);
+        if (!matches) return h;
+        if (isWeeklyTargetHabit(h)) {
+          const nextCount = Math.min((h.weekly_completed_count || 0) + 1, h.weekly_target || 1);
+          const done = nextCount >= (h.weekly_target || 1);
+          return {
+            ...h,
+            weekly_completed_count: nextCount,
+            weekly_remaining_count: Math.max((h.weekly_target || 1) - nextCount, 0),
+            completed_today: done,
+            is_completed_for_period: done,
+            streak: done ? (h.streak || 0) + 1 : h.streak,
+          };
+        }
+        return { ...h, completed_today: true, streak: (h.streak || 0) + 1 };
+      })
     );
 
     setBalance((current) => current + (habit.coins_per_completion || 0));
@@ -150,6 +170,15 @@ export default function HabitsScreen() {
         return;
       }
       const data = await api.post(`/habits/${habit.id}/complete`, {}, token);
+      if (data?.habit) {
+        setHabits((current) =>
+          current.map((h) =>
+            h._list_key === habit._list_key || (!h._list_key && h.id === habit.id)
+              ? { ...h, ...data.habit }
+              : h
+          )
+        );
+      }
       const hasMilestone = (data?.celebrations?.length || 0) > 0;
 
       enqueueCelebrations(data?.celebrations || []);
@@ -465,6 +494,7 @@ export default function HabitsScreen() {
                         annual_month: String(item.annual_month || ""),
                         annual_day: String(item.annual_day || ""),
                         show_days_before: String(item.show_days_before || 0),
+                        weekly_target: String(item.weekly_target || 1),
                         difficulty: item.difficulty || "medium",
                         custom_coins: item.custom_coins || "",
                         icon: item.icon || "fire",
@@ -600,6 +630,11 @@ function HabitCard({ item, tier, onComplete, onEdit }) {
               </Text>
             )}
             <Text style={[styles.orbitLabel, { color: item.is_orbit_item ? c.primary : c.textMuted }]}>{item.is_orbit_item ? item.orbit_name : "Personal"}</Text>
+            {isWeeklyTargetHabit(item) ? (
+              <Text style={[styles.orbitLabel, { color: c.primary }]}>
+                {weeklyProgressText(item)}
+              </Text>
+            ) : null}
           </View>
         </View>
 
@@ -609,6 +644,15 @@ function HabitCard({ item, tier, onComplete, onEdit }) {
               icon="bell"
               text="Maintenance"
               color={c.cyan || c.primary}
+              highlight
+            />
+          ) : null}
+
+          {isWeeklyTargetHabit(item) ? (
+            <CompactPill
+              icon="target"
+              text={weeklyProgressText(item)}
+              color={c.primary}
               highlight
             />
           ) : null}
@@ -653,7 +697,11 @@ function HabitCard({ item, tier, onComplete, onEdit }) {
             ]}
           >
             {item.completed_today
-              ? "Completed today"
+              ? isWeeklyTargetHabit(item)
+                ? "Weekly target met"
+                : "Completed today"
+              : isWeeklyTargetHabit(item)
+              ? "Mark instance complete"
               : isMaintenance
               ? "Reminder habit"
               : "Tap or swipe to complete"}

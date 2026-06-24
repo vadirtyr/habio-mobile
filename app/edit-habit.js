@@ -75,6 +75,7 @@ export default function EditHabitScreen() {
   const [reminderTime, setReminderTime] = useState(
     params.reminder_time || "20:00"
   );
+  const [weeklyTarget, setWeeklyTarget] = useState(String(params.weekly_target || "1"));
   const [schedule, setSchedule] = useState(
     recurrenceFromParams(params, "daily")
   );
@@ -107,6 +108,10 @@ export default function EditHabitScreen() {
         description: description.trim(),
         frequency: schedule.recurrence_type,
         ...recurrencePayload(schedule),
+        weekly_target:
+          schedule.recurrence_type === "weekly"
+            ? Math.max(1, Number.parseInt(weeklyTarget, 10) || 1)
+            : 1,
         difficulty: isMaintenance ? "easy" : getDifficultyForCoins(coins),
         custom_coins: coins,
         icon: params.icon || (isMaintenance ? "pill" : "fire"),
@@ -226,6 +231,20 @@ export default function EditHabitScreen() {
         </View>
 
         <RecurrenceFields value={schedule} onChange={setSchedule} />
+
+        {schedule.recurrence_type === "weekly" ? (
+          <View style={styles.section}>
+            <Text style={[styles.label, { color: c.text }]}>
+              Target times per week
+            </Text>
+            <AppInput
+              placeholder="1"
+              value={weeklyTarget}
+              onChangeText={setWeeklyTarget}
+              keyboardType="number-pad"
+            />
+          </View>
+        ) : null}
 
         <View style={styles.section}>
           <Text style={[styles.label, { color: c.text }]}>

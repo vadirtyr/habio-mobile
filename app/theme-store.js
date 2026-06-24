@@ -27,7 +27,7 @@ import { AppCard } from "../components/AppCard";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
-import { radii, spacing, typography } from "../lib/theme";
+import { gradientContrastInfo, radii, spacing, typography } from "../lib/theme";
 
 const ACHIEVEMENT_LABELS = {
   "streak-7": "Reach a 7-day streak",
@@ -469,6 +469,8 @@ function ThemeCard({
   const locked = (achievement || level) && !owned;
   const notEnoughCoins =
     !owned && !included && !achievement && !level && !affordable;
+  const gradientColors = item.gradient || [item.colors.background, item.colors.primary];
+  const gradientContrast = gradientContrastInfo(gradientColors);
 
   return (
     <Animated.View style={animatedStyle}>
@@ -481,15 +483,16 @@ function ThemeCard({
         ]}
       >
         <LinearGradient
-          colors={item.gradient || [item.colors.background, item.colors.primary]}
+          colors={gradientColors}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.gradientStrip}
         >
+          {gradientContrast.needsScrim ? <View style={styles.gradientScrim} /> : null}
           <View style={styles.gradientOverlay}>
             <View>
-              <Text style={styles.gradientTitle}>{item.name}</Text>
-              <Text style={styles.gradientSubtitle}>
+              <Text style={[styles.gradientTitle, { color: gradientContrast.textColor }]}>{item.name}</Text>
+              <Text style={[styles.gradientSubtitle, { color: gradientContrast.secondaryTextColor }]}>
                 {item.tagline || item.description}
               </Text>
             </View>
@@ -953,6 +956,11 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
 
+  gradientScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.18)",
+  },
+
   gradientOverlay: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -961,13 +969,11 @@ const styles = StyleSheet.create({
   },
 
   gradientTitle: {
-    color: "#FFFFFF",
     fontSize: 22,
     fontWeight: "900",
   },
 
   gradientSubtitle: {
-    color: "rgba(255,255,255,0.9)",
     marginTop: spacing.xs,
     fontWeight: "800",
   },
