@@ -786,6 +786,15 @@ export default function OrbitDetailScreen() {
         {canManage && <AppButton title="New goal" style={styles.action} onPress={() => router.push({ pathname: "/create-orbit-goal", params: { orbitId } })} />}
       </View>
 
+      <AppCard style={styles.orbitNavCard}>
+        <View style={styles.orbitNavRow}>
+          <AppButton title="Overview" variant="secondary" style={styles.orbitNavButton} disabled />
+          <AppButton title="Projects" variant="secondary" style={styles.orbitNavButton} onPress={() => router.push({ pathname: "/projects", params: { orbitId, orbitName: orbit.name } })} />
+          <AppButton title="Milestones" variant="secondary" style={styles.orbitNavButton} onPress={() => router.push({ pathname: "/orbit-milestones", params: { orbitId, orbitName: orbit.name, canSync: canManage ? "true" : "false" } })} />
+          <AppButton title="Timeline" variant="secondary" style={styles.orbitNavButton} onPress={() => router.push({ pathname: "/orbit-timeline", params: { orbitId, orbitName: orbit.name, canManage: canManage ? "true" : "false" } })} />
+        </View>
+      </AppCard>
+
       {canManage && <AppCard style={styles.quickActionsCard}>
         <View style={styles.sectionHeaderCompact}>
           <Text style={[styles.title, { color: c.text }]}>Orbit quick actions</Text>
@@ -1645,6 +1654,9 @@ function ProofImage({ objectKey, colors }) {
 const styles = StyleSheet.create({
   screen: { flex: 1 }, center: { flex: 1, alignItems: "center", justifyContent: "center" }, container: { padding: spacing.xl, paddingBottom: 100 },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginBottom: spacing.lg }, action: { flex: 1, minWidth: "30%" },
+  orbitNavCard: { marginBottom: spacing.lg },
+  orbitNavRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  orbitNavButton: { flex: 1, minWidth: "45%" },
   quickActionsCard: { marginBottom: spacing.lg },
   quickActionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md },
   quickAction: { width: "31%", borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, alignItems: "center", gap: spacing.sm },

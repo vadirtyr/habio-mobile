@@ -24,6 +24,7 @@ import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
 import { APP_URL } from "../lib/config";
 import { getOrbitTheme } from "../lib/orbitThemes";
+import { onboardingTemplates } from "../lib/orbitTemplates";
 import { gradientContrastInfo, radii, spacing, typography } from "../lib/theme";
 
 const GOALS = [
@@ -36,58 +37,7 @@ const GOALS = [
   { id: "personal", title: "Personal Growth", template: "blank" },
 ];
 
-const TEMPLATES = [
-  {
-    id: "family",
-    title: "Family Orbit",
-    icon: "home-heart",
-    placeholder: "Williams Family",
-    description: "Shared goals, chores, rewards, and family accountability.",
-  },
-  {
-    id: "scout_troop",
-    title: "Scout Troop Orbit",
-    icon: "tent",
-    placeholder: "Troop 123",
-    description: "Meetings, campouts, service projects, leadership, and troop accountability.",
-  },
-  {
-    id: "accountability_circle",
-    title: "Accountability Circle",
-    icon: "account-group",
-    placeholder: "Morning Momentum",
-    description: "Weekly check-ins, shared goals, and group accountability.",
-  },
-  {
-    id: "fitness_group",
-    title: "Fitness Group",
-    icon: "run",
-    placeholder: "Saturday Striders",
-    description: "Workouts, step goals, fitness challenges, and team motivation.",
-  },
-  {
-    id: "study_group",
-    title: "Study Group",
-    icon: "school",
-    placeholder: "Exam Prep Crew",
-    description: "Study sessions, reading goals, exam prep, and group focus.",
-  },
-  {
-    id: "couples",
-    title: "Couples Orbit",
-    icon: "heart-multiple",
-    placeholder: "Our Shared Orbit",
-    description: "Strengthen your relationship with shared goals, date nights, gratitude, and milestones.",
-  },
-  {
-    id: "blank",
-    title: "Blank Orbit",
-    icon: "orbit",
-    placeholder: "My Orbit",
-    description: "Start with an empty Orbit and customize everything yourself.",
-    secondary: true,
-  },
-];
+const TEMPLATES = onboardingTemplates();
 
 const INVITE_MESSAGES = {
   family: "Invite family members.",

@@ -1,5 +1,6 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
@@ -9,76 +10,24 @@ import { AppInput } from "../components/AppInput";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
+import { getTemplateById, templateCreateOptions } from "../lib/orbitTemplates";
 import { spacing, typography } from "../lib/theme";
 
-const ORBIT_TEMPLATES = [
-  {
-    id: "family",
-    icon: "👨‍👩‍👧‍👦",
-    name: "Family",
-    description: "Shared goals, chores, rewards, and family accountability.",
-    nameSuggestion: "Williams Family",
-    highlights: ["Starter challenges", "Shared rewards", "Family events"],
-  },
-  {
-    id: "scout_troop",
-    icon: "🏕",
-    name: "Scout Troop",
-    description: "Meetings, campouts, service projects, leadership, and troop accountability.",
-    nameSuggestion: "Troop 123",
-    highlights: ["Camp readiness", "Service projects", "Troop challenges"],
-  },
-  {
-    id: "accountability_circle",
-    icon: "🎯",
-    name: "Accountability Circle",
-    description: "Weekly check-ins, shared goals, and group accountability.",
-    nameSuggestion: "Weekly Accountability Circle",
-    highlights: ["Weekly check-ins", "Shared goals", "Consistency challenges"],
-  },
-  {
-    id: "fitness_group",
-    icon: "🏃",
-    name: "Fitness Group",
-    description: "Workouts, step goals, fitness challenges, and team motivation.",
-    nameSuggestion: "Morning Fitness Group",
-    highlights: ["Workout challenges", "Step goals", "Team motivation"],
-  },
-  {
-    id: "study_group",
-    icon: "📚",
-    name: "Study Group",
-    description: "Study sessions, reading goals, exam prep, and group focus.",
-    nameSuggestion: "Exam Prep Study Group",
-    highlights: ["Study sessions", "Reading goals", "Exam prep"],
-  },
-  {
-    id: "couples",
-    icon: "💕",
-    name: "Couples",
-    description: "Strengthen your relationship with shared goals, date nights, gratitude, and milestones.",
-    nameSuggestion: "Our Shared Orbit",
-    highlights: ["Date nights", "Daily gratitude", "Shared milestones"],
-  },
-  {
-    id: "blank",
-    icon: "✨",
-    name: "Blank Orbit",
-    description: "Start with an empty Orbit and customize everything yourself.",
-    nameSuggestion: "My Orbit",
-    highlights: ["Private invite-only Orbit", "Add your own habits, tasks, and goals"],
-  },
-];
-
+const ORBIT_TEMPLATES = templateCreateOptions();
 const BLANK_TEMPLATE_ID = "blank";
 const STARTER_TEMPLATE_COUNT = ORBIT_TEMPLATES.filter((template) => template.id !== BLANK_TEMPLATE_ID).length;
 
 export default function CreateOrbitScreen() {
+  const { template } = useLocalSearchParams();
   const { theme } = useTheme();
   const c = theme.colors;
-  const [step, setStep] = useState(0);
-  const [selectedTemplate, setSelectedTemplate] = useState(ORBIT_TEMPLATES[0]);
-  const [name, setName] = useState(ORBIT_TEMPLATES[0].nameSuggestion);
+  const initialTemplateId = Array.isArray(template) ? template[0] : template;
+  const initialTemplate = initialTemplateId
+    ? ORBIT_TEMPLATES.find((item) => item.id === getTemplateById(initialTemplateId).id) || ORBIT_TEMPLATES[0]
+    : ORBIT_TEMPLATES[0];
+  const [step, setStep] = useState(initialTemplateId ? 1 : 0);
+  const [selectedTemplate, setSelectedTemplate] = useState(initialTemplate);
+  const [name, setName] = useState(initialTemplate.nameSuggestion);
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const isFamily = selectedTemplate.id === "family";
@@ -173,7 +122,9 @@ export default function CreateOrbitScreen() {
             ]}>
               <View style={styles.templateHeader}>
                 <View style={styles.templateTitleRow}>
-                  <Text style={styles.templateIcon}>{template.icon}</Text>
+                  <View style={[styles.templateIconWrap, { backgroundColor: `${c.primary}14` }]}>
+                    <MaterialCommunityIcons name={template.icon} size={24} color={c.primary} />
+                  </View>
                   <View style={styles.templateTitleCopy}>
                     <Text style={[styles.templateTitle, { color: c.text }]}>{template.name}</Text>
                     {isBlank && <Text style={[styles.optionLabel, { color: c.textMuted }]}>Custom option</Text>}
@@ -200,7 +151,9 @@ export default function CreateOrbitScreen() {
       {step === 1 && <AppCard>
         <Text style={[styles.sectionTitle, { color: c.text }]}>Name Your Orbit</Text>
         <View style={styles.selectedSummary}>
-          <Text style={styles.templateIcon}>{selectedTemplate.icon}</Text>
+          <View style={[styles.templateIconWrap, { backgroundColor: `${c.primary}14` }]}>
+            <MaterialCommunityIcons name={selectedTemplate.icon} size={24} color={c.primary} />
+          </View>
           <View style={styles.summaryCopy}>
             <Text style={[styles.templateTitle, { color: c.text }]}>{selectedTemplate.name}</Text>
             <Text style={[styles.copy, { color: c.textSecondary }]}>{selectedTemplate.description}</Text>
@@ -222,7 +175,9 @@ export default function CreateOrbitScreen() {
       {step === 2 && <AppCard>
         <Text style={[styles.sectionTitle, { color: c.text }]}>Create Orbit</Text>
         <View style={styles.selectedSummary}>
-          <Text style={styles.templateIcon}>{selectedTemplate.icon}</Text>
+          <View style={[styles.templateIconWrap, { backgroundColor: `${c.primary}14` }]}>
+            <MaterialCommunityIcons name={selectedTemplate.icon} size={24} color={c.primary} />
+          </View>
           <View style={styles.summaryCopy}>
             <Text style={[styles.templateTitle, { color: c.text }]}>{name.trim()}</Text>
             <Text style={[styles.copy, { color: c.textSecondary }]}>{selectedTemplate.name}</Text>
@@ -252,7 +207,7 @@ const styles = StyleSheet.create({
   templateHeader: { flexDirection: "row", justifyContent: "space-between", gap: spacing.md },
   templateTitleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flex: 1 },
   templateTitleCopy: { flex: 1 },
-  templateIcon: { fontSize: 28 },
+  templateIconWrap: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center" },
   templateTitle: { ...typography.h3 }, copy: { ...typography.body, marginTop: spacing.xs }, previewLabel: { ...typography.caption, marginTop: spacing.md },
   optionLabel: { ...typography.caption, marginTop: 2 },
   selectedBadge: { ...typography.caption, textTransform: "uppercase" },

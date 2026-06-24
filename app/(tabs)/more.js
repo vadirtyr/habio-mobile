@@ -34,6 +34,13 @@ export default function MoreScreen() {
         />
 
         <MoreRow
+          icon="view-grid-plus-outline"
+          label="Template Marketplace"
+          description="Browse Orbit templates for families, troops, couples, fitness, study, and more."
+          onPress={() => router.push("/template-marketplace")}
+        />
+
+        <MoreRow
           icon="clipboard-list-outline"
           label="Projects"
           description="Plan bigger personal and Orbit goals with subtasks."
