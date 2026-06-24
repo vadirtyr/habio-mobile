@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -30,7 +31,8 @@ import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../hooks/useTheme";
 import { api } from "../../lib/api";
 import { getOrbitItems, mergeUnique } from "../../lib/orbitItems";
-import { radii, spacing, typography } from "../../lib/theme";
+import { getOrbitTheme } from "../../lib/orbitThemes";
+import { gradientContrastInfo, radii, spacing, typography } from "../../lib/theme";
 
 export default function DashboardScreen() {
   const { token, user } = useAuth();
@@ -224,7 +226,7 @@ export default function DashboardScreen() {
         <View style={styles.headerContent}>
           <BrandHeader
             eyebrow="OurOrbit"
-            title="Your Orbit Today"
+            title="My Orbits"
             subtitle={subtitle}
             compact
           />
@@ -308,27 +310,23 @@ export default function DashboardScreen() {
             />
           }
         >
-          <HeaderWithBell subtitle="Small actions compound into real progress." />
+          <HeaderWithBell subtitle="Your shared goals, habits, and progress live here." />
 
-          <SectionTitle title="Your Orbits" subtitle="Shared momentum, right from your dashboard." />
+          <SectionTitle
+            title="My Orbits"
+            subtitle="Switch Orbits, check shared progress, and jump into the right group."
+            action={orbitSummaries.length ? (
+              <Pressable onPress={() => router.push("/orbits")}>
+                <Text style={[styles.sectionLink, { color: c.primary }]}>View all</Text>
+              </Pressable>
+            ) : null}
+          />
           {orbitSummaries.length ? <>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.orbitStrip}>
-              {orbitSummaries.map((orbit) => <Pressable key={orbit.id} onPress={() => router.push({ pathname: "/orbit-detail", params: { orbitId: orbit.id } })}>
-                <AppCard style={styles.orbitChip}>
-                  <View style={[styles.orbitIcon, { backgroundColor: c.surfaceAlt }]}><MaterialCommunityIcons name="account-group" size={22} color={c.primary} /></View>
-                  <Text style={[styles.orbitName, { color: c.text }]} numberOfLines={1}>{orbit.name}</Text>
-                  <Text style={[styles.previewBadge, { color: c.textSecondary }]}>Level {orbit.level || 1} · {orbit.member_count || 0} members</Text>
-                </AppCard>
-              </Pressable>)}
+              {orbitSummaries.map((orbit) => <DashboardOrbitCard key={orbit.id} orbit={orbit} colors={c} />)}
             </ScrollView>
             <View style={styles.featuredOrbits}>
-              {orbitSummaries.slice(0, 3).map((orbit) => <Pressable key={`featured-${orbit.id}`} onPress={() => router.push({ pathname: "/orbit-detail", params: { orbitId: orbit.id } })}>
-                <AppCard style={styles.featuredOrbitCard}>
-                  <View style={styles.orbitCardHeader}><Text style={[styles.orbitName, { color: c.text }]}>{orbit.name}</Text><Text style={[styles.orbitLevel, { color: c.primary }]}>Level {orbit.level || 1}</Text></View>
-                  <View style={[styles.orbitTrack, { backgroundColor: c.surfaceAlt }]}><View style={[styles.orbitFill, { backgroundColor: c.primary, width: `${Math.min(100, orbit.weekly_completion_rate || 0)}%` }]} /></View>
-                  <Text style={[styles.todayCopy, { color: c.textSecondary }]}>{orbit.weekly_completion_rate || 0}% this week · {orbit.active_challenges_count || 0} challenges · {orbit.due_count || 0} due</Text>
-                </AppCard>
-              </Pressable>)}
+              {orbitSummaries.slice(0, 3).map((orbit) => <DashboardOrbitCard key={`featured-${orbit.id}`} orbit={orbit} colors={c} featured />)}
             </View>
           </> : <AppCard style={styles.noOrbitCard}>
             <MaterialCommunityIcons name="account-group-outline" size={36} color={c.primary} />
@@ -505,6 +503,48 @@ function normalizeList(data) {
   return [];
 }
 
+function DashboardOrbitCard({ orbit, colors, featured = false }) {
+  const orbitTheme = getOrbitTheme(orbit.theme || orbit.theme_id);
+  const contrast = gradientContrastInfo(orbitTheme.gradient);
+  const textColor = orbitTheme.text_color || contrast.textColor;
+  const secondaryTextColor = contrast.secondaryTextColor;
+  const accentColor = orbitTheme.accent || textColor;
+  const progress = Math.min(100, Math.max(0, orbit.weekly_completion_rate || 0));
+
+  return (
+    <Pressable
+      onPress={() => router.push({ pathname: "/orbit-detail", params: { orbitId: orbit.id } })}
+      style={featured ? null : styles.orbitChipWrap}
+    >
+      <LinearGradient colors={orbitTheme.gradient} style={[styles.orbitGradientCard, featured ? styles.featuredOrbitCard : styles.orbitChip]}>
+        {contrast.needsScrim ? <View style={styles.orbitGradientScrim} /> : null}
+        <View style={styles.orbitCardHeader}>
+          <View style={[styles.orbitIcon, { backgroundColor: `${accentColor}28` }]}>
+            <MaterialCommunityIcons name="account-group" size={22} color={textColor} />
+          </View>
+          <Text style={[styles.orbitLevel, { color: textColor }]}>Level {orbit.level || 1}</Text>
+        </View>
+
+        <Text style={[styles.orbitName, { color: textColor }]} numberOfLines={1}>{orbit.name}</Text>
+        <Text style={[styles.previewBadge, { color: secondaryTextColor }]}>
+          {orbit.member_count || 0} member{(orbit.member_count || 0) === 1 ? "" : "s"}
+        </Text>
+
+        {featured ? (
+          <>
+            <View style={[styles.orbitTrack, { backgroundColor: "rgba(255,255,255,0.28)" }]}>
+              <View style={[styles.orbitFill, { backgroundColor: accentColor, width: `${progress}%` }]} />
+            </View>
+            <Text style={[styles.todayCopy, { color: secondaryTextColor }]}> 
+              {progress}% this week | {orbit.active_challenges_count || 0} challenges | {orbit.due_count || 0} due
+            </Text>
+          </>
+        ) : null}
+      </LinearGradient>
+    </Pressable>
+  );
+}
+
 function PreviewItem({ icon, label, badge, accent = "cyan", themeColors }) {
   const c = themeColors;
   const accentColor = c?.[accent] || c?.primary || "#22C7DE";
@@ -627,14 +667,18 @@ const styles = StyleSheet.create({
   },
   previewCopy: { flex: 1 },
   previewBadge: { ...typography.caption, fontWeight: "800", marginTop: 2 },
+  sectionLink: { ...typography.caption, fontWeight: "900" },
   orbitStrip: { gap: spacing.sm, paddingBottom: spacing.sm },
-  orbitChip: { width: 210, minHeight: 120 },
-  orbitIcon: { width: 38, height: 38, borderRadius: radii.md, alignItems: "center", justifyContent: "center", marginBottom: spacing.sm },
-  orbitName: { ...typography.h3 },
+  orbitChipWrap: { width: 220 },
+  orbitChip: { width: 220, minHeight: 128 },
+  orbitGradientCard: { borderRadius: radii.xl, padding: spacing.lg, overflow: "hidden" },
+  orbitGradientScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.24)" },
+  orbitIcon: { width: 38, height: 38, borderRadius: radii.md, alignItems: "center", justifyContent: "center" },
+  orbitName: { ...typography.h3, marginTop: spacing.sm },
   featuredOrbits: { gap: spacing.sm, marginBottom: spacing.md },
-  featuredOrbitCard: { marginBottom: 0 },
+  featuredOrbitCard: { marginBottom: 0, minHeight: 150 },
   orbitCardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
-  orbitLevel: { ...typography.caption, fontWeight: "800" },
+  orbitLevel: { ...typography.caption, fontWeight: "900" },
   orbitTrack: { height: 8, borderRadius: radii.pill, overflow: "hidden", marginTop: spacing.md },
   orbitFill: { height: "100%", borderRadius: radii.pill },
   noOrbitCard: { marginBottom: spacing.md },

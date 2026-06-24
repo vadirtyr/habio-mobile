@@ -779,11 +779,42 @@ export default function OrbitDetailScreen() {
 
       <View style={styles.actions}>
         <AppButton title="Members" variant="secondary" style={styles.action} onPress={() => router.push({ pathname: "/orbit-members", params: { orbitId } })} />
+        <AppButton title="Switch Orbit" variant="secondary" style={styles.action} onPress={() => router.push("/orbits")} />
         <AppButton title="Projects" variant="secondary" style={styles.action} onPress={() => router.push({ pathname: "/projects", params: { orbitId, orbitName: orbit.name } })} />
         {canManage && <AppButton title={pendingProofCount ? `Verify (${pendingProofCount})` : "Verify"} variant="secondary" style={styles.action} onPress={() => router.push({ pathname: "/orbit-verifications", params: { orbitId, orbitName: orbit.name } })} />}
         {canManage && <AppButton title="Theme" variant="secondary" style={styles.action} onPress={() => router.push({ pathname: "/orbit-theme-settings", params: { orbitId } })} />}
         {canManage && <AppButton title="New goal" style={styles.action} onPress={() => router.push({ pathname: "/create-orbit-goal", params: { orbitId } })} />}
       </View>
+
+      {canManage && <AppCard style={styles.quickActionsCard}>
+        <View style={styles.sectionHeaderCompact}>
+          <Text style={[styles.title, { color: c.text }]}>Orbit quick actions</Text>
+          <Text style={[styles.time, { color: c.textMuted }]}>Create shared work</Text>
+        </View>
+        <View style={styles.quickActionsGrid}>
+          <QuickAction icon="repeat" label="Habit" colors={c} onPress={() => openCreate("habit")} />
+          <QuickAction icon="check-circle-outline" label="Task" colors={c} onPress={() => openCreate("task")} />
+          <QuickAction icon="clipboard-list-outline" label="Project" colors={c} onPress={() => router.push({ pathname: "/create-project", params: { orbitId, orbitName: orbit.name } })} />
+          <QuickAction icon="gift-outline" label="Reward" colors={c} onPress={() => openRewardForm()} />
+          <QuickAction icon="calendar-plus" label="Event" colors={c} onPress={() => openEventForm()} />
+        </View>
+      </AppCard>}
+
+      {!!recentActivity.length && <AppCard style={styles.activityPreviewCard}>
+        <View style={styles.sectionHeaderCompact}>
+          <Text style={[styles.title, { color: c.text }]}>Latest Orbit activity</Text>
+          <Text style={[styles.time, { color: c.textMuted }]}>Live momentum</Text>
+        </View>
+        {recentActivity.slice(0, 3).map((item) => (
+          <View key={`preview-${item.id}`} style={styles.activityPreviewRow}>
+            <MaterialCommunityIcons name="timeline-outline" size={20} color={c.primary} />
+            <View style={styles.activityCopy}>
+              <Text style={[styles.activityMessage, { color: c.text }]} numberOfLines={2}>{item.message}</Text>
+              <Text style={[styles.time, { color: c.textMuted }]}>{new Date(item.created_at).toLocaleString()}</Text>
+            </View>
+          </View>
+        ))}
+      </AppCard>}
 
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, styles.sectionTitleInline, { color: c.text }]}>Seasons</Text>
@@ -1223,6 +1254,17 @@ export default function OrbitDetailScreen() {
   );
 }
 
+function QuickAction({ icon, label, colors, onPress }) {
+  return (
+    <Pressable style={[styles.quickAction, { borderColor: colors.border, backgroundColor: colors.surfaceAlt }]} onPress={onPress}>
+      <View style={[styles.quickActionIcon, { backgroundColor: `${colors.primary}16` }]}>
+        <MaterialCommunityIcons name={icon} size={22} color={colors.primary} />
+      </View>
+      <Text style={[styles.quickActionLabel, { color: colors.text }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 function Stat({ label, value, color, labelColor }) {
   return (
     <View style={styles.stat}>
@@ -1603,6 +1645,14 @@ function ProofImage({ objectKey, colors }) {
 const styles = StyleSheet.create({
   screen: { flex: 1 }, center: { flex: 1, alignItems: "center", justifyContent: "center" }, container: { padding: spacing.xl, paddingBottom: 100 },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginBottom: spacing.lg }, action: { flex: 1, minWidth: "30%" },
+  quickActionsCard: { marginBottom: spacing.lg },
+  quickActionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md },
+  quickAction: { width: "31%", borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, alignItems: "center", gap: spacing.sm },
+  quickActionIcon: { width: 38, height: 38, borderRadius: radii.pill, alignItems: "center", justifyContent: "center" },
+  quickActionLabel: { ...typography.caption, fontWeight: "900" },
+  activityPreviewCard: { marginBottom: spacing.lg },
+  activityPreviewRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md, paddingTop: spacing.md, marginTop: spacing.sm, borderTopWidth: 1, borderTopColor: "rgba(127,127,127,0.16)" },
+  sectionHeaderCompact: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.md },
   orbitBanner: { borderRadius: radii.xxl, padding: spacing.xl, marginBottom: spacing.lg, overflow: "hidden", minHeight: 190 },
   orbitBannerScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.28)" },
   orbitBannerContent: { flexDirection: "row", alignItems: "center", gap: spacing.md },

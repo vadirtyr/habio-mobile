@@ -1,4 +1,5 @@
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
@@ -22,7 +23,8 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../hooks/useTheme";
 import { api } from "../lib/api";
 import { APP_URL } from "../lib/config";
-import { radii, spacing, typography } from "../lib/theme";
+import { getOrbitTheme } from "../lib/orbitThemes";
+import { gradientContrastInfo, radii, spacing, typography } from "../lib/theme";
 
 const GOALS = [
   { id: "family", title: "Family Accountability", template: "family" },
@@ -86,16 +88,6 @@ const TEMPLATES = [
     secondary: true,
   },
 ];
-
-const SUCCESS_ACTIONS = {
-  family: ["Invite family members", "Review starter challenges", "Review starter rewards"],
-  scout_troop: ["Invite leaders", "Create first event", "Review patrols"],
-  accountability_circle: ["Invite members", "Schedule check-in"],
-  fitness_group: ["Invite workout partners", "Review challenges"],
-  study_group: ["Invite study group", "Schedule study session"],
-  couples: ["Invite your partner", "Review starter rewards", "Schedule your first date night", "Review shared goals"],
-  blank: ["Invite a member", "Create your first challenge", "Add an event"],
-};
 
 const INVITE_MESSAGES = {
   family: "Invite family members.",
@@ -341,6 +333,8 @@ export default function OnboardingScreen() {
   const [orbitName, setOrbitName] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [createdOrbit, setCreatedOrbit] = useState(null);
+  const [provisionedItems, setProvisionedItems] = useState([]);
+  const [provisionError, setProvisionError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [selectedRewards, setSelectedRewards] = useState(REWARD_SUGGESTIONS.family);
   const [selectedHabits, setSelectedHabits] = useState(titlesFor(HABIT_SUGGESTIONS, "family"));
@@ -348,7 +342,7 @@ export default function OnboardingScreen() {
   const [selectedChallenges, setSelectedChallenges] = useState(titlesFor(CHALLENGE_SUGGESTIONS, "family"));
   const [selectedSeasons, setSelectedSeasons] = useState(titlesFor(SEASON_SUGGESTIONS, "family"));
   const [customReward, setCustomReward] = useState("");
-  const [rewardsAdded, setRewardsAdded] = useState(false);
+  const [, setRewardsAdded] = useState(false);
   const [inviteLink, setInviteLink] = useState("");
   const [inviteEmails, setInviteEmails] = useState("");
   const [inviteBusy, setInviteBusy] = useState(false);
@@ -373,9 +367,12 @@ export default function OnboardingScreen() {
   );
 
   const rewardSuggestions = REWARD_SUGGESTIONS[templateId] || REWARD_SUGGESTIONS.blank;
-  const suggestedActions = SUCCESS_ACTIONS[templateId] || SUCCESS_ACTIONS.blank;
   const eventSetup = EVENT_SETUP[templateId];
   const selectedSetupEvent = eventSetup?.options.find((item) => item.key === setupEventKey);
+  const successTheme = getOrbitTheme(createdOrbit?.theme || createdOrbit?.theme_id || templateId);
+  const successContrast = gradientContrastInfo(successTheme.gradient);
+  const successTextColor = successTheme.text_color || successContrast.textColor;
+  const successSecondaryColor = successContrast.secondaryTextColor || successTextColor;
   const progress = step === 0
     ? 20
     : step === 3
@@ -442,7 +439,15 @@ export default function OnboardingScreen() {
 
   async function provisionStarterContent(orbit) {
     const orbitId = orbit?.id || orbit?.orbit_id;
-    if (!orbitId || templateId === "blank") return;
+    const addProvisioned = (label) => setProvisionedItems((current) => current.includes(label) ? current : [...current, label]);
+
+    if (!orbitId) return;
+    setProvisionError(null);
+
+    if (templateId === "blank") {
+      addProvisioned("Roles Ready");
+      return;
+    }
 
     const habitTitles = titlesFor(HABIT_SUGGESTIONS, templateId);
     const taskTitles = titlesFor(TASK_SUGGESTIONS, templateId);
@@ -452,64 +457,85 @@ export default function OnboardingScreen() {
     const projectSuggestions = PROJECT_SUGGESTIONS[templateId] || [];
 
     try {
-      for (const name of habitTitles) {
-        await api.createOrbitHabit(orbitId, {
-          name,
-          description: "Starter habit added from your Orbit template.",
-          requires_proof: false,
-        });
+      addProvisioned("Roles Ready");
+      if (habitTitles.length && !provisionedItems.includes("Habits Ready")) {
+        for (const name of habitTitles) {
+          await api.createOrbitHabit(orbitId, {
+            name,
+            description: "Starter habit added from your Orbit template.",
+            requires_proof: false,
+          });
+        }
+        addProvisioned("Habits Ready");
       }
-      for (const name of taskTitles) {
-        await api.createOrbitTask(orbitId, {
-          name,
-          description: "Starter task added from your Orbit template.",
-          requires_proof: false,
-        });
+      if (taskTitles.length && !provisionedItems.includes("Tasks Ready")) {
+        for (const name of taskTitles) {
+          await api.createOrbitTask(orbitId, {
+            name,
+            description: "Starter task added from your Orbit template.",
+            requires_proof: false,
+          });
+        }
+        addProvisioned("Tasks Ready");
       }
-      for (const title of rewardTitles) {
-        await api.createOrbitReward(orbitId, {
-          title,
-          description: "Starter reward added from your Orbit template.",
-          xp_cost: 500,
-        });
-      }
-      for (const item of challengeSuggestions) {
-        await api.createOrbitChallenge(orbitId, {
-          title: item.title,
-          description: "Starter challenge added from your Orbit template.",
-          goal_type: item.goal_type,
-          goal_value: item.goal_value,
-          start_date: dateInputValue(0),
-          end_date: dateInputValue(item.duration_days || 30),
-          reward_xp: item.reward_xp,
-        });
-      }
-      for (const item of seasonSuggestions) {
-        await api.createOrbitSeason(orbitId, {
-          title: item.title,
-          description: "Starter season added from your Orbit template.",
-          start_date: dateInputValue(0),
-          end_date: dateInputValue(item.days || 30),
-          template: templateId,
-        });
-      }
-      for (const item of projectSuggestions) {
-        await api.createProject({
-          title: item.title,
-          description: "Starter project added from your Orbit template.",
-          orbit_id: orbitId,
-          xp_reward: 50,
-          coin_reward: 0,
-          subtasks: (item.subtasks || []).map((title) => ({
+      if (rewardTitles.length && !provisionedItems.includes("Rewards Ready")) {
+        for (const title of rewardTitles) {
+          await api.createOrbitReward(orbitId, {
             title,
-            assigned_user_id: null,
-            xp_reward: 0,
+            description: "Starter reward added from your Orbit template.",
+            xp_cost: 500,
+          });
+        }
+        addProvisioned("Rewards Ready");
+      }
+      if (challengeSuggestions.length && !provisionedItems.includes("Milestones Ready")) {
+        for (const item of challengeSuggestions) {
+          await api.createOrbitChallenge(orbitId, {
+            title: item.title,
+            description: "Starter challenge added from your Orbit template.",
+            goal_type: item.goal_type,
+            goal_value: item.goal_value,
+            start_date: dateInputValue(0),
+            end_date: dateInputValue(item.duration_days || 30),
+            reward_xp: item.reward_xp,
+          });
+        }
+        addProvisioned("Milestones Ready");
+      }
+      if (seasonSuggestions.length && !provisionedItems.includes("Seasons Ready")) {
+        for (const item of seasonSuggestions) {
+          await api.createOrbitSeason(orbitId, {
+            title: item.title,
+            description: "Starter season added from your Orbit template.",
+            start_date: dateInputValue(0),
+            end_date: dateInputValue(item.days || 30),
+            template: templateId,
+          });
+        }
+        addProvisioned("Seasons Ready");
+      }
+      if (projectSuggestions.length && !provisionedItems.includes("Projects Ready")) {
+        for (const item of projectSuggestions) {
+          await api.createProject({
+            title: item.title,
+            description: "Starter project added from your Orbit template.",
+            orbit_id: orbitId,
+            xp_reward: 50,
             coin_reward: 0,
-          })),
-        });
+            subtasks: (item.subtasks || []).map((title) => ({
+              title,
+              assigned_user_id: null,
+              xp_reward: 0,
+              coin_reward: 0,
+            })),
+          });
+        }
+        addProvisioned("Projects Ready");
       }
     } catch (error) {
-      throw new Error(error?.message || "Your Orbit was created, but starter content could not be added. Please try again or customize the Orbit later.");
+      const message = error?.message || "Template provisioning failed. Please retry before continuing.";
+      setProvisionError(message);
+      throw new Error(message);
     }
   }
 
@@ -524,13 +550,15 @@ export default function OnboardingScreen() {
     setSubmitting(true);
 
     try {
-      const data = await api.createOrbit({
-        name,
-        template: templateId,
-      });
-      const orbit = data?.orbit || data;
-
-      setCreatedOrbit(orbit);
+      let orbit = createdOrbit;
+      if (!orbit) {
+        const data = await api.createOrbit({
+          name,
+          template: templateId,
+        });
+        orbit = data?.orbit || data;
+        setCreatedOrbit(orbit);
+      }
       setChecklist((current) => ({ ...current, create_or_join_orbit: true }));
 
       await api.completeOnboardingStep({
@@ -541,7 +569,7 @@ export default function OnboardingScreen() {
 
       setStep(11);
     } catch (error) {
-      Alert.alert("Create Orbit failed", error?.message || "Unable to create your Orbit.");
+      Alert.alert(createdOrbit ? "Template provisioning failed" : "Create Orbit failed", error?.message || "Unable to create your Orbit.");
     } finally {
       setSubmitting(false);
     }
@@ -789,7 +817,7 @@ export default function OnboardingScreen() {
     await api.completeOnboardingStep({ step: "success" });
     await api.completeOnboarding();
     await refresh?.();
-    finish();
+    setStep(12);
   }
 
   async function createOnboardingInviteLink({ share = false } = {}) {
@@ -1037,8 +1065,9 @@ export default function OnboardingScreen() {
                   },
                 ]}
               />
+              {!!provisionError && <Text style={[styles.errorText, { color: c.danger }]}>{provisionError}</Text>}
               <AppButton
-                title={submitting ? "Creating..." : "Create Orbit"}
+                title={submitting ? "Creating..." : createdOrbit ? "Retry Provisioning" : "Create Orbit"}
                 onPress={createOrbit}
                 disabled={submitting}
               />
@@ -1395,24 +1424,29 @@ export default function OnboardingScreen() {
 
           {step === 12 && createdOrbit && (
             <AppCard elevated glow style={styles.section}>
-              <View style={[styles.successIcon, { backgroundColor: `${c.primary}18` }]}>
-                <Feather name="check" size={30} color={c.primary} />
-              </View>
-              <Text style={[styles.title, { color: c.text }]}>Your Orbit is ready.</Text>
+              <BrandBadge label="Orbit Ready" />
+              <LinearGradient colors={successTheme.gradient} style={styles.successBanner}>
+                {successContrast.needsScrim ? <View style={styles.successScrim} /> : null}
+                <Text style={[styles.successEyebrow, { color: successSecondaryColor }]}>{selectedTemplate.title}</Text>
+                <Text style={[styles.successBannerTitle, { color: successTextColor }]}>{createdOrbit.name || orbitName}</Text>
+                <Text style={[styles.successEyebrow, { color: successSecondaryColor }]}>{successTheme.name || "Default"} theme</Text>
+              </LinearGradient>
+              <Text style={[styles.title, { color: c.text }]}>Welcome to Your {selectedTemplate.title}</Text>
               <Text style={[styles.body, { color: c.textMuted }]}>
-                {rewardsAdded
-                  ? "Great! Your group now has rewards to work toward."
-                  : "Here are the best next actions to build momentum."}
+                Everything is ready. Start building habits, completing projects, and reaching milestones together.
               </Text>
               <View style={styles.stack}>
-                {suggestedActions.map((action) => (
-                  <View key={action} style={styles.checkRow}>
-                    <Feather name="arrow-right-circle" size={18} color={c.primary} />
-                    <Text style={[styles.checkText, { color: c.text }]}>{action}</Text>
-                  </View>
-                ))}
+                {provisionedItems
+                  .filter((item) => ["Habits Ready", "Rewards Ready", "Milestones Ready", "Projects Ready", "Roles Ready"].includes(item))
+                  .map((item) => (
+                    <View key={item} style={styles.checkRow}>
+                      <Feather name="check-circle" size={19} color={c.primary} />
+                      <Text style={[styles.checkText, { color: c.text }]}>{item}</Text>
+                    </View>
+                  ))}
               </View>
-              <AppButton title="View Getting Started Checklist" onPress={() => setStep(13)} />
+              <AppButton title="Enter Orbit" onPress={finish} />
+              <AppButton title="Invite Members" variant="secondary" onPress={() => setStep(11)} />
             </AppCard>
           )}
 
@@ -1519,6 +1553,27 @@ const styles = StyleSheet.create({
   },
   inviteAction: {
     flex: 1,
+  },
+  errorText: {
+    ...typography.caption,
+  },
+  successBanner: {
+    minHeight: 170,
+    borderRadius: radii.xxl,
+    padding: spacing.xl,
+    justifyContent: "flex-end",
+    overflow: "hidden",
+  },
+  successScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.28)",
+  },
+  successEyebrow: {
+    ...typography.caption,
+  },
+  successBannerTitle: {
+    ...typography.h1,
+    marginVertical: spacing.xs,
   },
   successIcon: {
     width: 58,

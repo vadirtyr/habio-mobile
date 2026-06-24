@@ -41,10 +41,10 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: "Home",
+          title: "Orbits",
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons
-              name="home-outline"
+              name="account-group-outline"
               color={color}
               size={size}
             />

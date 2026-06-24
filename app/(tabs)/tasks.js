@@ -75,10 +75,15 @@ export default function TasksScreen() {
 
   const sortedTasks = useMemo(() => {
     return [...tasks].sort((a, b) => {
+      const groupA = getTaskGroupLabel(a);
+      const groupB = getTaskGroupLabel(b);
+      if (groupA !== groupB) return groupA === "Personal" ? -1 : groupA.localeCompare(groupB);
       if (!!a.completed === !!b.completed) return 0;
       return a.completed ? 1 : -1;
     });
   }, [tasks]);
+
+  const groupedTasks = useMemo(() => withGroupHeaders(sortedTasks, getTaskGroupLabel), [sortedTasks]);
 
   const completedToday = useMemo(
     () => tasks.filter((task) => task.completed).length,
@@ -313,8 +318,8 @@ export default function TasksScreen() {
       onClose={() => setAvatarUnlock(null)}
       />
       <FlatList
-        data={sortedTasks}
-        keyExtractor={(item) => item._list_key || item.id}
+        data={groupedTasks}
+        keyExtractor={(item) => item._type === "group" ? item.id : item._list_key || item.id}
         refreshing={refreshing}
         onRefresh={handleRefresh}
         contentContainerStyle={styles.listContent}
@@ -439,7 +444,12 @@ export default function TasksScreen() {
             />
           </AppCard>
         }
-        renderItem={({ item, index }) => (
+        renderItem={({ item, index }) => {
+          if (item._type === "group") {
+            return <GroupHeader title={item.title} count={item.count} />;
+          }
+
+          return (
           <Swipeable
             renderLeftActions={() =>
               item.is_orbit_item && item.completed ? null : item.completed ? (
@@ -461,7 +471,11 @@ export default function TasksScreen() {
             )}
             onSwipeableOpen={(direction) => {
               if (direction === "left") {
-                item.completed ? uncompleteTask(item.id) : completeTask(item._list_key || item.id);
+                if (item.completed) {
+                  uncompleteTask(item.id);
+                } else {
+                  completeTask(item._list_key || item.id);
+                }
               }
 
               if (direction === "right" && !item.is_orbit_item) {
@@ -499,8 +513,43 @@ export default function TasksScreen() {
               />
             </AnimatedCard>
           </Swipeable>
-        )}
+          );
+        }}
       />
+    </View>
+  );
+}
+
+function getTaskGroupLabel(item) {
+  return item?.is_orbit_item ? `Orbit: ${item.orbit_name || "Shared Orbit"}` : "Personal";
+}
+
+function withGroupHeaders(items, getLabel) {
+  const counts = items.reduce((acc, item) => {
+    const label = getLabel(item);
+    acc[label] = (acc[label] || 0) + 1;
+    return acc;
+  }, {});
+  const output = [];
+  let currentLabel = null;
+  items.forEach((item) => {
+    const label = getLabel(item);
+    if (label !== currentLabel) {
+      currentLabel = label;
+      output.push({ _type: "group", id: `group-${label}`, title: label, count: counts[label] || 0 });
+    }
+    output.push(item);
+  });
+  return output;
+}
+
+function GroupHeader({ title, count }) {
+  const { theme } = useTheme();
+  const c = theme.colors;
+  return (
+    <View style={styles.groupHeader}>
+      <Text style={[styles.groupTitle, { color: c.text }]}>{title}</Text>
+      <Text style={[styles.groupCount, { color: c.textMuted }]}>{count}</Text>
     </View>
   );
 }
@@ -915,6 +964,23 @@ const styles = StyleSheet.create({
 
   listContent: {
     paddingBottom: 120,
+  },
+
+  groupHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+
+  groupTitle: {
+    ...typography.bodyBold,
+  },
+
+  groupCount: {
+    ...typography.caption,
+    fontWeight: "800",
   },
 
   summaryCard: {

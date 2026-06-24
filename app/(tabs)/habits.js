@@ -83,10 +83,15 @@ export default function HabitsScreen() {
 
   const sortedHabits = useMemo(() => {
     return [...habits].sort((a, b) => {
+      const groupA = getHabitGroupLabel(a);
+      const groupB = getHabitGroupLabel(b);
+      if (groupA !== groupB) return groupA === "Personal" ? -1 : groupA.localeCompare(groupB);
       if (!!a.completed_today === !!b.completed_today) return 0;
       return a.completed_today ? 1 : -1;
     });
   }, [habits]);
+
+  const groupedHabits = useMemo(() => withGroupHeaders(sortedHabits, getHabitGroupLabel), [sortedHabits]);
 
   const completedToday = useMemo(
     () => habits.filter((habit) => habit.completed_today).length,
@@ -324,8 +329,8 @@ export default function HabitsScreen() {
       />
 
       <FlatList
-        data={sortedHabits}
-        keyExtractor={(item) => item._list_key || item.id}
+        data={groupedHabits}
+        keyExtractor={(item) => item._type === "group" ? item.id : item._list_key || item.id}
         refreshing={refreshing}
         onRefresh={handleRefresh}
         contentContainerStyle={styles.listContent}
@@ -448,6 +453,10 @@ export default function HabitsScreen() {
           </AppCard>
         }
         renderItem={({ item, index }) => {
+          if (item._type === "group") {
+            return <GroupHeader title={item.title} count={item.count} />;
+          }
+
           const tier = getStreakTier(item.streak || 0, c);
 
           return (
@@ -510,6 +519,40 @@ export default function HabitsScreen() {
           );
         }}
       />
+    </View>
+  );
+}
+
+function getHabitGroupLabel(item) {
+  return item?.is_orbit_item ? `Orbit: ${item.orbit_name || "Shared Orbit"}` : "Personal";
+}
+
+function withGroupHeaders(items, getLabel) {
+  const counts = items.reduce((acc, item) => {
+    const label = getLabel(item);
+    acc[label] = (acc[label] || 0) + 1;
+    return acc;
+  }, {});
+  const output = [];
+  let currentLabel = null;
+  items.forEach((item) => {
+    const label = getLabel(item);
+    if (label !== currentLabel) {
+      currentLabel = label;
+      output.push({ _type: "group", id: `group-${label}`, title: label, count: counts[label] || 0 });
+    }
+    output.push(item);
+  });
+  return output;
+}
+
+function GroupHeader({ title, count }) {
+  const { theme } = useTheme();
+  const c = theme.colors;
+  return (
+    <View style={styles.groupHeader}>
+      <Text style={[styles.groupTitle, { color: c.text }]}>{title}</Text>
+      <Text style={[styles.groupCount, { color: c.textMuted }]}>{count}</Text>
     </View>
   );
 }
@@ -1001,6 +1044,23 @@ const styles = StyleSheet.create({
 
   listContent: {
     paddingBottom: 120,
+  },
+
+  groupHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+
+  groupTitle: {
+    ...typography.bodyBold,
+  },
+
+  groupCount: {
+    ...typography.caption,
+    fontWeight: "800",
   },
 
   summaryCard: {
