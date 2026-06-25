@@ -39,6 +39,26 @@ yarn-error.*
 
 app-example
 
+# Android
+.gradle/
+build/
+*/build/
+
+# Android Studio
+.idea/
+*.iml
+
+# Local config
+local.properties
+
+# Signing
+*.jks
+*.keystore
+
+# Environment
+.env
+.env.*
+
 # generated native folders
 /ios
 /android

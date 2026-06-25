@@ -7,6 +7,8 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyProperties;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
@@ -24,13 +26,25 @@ import org.json.JSONObject;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyStore;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Base64;
+import java.util.Locale;
+
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
 
 public class MainActivity extends Activity {
     private static final String API_BASE = "https://api.habioapp.co/api";
     private static final String PREFS = "ourorbit_wear";
-    private static final String TOKEN_KEY = "token";
+    private static final String TOKEN_KEY = "encrypted_token";
+    private static final String TOKEN_IV_KEY = "token_iv";
+    private static final String LEGACY_TOKEN_KEY = "token";
+    private static final String KEY_ALIAS = "ourorbit_wear_token_key";
 
     private LinearLayout root;
     private String token;
@@ -40,46 +54,41 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        token = getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(TOKEN_KEY, "");
+        token = readStoredToken();
         if (token == null || token.isEmpty()) {
-            renderTokenScreen();
+            renderPairingScreen();
         } else {
             renderShell("Loading...");
             loadSummary();
         }
     }
 
-    private void renderTokenScreen() {
+    private void renderPairingScreen() {
         root = baseRoot();
         TextView title = title("OurOrbit");
-        TextView subtitle = muted("Paste an API token from your phone session to pair this watch.");
+        TextView subtitle = muted("Generate a Wear OS pairing code in OurOrbit settings on your phone, then enter it here.");
         EditText input = new EditText(this);
-        input.setHint("Bearer token");
-        input.setSingleLine(false);
-        input.setMinLines(2);
+        input.setHint("Pairing code");
+        input.setSingleLine(true);
+        input.setGravity(Gravity.CENTER);
         input.setTextColor(Color.WHITE);
         input.setHintTextColor(Color.rgb(203, 213, 225));
+        input.setTextSize(20);
         input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        Button save = actionButton("Pair Watch");
-        save.setOnClickListener(v -> {
-            String value = input.getText().toString().trim();
-            if (value.startsWith("Bearer ")) value = value.substring(7).trim();
-            if (value.length() < 10) {
-                toast("Enter a valid token");
+        Button pair = actionButton("Pair Watch");
+        pair.setOnClickListener(v -> {
+            String value = input.getText().toString().trim().toUpperCase(Locale.US);
+            if (value.length() < 6) {
+                toast("Enter the pairing code");
                 return;
             }
-            token = value;
-            getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit()
-                .putString(TOKEN_KEY, token)
-                .apply();
-            renderShell("Loading...");
-            loadSummary();
+            renderShell("Pairing...");
+            new PairTask(value).execute();
         });
         root.addView(title);
         root.addView(subtitle);
         root.addView(input);
-        root.addView(save);
+        root.addView(pair);
         setContentView(scroll(root));
     }
 
@@ -317,8 +326,169 @@ public class MainActivity extends Activity {
         Toast.makeText(this, text, Toast.LENGTH_SHORT).show();
     }
 
+    private String readStoredToken() {
+        SharedPreferences prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        String encrypted = prefs.getString(TOKEN_KEY, "");
+        String iv = prefs.getString(TOKEN_IV_KEY, "");
+        prefs.edit().remove(LEGACY_TOKEN_KEY).apply();
+
+        if (encrypted == null || encrypted.isEmpty() || iv == null || iv.isEmpty()) {
+            return "";
+        }
+
+        try {
+            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+            cipher.init(
+                Cipher.DECRYPT_MODE,
+                getOrCreateSecretKey(),
+                new GCMParameterSpec(128, Base64.getDecoder().decode(iv))
+            );
+            byte[] plain = cipher.doFinal(Base64.getDecoder().decode(encrypted));
+            return new String(plain, StandardCharsets.UTF_8);
+        } catch (Exception ex) {
+            clearStoredToken();
+            return "";
+        }
+    }
+
+    private boolean writeStoredToken(String value) {
+        try {
+            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+            cipher.init(Cipher.ENCRYPT_MODE, getOrCreateSecretKey());
+            byte[] encrypted = cipher.doFinal(value.getBytes(StandardCharsets.UTF_8));
+            getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putString(TOKEN_KEY, Base64.getEncoder().encodeToString(encrypted))
+                .putString(TOKEN_IV_KEY, Base64.getEncoder().encodeToString(cipher.getIV()))
+                .remove(LEGACY_TOKEN_KEY)
+                .apply();
+            return true;
+        } catch (Exception ex) {
+            return false;
+        }
+    }
+
+    private void clearStoredToken() {
+        getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .remove(TOKEN_KEY)
+            .remove(TOKEN_IV_KEY)
+            .remove(LEGACY_TOKEN_KEY)
+            .apply();
+        token = "";
+    }
+
+    private SecretKey getOrCreateSecretKey() throws Exception {
+        KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
+        keyStore.load(null);
+        if (keyStore.containsAlias(KEY_ALIAS)) {
+            return ((KeyStore.SecretKeyEntry) keyStore.getEntry(KEY_ALIAS, null)).getSecretKey();
+        }
+
+        KeyGenerator keyGenerator = KeyGenerator.getInstance(
+            KeyProperties.KEY_ALGORITHM_AES,
+            "AndroidKeyStore"
+        );
+        keyGenerator.init(
+            new KeyGenParameterSpec.Builder(
+                KEY_ALIAS,
+                KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT
+            )
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setRandomizedEncryptionRequired(true)
+                .build()
+        );
+        return keyGenerator.generateKey();
+    }
+
     private interface ApiCallback {
         void onSuccess(String result);
+    }
+
+    private class PairTask extends AsyncTask<Void, Void, String> {
+        private final String code;
+        private String error;
+
+        PairTask(String code) {
+            this.code = code;
+        }
+
+        @Override
+        protected String doInBackground(Void... voids) {
+            try {
+                URL url = new URL(API_BASE + "/watch/pairing/exchange");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setConnectTimeout(12000);
+                conn.setReadTimeout(12000);
+                conn.setDoOutput(true);
+
+                JSONObject body = new JSONObject();
+                body.put("code", code);
+                OutputStream output = conn.getOutputStream();
+                output.write(body.toString().getBytes(StandardCharsets.UTF_8));
+                output.close();
+
+                int responseCode = conn.getResponseCode();
+                BufferedReader reader = new BufferedReader(new InputStreamReader(
+                    responseCode >= 200 && responseCode < 300 ? conn.getInputStream() : conn.getErrorStream()
+                ));
+                StringBuilder builder = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) builder.append(line);
+                reader.close();
+
+                if (responseCode < 200 || responseCode >= 300) {
+                    error = pairingError(builder.toString(), responseCode);
+                    return null;
+                }
+
+                JSONObject result = new JSONObject(builder.toString());
+                String newToken = result.optString("token", "");
+                if (newToken.isEmpty()) {
+                    error = "Pairing failed. Try a new code.";
+                    return null;
+                }
+                return newToken;
+            } catch (Exception ex) {
+                error = "Could not pair watch.";
+                return null;
+            }
+        }
+
+        @Override
+        protected void onPostExecute(String result) {
+            if (result == null) {
+                toast(error == null ? "Invalid or expired code" : error);
+                renderPairingScreen();
+                return;
+            }
+
+            if (!writeStoredToken(result)) {
+                toast("Could not save watch session.");
+                renderPairingScreen();
+                return;
+            }
+
+            token = result;
+            activeScreen = "today";
+            toast("Watch paired");
+            renderShell("Loading...");
+            loadSummary();
+        }
+
+        private String pairingError(String body, int responseCode) {
+            try {
+                JSONObject errorBody = new JSONObject(body);
+                String detail = errorBody.optString("detail", "");
+                if (!detail.isEmpty()) return detail;
+            } catch (Exception ignored) {
+            }
+            if (responseCode == 404 || responseCode == 410) return "Code expired or already used.";
+            return "Invalid pairing code.";
+        }
     }
 
     private class ApiTask extends AsyncTask<Void, Void, String> {
@@ -360,7 +530,7 @@ public class MainActivity extends Activity {
                 while ((line = reader.readLine()) != null) builder.append(line);
                 reader.close();
                 if (code == 401) {
-                    getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(TOKEN_KEY).apply();
+                    clearStoredToken();
                     error = "Session expired. Pair again.";
                     return null;
                 }
@@ -379,7 +549,7 @@ public class MainActivity extends Activity {
         protected void onPostExecute(String result) {
             if (result == null) {
                 toast(error == null ? "Network error" : error);
-                if (error != null && error.contains("Pair again")) renderTokenScreen();
+                if (error != null && error.contains("Pair again")) renderPairingScreen();
                 return;
             }
             callback.onSuccess(result);

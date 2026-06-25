@@ -299,6 +299,13 @@ export default function SettingsScreen() {
             />
 
             <SettingsRow
+              icon="watch-variant"
+              label="Wear OS Pairing"
+              subtitle="Generate a short-lived code for your watch"
+              onPress={() => router.push("/wear-os-pairing")}
+            />
+
+            <SettingsRow
               icon="shield-lock-outline"
               label="Privacy Policy"
               subtitle="View privacy and data handling"
