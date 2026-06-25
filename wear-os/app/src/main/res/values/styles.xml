@@ -1,0 +1,7 @@
+<resources>
+    <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/ourorbit_bg</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">@color/ourorbit_primary</item>
+    </style>
+</resources>

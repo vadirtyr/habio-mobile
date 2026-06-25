@@ -1,0 +1,7 @@
+<resources>
+    <color name="ourorbit_bg">#020817</color>
+    <color name="ourorbit_card">#111827</color>
+    <color name="ourorbit_primary">#60A5FA</color>
+    <color name="ourorbit_text">#F8FAFC</color>
+    <color name="ourorbit_muted">#CBD5E1</color>
+</resources>
