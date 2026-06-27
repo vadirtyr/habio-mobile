@@ -39,10 +39,33 @@ yarn-error.*
 
 app-example
 
+<<<<<<< HEAD
 wear-os/keystores/
 *.jks
 *.keystore
 wear-os/keystore.properties
+=======
+# Android
+.gradle/
+build/
+*/build/
+
+# Android Studio
+.idea/
+*.iml
+
+# Local config
+local.properties
+
+# Signing
+*.jks
+*.keystore
+
+# Environment
+.env
+.env.*
+
+>>>>>>> 1a0807add9fd24081235c60a443cfa13a2d08378
 # generated native folders
 /ios
 /android
