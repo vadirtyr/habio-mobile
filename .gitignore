@@ -59,6 +59,10 @@ local.properties
 .env
 .env.*
 
+wear-os/keystores/
+*.jks
+*.keystore
+wear-os/keystore.properties
 # generated native folders
 /ios
 /android

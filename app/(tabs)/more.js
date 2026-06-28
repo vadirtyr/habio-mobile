@@ -74,6 +74,13 @@ export default function MoreScreen() {
 
       <AppCard>
         <MoreRow
+          icon="creation-outline"
+          label="AI Coach"
+          description="Ask for focused next steps based on your real progress."
+          onPress={() => router.push("/ai-coach")}
+        />
+
+        <MoreRow
           icon="map-marker-path"
           label="Quests"
           description="Take on guided challenges."

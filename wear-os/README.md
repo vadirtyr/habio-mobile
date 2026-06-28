@@ -13,6 +13,19 @@ This is a lightweight native Android/Wear OS companion app for quick OurOrbit ac
 - Immediate completion for simple items
 - "Open on phone" messaging for proof/approval-required items
 
+## Navigation
+
+After pairing, the watch lands on Today. Main screens use a shallow menu:
+
+- Today
+- Habits
+- Tasks
+- Projects
+- Orbits
+- Notifications
+
+Lists open a single detail/action screen. Hardware Back returns from detail to the list, then from any section back to Today. Main screens include Refresh, and detail screens include an on-screen Back button.
+
 ## Authentication
 
 The MVP uses a short-lived pairing code from the mobile app:
@@ -46,6 +59,15 @@ Command-line build:
 cd wear-os
 ./gradlew :app:assembleDebug
 ```
+
+## Emulator Smoke Test
+
+1. Install and launch the watch app on a Wear OS emulator.
+2. Pair with the code from mobile Settings -> Wear OS Pairing.
+3. Confirm Today loads first.
+4. Tap each menu item: Today, Habits, Tasks, Projects, Orbits, Notifications.
+5. Open one list item, use Back, then complete a simple habit/task/subtask.
+6. Use Refresh on a main screen and confirm data reloads.
 
 If you prefer a pinned wrapper, generate one from Android Studio or run `gradle wrapper` in this folder.
 

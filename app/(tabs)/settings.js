@@ -306,6 +306,13 @@ export default function SettingsScreen() {
             />
 
             <SettingsRow
+              icon="credit-card-outline"
+              label="Plan & Billing"
+              subtitle="View plans and subscription status"
+              onPress={() => router.push("/billing-settings")}
+            />
+
+            <SettingsRow
               icon="shield-lock-outline"
               label="Privacy Policy"
               subtitle="View privacy and data handling"

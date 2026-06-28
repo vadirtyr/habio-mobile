@@ -13,6 +13,7 @@ import { AppInput } from "../components/AppInput";
 import { EmptyState } from "../components/EmptyState";
 import { ErrorState } from "../components/ErrorState";
 import { OrbitProgressBar } from "../components/OrbitProgressBar";
+import { PredictiveCoachingCards } from "../components/PredictiveCoachingCards";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { UserAvatar } from "../components/UserAvatar";
 import { useTheme } from "../hooks/useTheme";
@@ -53,6 +54,7 @@ export default function OrbitDetailScreen() {
   const [readinessByEvent, setReadinessByEvent] = useState({});
   const [patrolReadinessByEvent, setPatrolReadinessByEvent] = useState({});
   const [orbitRecaps, setOrbitRecaps] = useState([]);
+  const [predictiveCards, setPredictiveCards] = useState([]);
   const [insightsError, setInsightsError] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -155,6 +157,9 @@ export default function OrbitDetailScreen() {
         setTroopMilestones([]);
       }
       setOrbitRecaps(recapData.items || []);
+      api.getPredictiveCoaching(orbitId)
+        .then((result) => setPredictiveCards(result.items || []))
+        .catch(() => setPredictiveCards([]));
       setError(null);
     }
     catch (err) { setError(err.message); }
@@ -1223,11 +1228,21 @@ export default function OrbitDetailScreen() {
         <AppButton title={busyItem === "orbit-ai-recap" ? "Generating..." : orbitRecaps[0]?.ai_recap ? "Refresh AI Recap" : "Generate AI Recap"} onPress={generateOrbitAIRecap} disabled={!!busyItem} style={styles.contribute} />
       </AppCard>
 
+      {!!predictiveCards.length && <>
+        <Text style={[styles.sectionTitle, { color: c.text }]}>Predictive Coaching</Text>
+        <PredictiveCoachingCards
+          cards={predictiveCards}
+          colors={c}
+          onDismiss={(id) => setPredictiveCards((cards) => cards.filter((card) => card.id !== id))}
+        />
+      </>}
+
       <Text style={[styles.sectionTitle, { color: c.text }]}>AI Orbit Coach</Text>
       <AppCard style={styles.card}>
         {orbitRecaps[0]?.ai_insights ? <OrbitAIInsights insights={orbitRecaps[0].ai_insights} colors={c} /> : <Text style={[styles.copy, { color: c.textSecondary }]}>Get practical coaching based on this Orbit&apos;s participation, progress, streaks, and challenges.</Text>}
         {!!orbitRecaps[0]?.ai_insights_generated_at && <Text style={[styles.time, { color: c.textMuted }]}>Last generated {new Date(orbitRecaps[0].ai_insights_generated_at).toLocaleString()}</Text>}
         {!!insightsError && <Text style={[styles.copy, { color: c.danger }]}>{insightsError}</Text>}
+        <AppButton title="Chat with Coach" variant="secondary" onPress={() => router.push({ pathname: "/ai-coach", params: { orbitId } })} disabled={!!busyItem} style={styles.contribute} />
         <AppButton title={busyItem === "orbit-ai-insights" ? "Generating..." : orbitRecaps[0]?.ai_insights ? "Refresh Insights" : "Generate Insights"} onPress={generateOrbitAIInsights} disabled={!!busyItem} style={styles.contribute} />
       </AppCard>
 

@@ -102,6 +102,8 @@ function AppShell() {
         <Stack.Screen name="delete-account" />
         <Stack.Screen name="privacy" />
         <Stack.Screen name="wear-os-pairing" />
+        <Stack.Screen name="billing-settings" />
+        <Stack.Screen name="ai-coach" />
         <Stack.Screen name="orbits" />
         <Stack.Screen name="create-orbit" />
         <Stack.Screen name="orbit-detail" />

@@ -23,6 +23,7 @@ import { MomentumCard } from "../../components/dashboard/MomentumCard";
 import { TodayOrbitCard } from "../../components/dashboard/TodayOrbitCard";
 import { EmptyState } from "../../components/EmptyState";
 import { ErrorState } from "../../components/ErrorState";
+import { PredictiveCoachingCards } from "../../components/PredictiveCoachingCards";
 import { SectionTitle } from "../../components/SectionTitle";
 import { SkeletonCard } from "../../components/SkeletonCard";
 import { UserAvatar } from "../../components/UserAvatar";
@@ -68,6 +69,7 @@ export default function DashboardScreen() {
   const [todayTasks, setTodayTasks] = useState([]);
   const [orbitSummaries, setOrbitSummaries] = useState([]);
   const [orbitCounts, setOrbitCounts] = useState({ habitsTotal: 0, habitsDone: 0, tasksTotal: 0, tasksDone: 0 });
+  const [predictiveCards, setPredictiveCards] = useState([]);
 
   const totalTodayItems = todayHabits.length + todayTasks.length;
   const dailyGoal = Math.max(totalTodayItems, stats.completed_today, 1);
@@ -116,6 +118,7 @@ export default function DashboardScreen() {
         tasksData,
         questsData,
         orbitItemsData,
+        predictiveData,
       ] = await Promise.allSettled([
         api.get("/stats"),
         api.get("/achievements"),
@@ -123,6 +126,7 @@ export default function DashboardScreen() {
         api.get("/tasks"),
         api.get("/quests"),
         getOrbitItems(),
+        api.getPredictiveCoaching(),
       ]);
 
       await loadNotificationCount();
@@ -196,6 +200,12 @@ export default function DashboardScreen() {
       if (questsData.status === "fulfilled") {
         const data = questsData.value || {};
         setQuests(Array.isArray(data) ? data : data.items || []);
+      }
+
+      if (predictiveData.status === "fulfilled") {
+        setPredictiveCards(predictiveData.value?.items || []);
+      } else {
+        setPredictiveCards([]);
       }
     } catch (error) {
       setError(error?.message || "Unable to load dashboard.");
@@ -392,11 +402,59 @@ export default function DashboardScreen() {
     color={c.textSecondary}
   />
 </Pressable>
+          <Pressable
+            style={[
+              styles.recapCard,
+              {
+                backgroundColor: c.surface,
+                borderColor: c.border,
+              },
+            ]}
+            onPress={() => router.push("/ai-coach")}
+          >
+            <View style={styles.recapIcon}>
+              <MaterialCommunityIcons
+                name="creation-outline"
+                size={26}
+                color={c.primary}
+              />
+            </View>
+
+            <View style={styles.recapText}>
+              <Text style={[styles.recapTitle, { color: c.text }]}>
+                AI Coach
+              </Text>
+
+              <Text style={[styles.recapSubtitle, { color: c.textSecondary }]}>
+                Ask what to focus on next.
+              </Text>
+            </View>
+
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={24}
+              color={c.textSecondary}
+            />
+          </Pressable>
           <ActiveQuestCard quest={activeQuest} />
 
           <AchievementStrip achievements={achievements} />
 
           <EncouragementCard momentum={momentumScore} />
+
+          {!!predictiveCards.length && (
+            <AnimatedScreen delay={100}>
+              <SectionTitle
+                title="Predictive Coaching"
+                subtitle="A few timely nudges before things fall behind."
+              />
+              <PredictiveCoachingCards
+                cards={predictiveCards}
+                colors={c}
+                onDismiss={(id) => setPredictiveCards((cards) => cards.filter((card) => card.id !== id))}
+              />
+            </AnimatedScreen>
+          )}
 
           <AnimatedScreen delay={120}>
             <SectionTitle

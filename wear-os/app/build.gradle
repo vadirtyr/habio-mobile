@@ -2,15 +2,47 @@ plugins {
     id "com.android.application"
 }
 
+import java.util.Properties
+
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
-    namespace "co.ourorbit.wear"
+    namespace "com.OurOrbit.app"
     compileSdk 35
 
     defaultConfig {
-        applicationId "co.ourorbit.wear"
+        applicationId "com.OurOrbit.app"
         minSdk 26
         targetSdk 35
-        versionCode 1
+        versionCode 42
         versionName "0.1.0"
     }
+
+    signingConfigs {
+        release {
+            storeFile rootProject.file(keystoreProperties["storeFile"])
+            storePassword keystoreProperties["storePassword"]
+            keyAlias keystoreProperties["keyAlias"]
+            keyPassword keystoreProperties["keyPassword"]
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            shrinkResources false
+        }
+    }
+}
+
+dependencies {
+    implementation "androidx.wear.watchface:watchface-complications-data-source:1.2.1"
+    implementation "androidx.wear.tiles:tiles:1.4.1"
+    implementation "androidx.concurrent:concurrent-futures:1.1.0"
 }

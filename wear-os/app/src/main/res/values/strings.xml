@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">OurOrbit</string>
+    <string name="complication_habit_progress">Today Habit Progress</string>
+    <string name="complication_tasks_due">Tasks Due</string>
+    <string name="complication_orbit_health">Orbit Health</string>
+    <string name="complication_weekly_target">Weekly Target</string>
+    <string name="tile_today">Today</string>
+    <string name="tile_habits">Habits</string>
+    <string name="tile_tasks">Tasks</string>
+    <string name="tile_orbit">Orbit</string>
 </resources>
