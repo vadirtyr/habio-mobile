@@ -19,7 +19,11 @@ android {
         applicationId "com.OurOrbit.app"
         minSdk 26
         targetSdk 35
+<<<<<<< HEAD
         versionCode 42
+=======
+        versionCode 30
+>>>>>>> d484e0cc4ab7c6717e15bff7e0bc33e9b71a46a0
         versionName "0.1.0"
     }
 
@@ -39,6 +43,7 @@ android {
             shrinkResources false
         }
     }
+<<<<<<< HEAD
 }
 
 dependencies {
@@ -46,3 +51,6 @@ dependencies {
     implementation "androidx.wear.tiles:tiles:1.4.1"
     implementation "androidx.concurrent:concurrent-futures:1.1.0"
 }
+=======
+}
+>>>>>>> d484e0cc4ab7c6717e15bff7e0bc33e9b71a46a0
